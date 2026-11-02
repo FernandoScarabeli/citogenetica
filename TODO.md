@@ -66,7 +66,7 @@ Nada é commitado até o fim da sequência.
 
 ### 1.3 Base do domínio
 - [ ] **Primeira tarefa depois do primeiro commit: auto-cadastro com confirmação de e-mail** (sem isso ninguém cria conta, porque o admin padrão foi removido na T04)
-- [ ] `./mvnw test` precisa passar num clone limpo, sem `.env` nem banco rodando: perfil de teste + Postgres via Testcontainers no teste de contexto (hoje ele exige variáveis de e-mail e banco no ar)
+- [x] `./mvnw test` precisa passar num clone limpo, sem `.env` nem banco rodando: perfil de teste + Postgres via Testcontainers no teste de contexto (hoje ele exige variáveis de e-mail e banco no ar)
 - [ ] IDs UUID nas entidades novas (gerados no cliente quando vierem offline)
 - [ ] Papel por laboratório (Participação), não global no usuário
 - [ ] Auto-cadastro + verificação de e-mail

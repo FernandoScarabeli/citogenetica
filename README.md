@@ -68,14 +68,10 @@ npm test
 npm run build
 ```
 
-Os testes da API exigem as variáveis do `.env` carregadas, além de PostgreSQL e RustFS acessíveis. A integração com RustFS via Testcontainers usa Docker e é ignorada quando Docker não está disponível. Com os serviços locais iniciados:
+Os testes da API iniciam PostgreSQL 16 e, no teste de integração de storage, RustFS isolados com Testcontainers. É necessário ter Docker disponível; não é necessário criar `.env`, iniciar o Compose ou serviços locais de RustFS/Mailpit, nem exportar variáveis do projeto:
 
 ```sh
-docker compose up -d db rustfs mailpit
 cd apps/api
-set -a
-source ../../.env
-set +a
 ./mvnw test
 ```
 
