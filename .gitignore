@@ -1,0 +1,38 @@
+# Build e IDEs (vale também para subpastas)
+target/
+node_modules/
+dist/
+.idea/
+*.iml
+.classpath
+.project
+.settings/
+.vscode/
+
+# Artefatos locais das ferramentas de design
+.impeccable/
+.taste-skill/
+
+# PDFs internos do laboratório; HTMLs de referência continuam versionáveis
+docs/*.pdf
+
+# Configurações locais e credenciais; exemplos continuam versionáveis
+.env
+.env.*
+!.env.example
+!env.example
+local.yaml
+*kubeconfig*
+*.pem
+*.key
+*.p12
+
+# Logs e arquivos temporários
+*.log
+*.hprof
+*.jfr
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db

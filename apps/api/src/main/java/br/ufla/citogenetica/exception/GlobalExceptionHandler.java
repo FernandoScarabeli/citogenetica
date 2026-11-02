@@ -1,0 +1,127 @@
+package br.ufla.citogenetica.exception;
+
+import br.ufla.citogenetica.model.error.dto.response.ErrorResponseDTO;
+import jakarta.servlet.http.HttpServletRequest;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.MethodArgumentNotValidException;
+import org.springframework.web.bind.annotation.ExceptionHandler;
+import org.springframework.web.bind.annotation.RestControllerAdvice;
+
+import org.springframework.security.access.AccessDeniedException;
+import org.springframework.security.authentication.BadCredentialsException;
+import org.springframework.security.authentication.DisabledException;
+import org.springframework.security.core.AuthenticationException;
+
+import java.util.List;
+import java.util.stream.Collectors;
+
+@RestControllerAdvice
+public class GlobalExceptionHandler {
+
+    @ExceptionHandler(MethodArgumentNotValidException.class)
+    public ResponseEntity<ErrorResponseDTO> handleValidationExceptions(MethodArgumentNotValidException ex, HttpServletRequest request) {
+        List<String> details = ex.getBindingResult()
+                .getFieldErrors()
+                .stream()
+                .map(error -> error.getField() + ": " + error.getDefaultMessage())
+                .collect(Collectors.toList());
+
+        ErrorResponseDTO errorResponse = new ErrorResponseDTO(
+                HttpStatus.BAD_REQUEST.value(),
+                HttpStatus.BAD_REQUEST.getReasonPhrase(),
+                "Erro de validação",
+                request.getRequestURI(),
+                details
+        );
+        return new ResponseEntity<>(errorResponse, HttpStatus.BAD_REQUEST);
+    }
+
+    @ExceptionHandler(NotFoundException.class)
+    public ResponseEntity<ErrorResponseDTO> handleNotFoundException(NotFoundException ex, HttpServletRequest request) {
+        ErrorResponseDTO errorResponse = new ErrorResponseDTO(
+                HttpStatus.NOT_FOUND.value(),
+                HttpStatus.NOT_FOUND.getReasonPhrase(),
+                ex.getMessage(),
+                request.getRequestURI()
+        );
+        return new ResponseEntity<>(errorResponse, HttpStatus.NOT_FOUND);
+    }
+
+    @ExceptionHandler(BusinessException.class)
+    public ResponseEntity<ErrorResponseDTO> handleBusinessException(BusinessException ex, HttpServletRequest request) {
+        ErrorResponseDTO errorResponse = new ErrorResponseDTO(
+                HttpStatus.UNPROCESSABLE_ENTITY.value(),
+                HttpStatus.UNPROCESSABLE_ENTITY.getReasonPhrase(),
+                ex.getMessage(),
+                request.getRequestURI()
+        );
+        return new ResponseEntity<>(errorResponse, HttpStatus.UNPROCESSABLE_ENTITY);
+    }
+
+    @ExceptionHandler(ValidationConflictException.class)
+    public ResponseEntity<ErrorResponseDTO> handleValidationConflictException(ValidationConflictException ex, HttpServletRequest request) {
+        ErrorResponseDTO errorResponse = new ErrorResponseDTO(
+                HttpStatus.CONFLICT.value(),
+                HttpStatus.CONFLICT.getReasonPhrase(),
+                ex.getMessage(),
+                request.getRequestURI()
+        );
+        return new ResponseEntity<>(errorResponse, HttpStatus.CONFLICT);
+    }
+
+    @ExceptionHandler(BadCredentialsException.class)
+    public ResponseEntity<ErrorResponseDTO> handleBadCredentialsException(BadCredentialsException ex, HttpServletRequest request) {
+        ErrorResponseDTO errorResponse = new ErrorResponseDTO(
+                HttpStatus.UNAUTHORIZED.value(),
+                HttpStatus.UNAUTHORIZED.getReasonPhrase(),
+                "Email ou senha inválidos.",
+                request.getRequestURI()
+        );
+        return new ResponseEntity<>(errorResponse, HttpStatus.UNAUTHORIZED);
+    }
+
+    @ExceptionHandler(DisabledException.class)
+    public ResponseEntity<ErrorResponseDTO> handleDisabledException(DisabledException ex, HttpServletRequest request) {
+        ErrorResponseDTO errorResponse = new ErrorResponseDTO(
+                HttpStatus.FORBIDDEN.value(),
+                HttpStatus.FORBIDDEN.getReasonPhrase(),
+                "Usuário desabilitado.",
+                request.getRequestURI()
+        );
+        return new ResponseEntity<>(errorResponse, HttpStatus.FORBIDDEN);
+    }
+
+    @ExceptionHandler(AccessDeniedException.class)
+    public ResponseEntity<ErrorResponseDTO> handleAccessDeniedException(AccessDeniedException ex, HttpServletRequest request) {
+        ErrorResponseDTO errorResponse = new ErrorResponseDTO(
+                HttpStatus.FORBIDDEN.value(),
+                HttpStatus.FORBIDDEN.getReasonPhrase(),
+                "Acesso negado. Você não possui permissão para este recurso.",
+                request.getRequestURI()
+        );
+        return new ResponseEntity<>(errorResponse, HttpStatus.FORBIDDEN);
+    }
+
+    @ExceptionHandler(AuthenticationException.class)
+    public ResponseEntity<ErrorResponseDTO> handleAuthenticationException(AuthenticationException ex, HttpServletRequest request) {
+        ErrorResponseDTO errorResponse = new ErrorResponseDTO(
+                HttpStatus.UNAUTHORIZED.value(),
+                HttpStatus.UNAUTHORIZED.getReasonPhrase(),
+                "Falha na autenticação.",
+                request.getRequestURI()
+        );
+        return new ResponseEntity<>(errorResponse, HttpStatus.UNAUTHORIZED);
+    }
+
+    @ExceptionHandler(Exception.class)
+    public ResponseEntity<ErrorResponseDTO> handleGenericException(Exception ex, HttpServletRequest request) {
+        ErrorResponseDTO errorResponse = new ErrorResponseDTO(
+                HttpStatus.INTERNAL_SERVER_ERROR.value(),
+                HttpStatus.INTERNAL_SERVER_ERROR.getReasonPhrase(),
+                "Ocorreu um erro inesperado no servidor.",
+                request.getRequestURI()
+        );
+        return new ResponseEntity<>(errorResponse, HttpStatus.INTERNAL_SERVER_ERROR);
+    }
+}

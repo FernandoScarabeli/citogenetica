@@ -1,0 +1,19 @@
+# Saída de build e arquivos da IDE
+target/
+.idea/
+*.iml
+
+# A imagem Maven executa o build; o Wrapper local não é necessário neste contexto
+.mvn/
+mvnw
+mvnw.cmd
+
+# Configuração local e credenciais
+.env
+.env.*
+local.yaml
+*kubeconfig*
+*.pem
+*.key
+*.p12
+*.log

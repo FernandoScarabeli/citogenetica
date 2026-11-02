@@ -1,0 +1,85 @@
+# Citogenetica — API
+
+Esta pasta contém a API do sistema de registro de lâminas de citogenética da UFLA. O backend está em desenvolvimento; sua base atual inclui autenticação e gestão de usuários, notificações, armazenamento de arquivos com URLs temporárias assinadas e um CRUD de exemplo mantido como referência de implementação.
+
+## Tecnologias
+
+- Java 17
+- Spring Boot 3.3.4
+- Maven
+- PostgreSQL e Flyway
+- Spring Security e JWT
+- SpringDoc OpenAPI (Swagger)
+- Docker Compose
+- RustFS com API compatível com S3
+- Lombok e MapStruct
+
+## Pré-requisitos
+
+- Docker e Docker Compose
+- Java 17 e Maven Wrapper para executar a API fora do Docker
+
+## Configuração
+
+Na raiz do repositório, gere um `.env` local com segredos aleatórios:
+
+```bash
+./scripts/gerar-env.sh
+```
+
+O script não sobrescreve um `.env` existente; `./scripts/gerar-env.sh --force` permite substituí-lo. O arquivo gerado recebe permissão restrita. Guarde o `.env`: o Postgres grava a senha no volume na primeira inicialização, então trocar `SPRING_DATASOURCE_PASSWORD` depois não altera o banco já criado. Em desenvolvimento, se precisar gerar um `.env` novo, recrie os volumes com `docker compose down -v` (isso apaga os dados locais). O `.env.example` documenta as variáveis e usa marcadores nos segredos; copiar o exemplo diretamente sem gerar ou trocar os segredos faz a API recusar a inicialização.
+
+As variáveis principais incluem `SERVER_PORT`, as configurações `SPRING_DATASOURCE_*`, as configurações de segurança e e-mail, `API_FRONTEND_URL`, `MAILPIT_WEB_PORT` e as configurações `STORAGE_*`. No Compose local, a API envia e-mails pelo Mailpit; a interface fica em `http://localhost:8025` por padrão. Para outro servidor SMTP, configure `SPRING_MAIL_HOST`, `SPRING_MAIL_PORT`, `SPRING_MAIL_USERNAME`, `SPRING_MAIL_PASSWORD`, `SPRING_MAIL_AUTH` e `SPRING_MAIL_STARTTLS_ENABLE`. Com autenticação SMTP habilitada, STARTTLS também precisa estar habilitado.
+
+O Compose usa `API_FRONTEND_URL` como origem permitida para requisições CORS ao RustFS, incluindo o preflight do upload pelo navegador.
+
+## Executando com Docker Compose
+
+Execute na raiz do repositório:
+
+```bash
+docker compose up -d --build
+```
+
+Serviços locais:
+
+- API: `http://localhost:8080`
+- Swagger UI: `http://localhost:8080/swagger-ui.html`
+- RustFS API S3: `http://localhost:9000`
+- RustFS Console: `http://localhost:9090`
+
+## Executando a API localmente
+
+Suba PostgreSQL e RustFS usando os serviços do Compose:
+
+```bash
+docker compose up -d db rustfs
+```
+
+Carregue o `.env` da raiz no shell e inicie a aplicação:
+
+```bash
+cd apps/api
+set -a; source ../../.env; set +a
+./mvnw spring-boot:run
+```
+
+Para depurar pela IDE, configure o carregamento das variáveis do `.env` na raiz e mantenha o diretório de trabalho em `apps/api/`.
+
+## Estrutura
+
+```text
+src/
+  main/
+    java/br/ufla/citogenetica/
+    resources/
+      application.yml
+      db/migration/
+  test/java/br/ufla/citogenetica/
+```
+
+A classe principal é `CitogeneticaApplication`. O projeto segue atualmente uma organização em camadas; a evolução para o monólito modular planejado ocorrerá nas etapas próprias do projeto.
+
+## Documentação da API
+
+- Swagger UI: `http://localhost:8080/swagger-ui.html`

@@ -1,0 +1,917 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Registro de Ciclo Celular e Índice Mitótico</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600;700&display=swap');
+
+:root{
+  --bg: #1b2320;
+  --panel: #232d29;
+  --panel-2: #2a3531;
+  --line: #3a4a44;
+  --ink: #e9ede9;
+  --ink-dim: #9fb0a8;
+  --stain: #c23b52;
+  --stain-dim: #7a2c3a;
+  --normal: #4fa187;
+  --normal-dim: #2c4f44;
+  --amber: #d9a441;
+}
+
+*{ box-sizing:border-box; }
+
+body{
+  margin:0;
+  background: var(--bg);
+  background-image:
+    linear-gradient(rgba(233,237,233,0.035) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(233,237,233,0.035) 1px, transparent 1px);
+  background-size: 22px 22px;
+  color: var(--ink);
+  font-family: 'IBM Plex Sans', sans-serif;
+  padding: 28px 16px 60px;
+}
+
+.wrap{ max-width: 980px; margin: 0 auto; }
+
+header{
+  display:flex; flex-wrap:wrap; gap:16px 24px;
+  justify-content:space-between; align-items:flex-end;
+  border-bottom: 2px solid var(--line);
+  padding-bottom: 18px; margin-bottom: 22px;
+}
+header h1{
+  font-size: 1.4rem; margin:0 0 4px; letter-spacing:.2px;
+}
+header .sub{ color: var(--ink-dim); font-size:.85rem; }
+
+.slide-control{ display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
+.slide-control input[type=text]{
+  background: var(--panel-2); border:1px solid var(--line); color:var(--ink);
+  padding:9px 12px; border-radius:4px; font-family:'IBM Plex Mono',monospace;
+  font-size:.9rem; min-width:150px;
+}
+button{
+  font-family:'IBM Plex Sans', sans-serif; cursor:pointer; border-radius:4px;
+  border:1px solid var(--line); background: var(--panel-2); color: var(--ink);
+  padding:9px 14px; font-size:.85rem; transition: border-color .15s, background .15s;
+}
+button:hover{ border-color: var(--ink-dim); }
+button.primary{ background: var(--stain); border-color: var(--stain); color:#fff; font-weight:600; }
+button.primary:hover{ background:#a92f43; }
+button:disabled{ opacity:.4; cursor:not-allowed; }
+
+select{
+  background: var(--panel-2); border:1px solid var(--line); color:var(--ink);
+  padding:9px 10px; border-radius:4px; font-size:.85rem; font-family:'IBM Plex Sans',sans-serif;
+}
+label{ display:block; font-size:.72rem; color:var(--ink-dim); margin-bottom:4px; text-transform:uppercase; letter-spacing:.03em; }
+
+.slide-list{ font-size:.78rem; color:var(--ink-dim); margin-top:6px; }
+.slide-list a{ color: var(--amber); cursor:pointer; text-decoration:underline; }
+
+.grid{
+  display:grid; grid-template-columns: repeat(auto-fill, minmax(190px,1fr));
+  gap:12px; margin-bottom: 26px;
+}
+.phase-card{
+  background: var(--panel); border:1px solid var(--line); border-radius:6px;
+  padding:12px 14px 14px;
+}
+.phase-card h3{
+  margin:0 0 10px; font-size:.88rem; font-weight:600;
+}
+.counts{
+  display:flex; gap:10px; margin-bottom:10px; font-family:'IBM Plex Mono',monospace;
+}
+.count-pill{
+  flex:1; text-align:center; border-radius:4px; padding:6px 4px; font-size:1.05rem; font-weight:600;
+}
+.count-pill.n{ background: var(--normal-dim); color:#bfe9db; }
+.count-pill.a{ background: var(--stain-dim); color:#f3c3cd; }
+.count-pill .lbl{ display:block; font-size:.62rem; font-weight:500; color:var(--ink-dim); margin-top:2px; letter-spacing:.03em; }
+.btn-row{ display:flex; gap:8px; }
+.btn-row button{ flex:1; padding:7px 4px; font-size:.78rem; }
+.btn-row .b-normal{ border-color: var(--normal); color:#bfe9db; }
+.btn-row .b-normal:hover{ background: var(--normal-dim); }
+.btn-row .b-abn{ border-color: var(--stain); color:#f3c3cd; }
+.btn-row .b-abn:hover{ background: var(--stain-dim); }
+
+section.panel{
+  background: var(--panel); border:1px solid var(--line); border-radius:6px;
+  padding:18px 18px 20px; margin-bottom: 20px;
+}
+section.panel h2{ font-size:1rem; margin:0 0 14px; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px; }
+
+table{ width:100%; border-collapse:collapse; font-size:.85rem; }
+th, td{ text-align:left; padding:7px 8px; border-bottom:1px solid var(--line); }
+th{ color: var(--ink-dim); font-weight:600; font-size:.75rem; text-transform:uppercase; letter-spacing:.04em; }
+td.num, th.num{ text-align:right; font-family:'IBM Plex Mono',monospace; }
+tr.total-row td{ font-weight:700; border-top:2px solid var(--line); border-bottom:none; }
+.abn-types{ font-size:.74rem; color: var(--ink-dim); }
+
+.im-stat{
+  margin-top:14px; padding:12px 14px; background: var(--panel-2); border:1px solid var(--line);
+  border-radius:6px; font-family:'IBM Plex Mono',monospace; font-size:.88rem; color: var(--amber);
+}
+.im-stat .goal{ font-family:'IBM Plex Sans',sans-serif; color: var(--ink-dim); font-size:.78rem; margin-top:4px; }
+
+.hist-list{ max-height:320px; overflow-y:auto; display:flex; flex-direction:column; gap:4px; }
+.hist-day-label{
+  font-family:'IBM Plex Mono',monospace; font-size:.72rem; color: var(--amber);
+  text-transform:uppercase; letter-spacing:.05em; margin:14px 0 6px; padding-bottom:4px;
+  border-bottom:1px solid var(--line);
+}
+.hist-day-label:first-child{ margin-top:0; }
+.hist-item{
+  display:flex; justify-content:space-between; align-items:center; gap:10px; font-size:.8rem;
+  padding:6px 10px; background: var(--panel-2); border-radius:4px; border:1px solid var(--line);
+}
+.hist-item .tag{ font-family:'IBM Plex Mono',monospace; color: var(--ink-dim); font-size:.72rem; }
+.hist-item .hist-right{ display:flex; align-items:center; gap:8px; flex-shrink:0; }
+.hist-edit-btn{
+  background:none; border:none; color: var(--amber); font-size:.72rem; padding:2px 4px;
+  text-decoration:underline; cursor:pointer;
+}
+.hist-edit-btn:hover{ color:#fff; border-color:transparent; }
+
+textarea{
+  width:100%; min-height:70px; background:var(--panel-2); border:1px solid var(--line);
+  color:var(--ink); border-radius:4px; padding:10px; font-family:'IBM Plex Sans',sans-serif;
+  font-size:.85rem; resize:vertical;
+}
+
+.empty{ color:var(--ink-dim); font-size:.85rem; text-align:center; padding:14px 0; }
+
+/* Modal */
+.overlay{
+  position:fixed; inset:0; background:rgba(0,0,0,.55); display:none;
+  align-items:center; justify-content:center; z-index:50; padding:16px;
+}
+.overlay.show{ display:flex; }
+.modal{
+  background: var(--panel); border:1px solid var(--line); border-radius:8px;
+  padding:20px; width:100%; max-width:380px;
+}
+.modal h3{ margin:0 0 4px; font-size:1rem; }
+.modal .phase-name{ color: var(--stain); font-weight:600; }
+.modal select, .modal input[type=text]{
+  width:100%; background: var(--panel-2); border:1px solid var(--line); color:var(--ink);
+  padding:9px 10px; border-radius:4px; font-size:.85rem; margin-top:12px;
+}
+.modal .modal-actions{ display:flex; gap:10px; margin-top:16px; justify-content:flex-end; }
+
+.footer-actions{ display:flex; gap:10px; flex-wrap:wrap; margin-top:8px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header>
+    <div>
+      <h1>Registro de Ciclo Celular e Índice Mitótico</h1>
+      <div class="sub">Contagem de células por fase — normal × anormal — com cálculo automático do Índice Mitótico</div>
+    </div>
+    <div>
+      <div class="slide-control">
+        <input type="text" id="slideName" placeholder="identificação da lâmina (ex: Controle-L1)">
+        <input type="text" id="especieField" placeholder="espécie (opcional)" onchange="saveMeta()">
+        <input type="text" id="tratamentoField" placeholder="tratamento (opcional)" onchange="saveMeta()">
+        <button class="primary" onclick="loadOrCreateSlide()">Abrir lâmina</button>
+      </div>
+      <div class="slide-list" id="slideListArea"></div>
+      <div class="slide-list" id="storageStatus"></div>
+    </div>
+  </header>
+
+  <section class="panel" style="margin-bottom:22px;">
+    <h2>Backup entre dispositivos</h2>
+    <div class="sub" style="color:var(--ink-dim); font-size:.82rem; margin-bottom:12px;">
+      Não existe login aqui (é um arquivo sem servidor), mas você pode baixar um backup com todas as suas lâminas
+      e importar depois em qualquer celular, computador ou navegador — assim os dados nunca dependem só da memória de um único aparelho.
+    </div>
+    <div class="footer-actions">
+      <button onclick="exportBackup()">Baixar backup completo (JSON)</button>
+      <button onclick="document.getElementById('importFileInput').click()">Importar backup</button>
+      <input type="file" id="importFileInput" accept="application/json,.json" style="display:none" onchange="handleImportChange(event)">
+    </div>
+    <div id="backupStatus" style="font-size:.78rem; color:var(--ink-dim); margin-top:8px;"></div>
+  </section>
+
+  <div id="mainArea" style="display:none;">
+
+    <div class="grid" id="phaseGrid"></div>
+
+    <section class="panel">
+      <h2>Resumo</h2>
+      <table>
+        <thead>
+          <tr><th>Fase</th><th class="num">Normal</th><th class="num">Anormal</th><th class="num">Total</th><th class="num">% anormal</th><th>Tipos de anormalidade</th></tr>
+        </thead>
+        <tbody id="summaryBody"></tbody>
+        <tfoot>
+          <tr class="total-row">
+            <td>Total</td>
+            <td class="num" id="totalNormal">0</td>
+            <td class="num" id="totalAbnormal">0</td>
+            <td class="num" id="totalAll">0</td>
+            <td class="num" id="totalPct">0%</td>
+            <td></td>
+          </tr>
+        </tfoot>
+      </table>
+      <div class="im-stat" id="imStat"></div>
+    </section>
+
+    <section class="panel">
+      <h2>Observações da lâmina</h2>
+      <textarea id="obsField" placeholder="anotações gerais sobre esta lâmina..." onchange="saveObs()"></textarea>
+    </section>
+
+    <section class="panel">
+      <h2>
+        Histórico recente
+        <div class="footer-actions">
+          <button onclick="undoLast()" id="undoBtn">Desfazer última</button>
+          <button onclick="exportCSV()">Exportar CSV</button>
+          <button onclick="exportPDF()">Baixar relatório (PDF)</button>
+          <button onclick="clearSlide()" style="border-color:var(--stain); color:#f3c3cd;">Limpar lâmina</button>
+        </div>
+      </h2>
+      <div class="hist-list" id="histList"><div class="empty">Nenhuma célula registrada ainda.</div></div>
+    </section>
+
+  </div>
+</div>
+
+<footer style="max-width:980px; margin:36px auto 0; padding-top:16px; border-top:1px solid var(--line); text-align:center; color:var(--ink-dim); font-size:.76rem; line-height:1.6;">
+  Desenvolvido por <strong style="color:var(--ink);">Maria Antônia Valeriano de Paula</strong> — Laboratório de Citogenética, UFLA.<br>
+  Concepção, protocolo e requisitos definidos pela autora; implementação com auxílio de inteligência artificial.
+</footer>
+
+<div class="overlay" id="confirmOverlay">
+  <div class="modal">
+    <h3>Apagar dados desta lâmina?</h3>
+    <div class="sub" style="color:var(--ink-dim); font-size:.8rem; margin-top:6px;">
+      Isso remove todas as contagens, o histórico e as observações desta lâmina. Não pode ser desfeito.
+    </div>
+    <div class="modal-actions">
+      <button onclick="closeConfirmModal()">Cancelar</button>
+      <button class="primary" onclick="doClearSlide()" style="background:var(--stain); border-color:var(--stain);">Apagar mesmo assim</button>
+    </div>
+  </div>
+</div>
+
+<div class="overlay" id="overlay">
+  <div class="modal">
+    <h3>Célula anormal — <span class="phase-name" id="modalPhase"></span></h3>
+    <div class="sub" style="color:var(--ink-dim); font-size:.8rem;">Selecione o tipo de anormalidade observada</div>
+    <select id="abnormalType"></select>
+    <input type="text" id="customType" placeholder="descreva a anormalidade" style="display:none;">
+    <div class="modal-actions">
+      <button onclick="closeModal()">Cancelar</button>
+      <button class="primary" onclick="confirmAbnormal()">Registrar</button>
+    </div>
+  </div>
+</div>
+
+<div class="overlay" id="editOverlay">
+  <div class="modal">
+    <h3>Editar registro</h3>
+    <div class="sub" style="color:var(--ink-dim); font-size:.8rem;">
+      Corrige a fase e a classificação desse registro — a data original em que foi contado é mantida.
+    </div>
+    <label style="margin-top:12px;">Fase</label>
+    <select id="editPhase"></select>
+    <label style="margin-top:12px;">Classificação</label>
+    <select id="editStatus">
+      <option value="Normal">Normal</option>
+      <option value="Anormal">Anormal</option>
+    </select>
+    <select id="editType" style="display:none; margin-top:12px;"></select>
+    <input type="text" id="editCustomType" placeholder="descreva a anormalidade" style="display:none;">
+    <div class="modal-actions">
+      <button onclick="closeEditModal()">Cancelar</button>
+      <button class="primary" onclick="confirmEditHistory()">Salvar alteração</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const PHASE_DEFS = [
+  { name: "Interfase", types: ["Núcleos apoptóticos (condensados)"] },
+  { name: "Prófase", types: ["Stickness","Cromossomos ou fragmentos desprendidos","Núcleo com brotações","Micronúcleo"] },
+  { name: "Metáfase", types: ["Cromossomos não orientados","Metáfase colchicínica","Stickness"] },
+  { name: "Anáfase", types: ["Cromossomos atrasados","Fuso anormal","Stickness","Ponte","Pontes com fragmento"] },
+  { name: "Telófase", types: ["Fuso anormal","Ponte","Ponte com fragmento","Micronúcleo: 1","Micronúcleo: 2","Micronúcleo: 3","Micronúcleo: +de 3"] },
+];
+const PHASES = PHASE_DEFS.map(p => p.name);
+const PHASE_TYPES = {};
+PHASE_DEFS.forEach(p => PHASE_TYPES[p.name] = p.types);
+const DIVISION_PHASES = ["Prófase","Metáfase","Anáfase","Telófase"];
+const CELLS_TARGET = 1000;
+
+let currentSlide = null;
+let data = null; // { phases: {phase: {normal, abnormalTypes:{type:count}}}, history: [], obs: "", especie: "", tratamento: "" }
+let pendingPhase = null;
+
+function emptyData(){
+  const phases = {};
+  PHASES.forEach(p => phases[p] = { normal: 0, abnormalTypes: {} });
+  return { phases, history: [], obs: "", especie: "", tratamento: "" };
+}
+
+// Garante que dados salvos em uma versão anterior da ferramenta (com fases
+// diferentes) ganhem entradas para todas as fases atuais, sem quebrar a UI.
+function reconcilePhases(d){
+  if(!d.phases) d.phases = {};
+  PHASES.forEach(p => {
+    if(!d.phases[p]){ d.phases[p] = { normal: 0, abnormalTypes: {} }; }
+    if(typeof d.phases[p].normal !== 'number'){ d.phases[p].normal = 0; }
+    if(!d.phases[p].abnormalTypes){ d.phases[p].abnormalTypes = {}; }
+  });
+  if(!Array.isArray(d.history)) d.history = [];
+  d.history.forEach(h => { if(!h.id) h.id = genId(); });
+  if(typeof d.obs !== 'string') d.obs = "";
+  if(typeof d.especie !== 'string') d.especie = "";
+  if(typeof d.tratamento !== 'string') d.tratamento = "";
+  return d;
+}
+
+const memStore = {};
+function localStorageAvailable(){
+  try{
+    const k = '__ls_test__';
+    localStorage.setItem(k, '1');
+    localStorage.removeItem(k);
+    return true;
+  }catch(e){ return false; }
+}
+const hasLocalStorage = localStorageAvailable();
+
+async function storageGet(key){
+  if(window.storage){
+    try{ return await window.storage.get(key, false); }catch(e){ /* tenta o próximo nível */ }
+  }
+  if(hasLocalStorage){
+    const v = localStorage.getItem(key);
+    return v !== null ? { value: v } : null;
+  }
+  return (key in memStore) ? { value: memStore[key] } : null;
+}
+async function storageSet(key, value){
+  if(window.storage){
+    try{ await window.storage.set(key, value, false); return; }catch(e){ /* tenta o próximo nível */ }
+  }
+  if(hasLocalStorage){
+    try{ localStorage.setItem(key, value); return; }catch(e){ /* tenta o próximo nível */ }
+  }
+  memStore[key] = value;
+}
+
+async function getSlideList(){
+  try{
+    const r = await storageGet('mitose:laminas:list');
+    return r ? JSON.parse(r.value) : [];
+  }catch(e){ return []; }
+}
+async function saveSlideList(list){
+  try{ await storageSet('mitose:laminas:list', JSON.stringify(list)); }catch(e){ /* ignore */ }
+}
+
+async function loadOrCreateSlide(){
+  const name = document.getElementById('slideName').value.trim();
+  const nameInput = document.getElementById('slideName');
+  if(!name){
+    nameInput.style.borderColor = 'var(--stain)';
+    nameInput.placeholder = 'digite um nome antes de abrir a lâmina';
+    nameInput.focus();
+    return;
+  }
+  nameInput.style.borderColor = 'var(--line)';
+  currentSlide = name;
+  try{
+    const r = await storageGet('mitose:lamina:' + name);
+    data = r ? reconcilePhases(JSON.parse(r.value)) : emptyData();
+  }catch(e){
+    data = emptyData();
+  }
+  try{
+    const list = await getSlideList();
+    if(!list.includes(name)){ list.push(name); await saveSlideList(list); }
+    await renderSlideList();
+  }catch(e){ /* non-fatal: slide still opens even if the list fails */ }
+  document.getElementById('obsField').value = data.obs || "";
+  document.getElementById('especieField').value = data.especie || "";
+  document.getElementById('tratamentoField').value = data.tratamento || "";
+  document.getElementById('mainArea').style.display = 'block';
+  render();
+}
+
+async function renderSlideList(){
+  const list = await getSlideList();
+  const area = document.getElementById('slideListArea');
+  if(list.length === 0){ area.innerHTML = ''; }
+  else{
+    area.innerHTML = 'Lâminas salvas: ' + list.map(n =>
+      `<a onclick="quickOpen('${n.replace(/'/g,"\\'")}')">${n}</a>`
+    ).join(' · ');
+  }
+}
+async function quickOpen(name){
+  document.getElementById('slideName').value = name;
+  await loadOrCreateSlide();
+}
+
+async function persist(){
+  if(!currentSlide) return;
+  try{ await storageSet('mitose:lamina:' + currentSlide, JSON.stringify(data)); }catch(e){ /* ignore */ }
+}
+
+async function saveObs(){
+  data.obs = document.getElementById('obsField').value;
+  await persist();
+}
+async function saveMeta(){
+  if(!currentSlide) return;
+  data.especie = document.getElementById('especieField').value;
+  data.tratamento = document.getElementById('tratamentoField').value;
+  await persist();
+}
+
+function countAbnormal(phaseData){
+  return Object.values(phaseData.abnormalTypes).reduce((a,b)=>a+b, 0);
+}
+
+// Formata os tipos de anormalidade de uma fase como "Tipo: n (x.x%)",
+// usando o total de células da fase como base do percentual.
+function formatAbnormalTypes(pd, sep){
+  const tot = pd.normal + countAbnormal(pd);
+  return Object.entries(pd.abnormalTypes)
+    .map(([k,v]) => `${k}: ${v} (${tot ? ((v/tot)*100).toFixed(1) : '0.0'}%)`)
+    .join(sep);
+}
+
+// Índice Mitótico = células em divisão / total de células contadas
+function computeIM(d){
+  let divisionCells = 0, totalCells = 0;
+  PHASES.forEach(p=>{
+    const pd = d.phases[p];
+    const tot = pd.normal + countAbnormal(pd);
+    totalCells += tot;
+    if(DIVISION_PHASES.includes(p)) divisionCells += tot;
+  });
+  const im = totalCells ? divisionCells / totalCells : 0;
+  return { divisionCells, totalCells, im };
+}
+
+function genId(){
+  return 'h' + Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
+}
+
+function logNormal(phase){
+  data.phases[phase].normal++;
+  data.history.push({ id: genId(), phase, status:'Normal', type:null, t: Date.now() });
+  persist();
+  render();
+}
+
+function openAbnormalModal(phase){
+  pendingPhase = phase;
+  document.getElementById('modalPhase').textContent = phase;
+  const options = [...PHASE_TYPES[phase], "Outro (especificar)"];
+  const select = document.getElementById('abnormalType');
+  select.innerHTML = options.map(o => `<option>${o}</option>`).join('');
+  const customField = document.getElementById('customType');
+  customField.value = '';
+  customField.style.borderColor = 'var(--line)';
+  customField.placeholder = 'descreva a anormalidade';
+  customField.style.display = select.value === 'Outro (especificar)' ? 'block' : 'none';
+  document.getElementById('overlay').classList.add('show');
+  if(customField.style.display === 'block'){ customField.focus(); }
+}
+function closeModal(){
+  document.getElementById('overlay').classList.remove('show');
+  pendingPhase = null;
+}
+document.getElementById('abnormalType').addEventListener('change', (e)=>{
+  document.getElementById('customType').style.display = e.target.value === 'Outro (especificar)' ? 'block' : 'none';
+});
+
+function confirmAbnormal(){
+  let type = document.getElementById('abnormalType').value;
+  if(type === 'Outro (especificar)'){
+    const custom = document.getElementById('customType').value.trim();
+    if(!custom){
+      const customField = document.getElementById('customType');
+      customField.style.borderColor = 'var(--stain)';
+      customField.placeholder = 'descreva a anormalidade (obrigatório)';
+      customField.focus();
+      return;
+    }
+    type = custom;
+  }
+  const phase = pendingPhase;
+  const pd = data.phases[phase];
+  pd.abnormalTypes[type] = (pd.abnormalTypes[type] || 0) + 1;
+  data.history.push({ id: genId(), phase, status:'Anormal', type, t: Date.now() });
+  persist();
+  closeModal();
+  render();
+}
+
+function undoLast(){
+  if(data.history.length === 0) return;
+  const last = data.history.pop();
+  const pd = data.phases[last.phase];
+  if(last.status === 'Normal'){
+    pd.normal = Math.max(0, pd.normal - 1);
+  } else {
+    pd.abnormalTypes[last.type] = Math.max(0, (pd.abnormalTypes[last.type]||0) - 1);
+    if(pd.abnormalTypes[last.type] === 0) delete pd.abnormalTypes[last.type];
+  }
+  persist();
+  render();
+}
+
+// --- Edição de um registro específico do histórico (correção de erro antigo) ---
+let pendingEditId = null;
+
+function revertEntry(entry){
+  const pd = data.phases[entry.phase];
+  if(!pd) return;
+  if(entry.status === 'Normal'){
+    pd.normal = Math.max(0, pd.normal - 1);
+  } else {
+    pd.abnormalTypes[entry.type] = Math.max(0, (pd.abnormalTypes[entry.type]||0) - 1);
+    if(pd.abnormalTypes[entry.type] === 0) delete pd.abnormalTypes[entry.type];
+  }
+}
+function applyEntry(entry){
+  const pd = data.phases[entry.phase];
+  if(entry.status === 'Normal'){
+    pd.normal++;
+  } else {
+    pd.abnormalTypes[entry.type] = (pd.abnormalTypes[entry.type] || 0) + 1;
+  }
+}
+
+function refreshEditTypeOptions(phase, currentType){
+  const status = document.getElementById('editStatus').value;
+  const typeSel = document.getElementById('editType');
+  const customField = document.getElementById('editCustomType');
+  customField.style.borderColor = 'var(--line)';
+  customField.placeholder = 'descreva a anormalidade';
+  if(status !== 'Anormal'){
+    typeSel.style.display = 'none';
+    customField.style.display = 'none';
+    return;
+  }
+  const options = [...PHASE_TYPES[phase], "Outro (especificar)"];
+  typeSel.innerHTML = options.map(o => `<option>${o}</option>`).join('');
+  typeSel.style.display = 'block';
+  if(currentType && options.includes(currentType)){
+    typeSel.value = currentType;
+    customField.style.display = 'none';
+    customField.value = '';
+  } else if(currentType){
+    // o tipo antigo não existe mais na lista dessa fase (ex: fase foi trocada) — mantém como texto livre
+    typeSel.value = 'Outro (especificar)';
+    customField.style.display = 'block';
+    customField.value = currentType;
+  } else {
+    typeSel.value = options[0];
+    customField.style.display = 'none';
+    customField.value = '';
+  }
+}
+
+function openEditHistory(id){
+  const entry = data.history.find(h => h.id === id);
+  if(!entry) return;
+  pendingEditId = id;
+  const phaseSel = document.getElementById('editPhase');
+  phaseSel.innerHTML = PHASES.map(p => `<option value="${p}">${p}</option>`).join('');
+  phaseSel.value = entry.phase;
+  document.getElementById('editStatus').value = entry.status;
+  refreshEditTypeOptions(entry.phase, entry.status === 'Anormal' ? entry.type : null);
+  document.getElementById('editOverlay').classList.add('show');
+}
+function closeEditModal(){
+  document.getElementById('editOverlay').classList.remove('show');
+  pendingEditId = null;
+}
+document.getElementById('editPhase').addEventListener('change', (e)=>{
+  refreshEditTypeOptions(e.target.value, null);
+});
+document.getElementById('editStatus').addEventListener('change', ()=>{
+  const phase = document.getElementById('editPhase').value;
+  refreshEditTypeOptions(phase, null);
+});
+document.getElementById('editType').addEventListener('change', (e)=>{
+  document.getElementById('editCustomType').style.display = e.target.value === 'Outro (especificar)' ? 'block' : 'none';
+});
+
+function confirmEditHistory(){
+  const entry = data.history.find(h => h.id === pendingEditId);
+  if(!entry){ closeEditModal(); return; }
+  const newPhase = document.getElementById('editPhase').value;
+  const newStatus = document.getElementById('editStatus').value;
+  let newType = null;
+  if(newStatus === 'Anormal'){
+    newType = document.getElementById('editType').value;
+    if(newType === 'Outro (especificar)'){
+      const custom = document.getElementById('editCustomType').value.trim();
+      if(!custom){
+        const cf = document.getElementById('editCustomType');
+        cf.style.borderColor = 'var(--stain)';
+        cf.placeholder = 'descreva a anormalidade (obrigatório)';
+        cf.focus();
+        return;
+      }
+      newType = custom;
+    }
+  }
+  revertEntry(entry);
+  entry.phase = newPhase;
+  entry.status = newStatus;
+  entry.type = newType;
+  applyEntry(entry);
+  persist();
+  closeEditModal();
+  render();
+}
+
+function clearSlide(){
+  document.getElementById('confirmOverlay').classList.add('show');
+}
+function closeConfirmModal(){
+  document.getElementById('confirmOverlay').classList.remove('show');
+}
+async function doClearSlide(){
+  data = emptyData();
+  await persist();
+  closeConfirmModal();
+  render();
+}
+
+function exportCSV(){
+  let rows = [['Fase','Normal','Anormal','Total','% anormal','Tipos de anormalidade (contagem)']];
+  let totN=0, totA=0;
+  PHASES.forEach(p=>{
+    const pd = data.phases[p];
+    const a = countAbnormal(pd);
+    const tot = pd.normal + a;
+    totN += pd.normal; totA += a;
+    const pct = tot ? ((a/tot)*100).toFixed(1)+'%' : '0%';
+    const types = formatAbnormalTypes(pd, '; ');
+    rows.push([p, pd.normal, a, tot, pct, types]);
+  });
+  rows.push(['Total', totN, totA, totN+totA, (totN+totA)? ((totA/(totN+totA))*100).toFixed(1)+'%':'0%', '']);
+  const im = computeIM(data);
+  rows.push([]);
+  rows.push(['Espécie:', data.especie || '']);
+  rows.push(['Tratamento:', data.tratamento || '']);
+  rows.push(['Índice Mitótico (IM):', `${im.divisionCells}/${im.totalCells} = ${im.im.toFixed(4)} (${(im.im*100).toFixed(2)}%)`]);
+  rows.push([]);
+  rows.push(['Observações:', (data.obs||'').replace(/\n/g,' ')]);
+  const csv = rows.map(r => r.map(c => `"${String(c).replace(/"/g,'""')}"`).join(',')).join('\n');
+  const blob = new Blob([csv], {type:'text/csv;charset=utf-8;'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = `mitose_${currentSlide}.csv`;
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
+function exportPDF(){
+  if(!currentSlide) return;
+  const rows = PHASES.map(p=>{
+    const pd = data.phases[p];
+    const a = countAbnormal(pd);
+    const tot = pd.normal + a;
+    const pct = tot ? ((a/tot)*100).toFixed(1)+'%' : '—';
+    const types = formatAbnormalTypes(pd, ', ') || '—';
+    return { p, normal: pd.normal, a, tot, pct, types };
+  });
+  let totN=0, totA=0;
+  rows.forEach(r=>{ totN += r.normal; totA += r.a; });
+  const totTot = totN + totA;
+  const totPct = totTot ? ((totA/totTot)*100).toFixed(1)+'%' : '0%';
+  const im = computeIM(data);
+  const dateStr = new Date().toLocaleDateString('pt-BR');
+
+  const escapeHTML = s => String(s).replace(/[&<>]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));
+
+  const rowsHTML = rows.map(r =>
+    `<tr><td>${escapeHTML(r.p)}</td><td>${r.normal}</td><td>${r.a}</td><td>${r.tot}</td><td>${r.pct}</td><td>${escapeHTML(r.types)}</td></tr>`
+  ).join('');
+
+  const obsHTML = data.obs
+    ? `<div class="obs"><strong>Observações:</strong><p>${escapeHTML(data.obs)}</p></div>`
+    : '';
+
+  const standaloneHTML = `<!DOCTYPE html>
+<html lang="pt-BR"><head><meta charset="UTF-8">
+<title>Relatório - ${escapeHTML(currentSlide)}</title>
+<style>
+  body{ font-family: Arial, Helvetica, sans-serif; color:#111; padding:32px; max-width:800px; margin:0 auto; }
+  h1{ font-size:1.4rem; margin:0 0 6px; }
+  .meta{ font-size:.9rem; color:#444; margin-bottom:8px; }
+  .im{ font-size:.95rem; margin-bottom:20px; padding:10px 12px; background:#f4f4f4; border:1px solid #ccc; border-radius:4px; display:inline-block; }
+  table{ width:100%; border-collapse:collapse; font-size:.85rem; }
+  th, td{ border:1px solid #999; padding:7px 9px; text-align:left; }
+  th{ background:#eee; }
+  tfoot td{ font-weight:700; background:#f4f4f4; }
+  .obs{ margin-top:22px; font-size:.9rem; }
+  .obs p{ white-space:pre-wrap; }
+  .hint{ margin-top:28px; font-size:.78rem; color:#777; }
+  @media print{ .hint{ display:none; } }
+</style></head>
+<body>
+  <h1>Registro de Ciclo Celular e Índice Mitótico</h1>
+  <div class="meta">Lâmina: <strong>${escapeHTML(currentSlide)}</strong> &nbsp;·&nbsp; Espécie: ${escapeHTML(data.especie||'—')} &nbsp;·&nbsp; Tratamento: ${escapeHTML(data.tratamento||'—')} &nbsp;·&nbsp; Data: ${dateStr}</div>
+  <div class="im"><strong>Índice Mitótico (IM)</strong> = ${im.divisionCells} / ${im.totalCells} = ${im.im.toFixed(4)} (${(im.im*100).toFixed(2)}%)</div>
+  <table>
+    <thead><tr><th>Fase</th><th>Normal</th><th>Anormal</th><th>Total</th><th>% anormal</th><th>Tipos de anormalidade</th></tr></thead>
+    <tbody>${rowsHTML}</tbody>
+    <tfoot><tr><td>Total</td><td>${totN}</td><td>${totA}</td><td>${totTot}</td><td>${totPct}</td><td></td></tr></tfoot>
+  </table>
+  ${obsHTML}
+  <div class="hint">Para salvar como PDF: abra o menu de impressão do navegador (Ctrl/Cmd+P) e escolha "Salvar como PDF" no destino.</div>
+</body></html>`;
+
+  const blob = new Blob([standaloneHTML], { type: 'text/html;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `relatorio_mitose_${currentSlide}.html`;
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
+async function exportBackup(){
+  const list = await getSlideList();
+  const backup = { exportadoEm: new Date().toISOString(), laminas: {} };
+  for(const name of list){
+    const r = await storageGet('mitose:lamina:' + name);
+    if(r){
+      try{ backup.laminas[name] = JSON.parse(r.value); }catch(e){ /* pula lâmina corrompida */ }
+    }
+  }
+  const statusEl = document.getElementById('backupStatus');
+  const count = Object.keys(backup.laminas).length;
+  if(count === 0){
+    statusEl.textContent = 'Nenhuma lâmina encontrada pra fazer backup ainda.';
+    return;
+  }
+  const blob = new Blob([JSON.stringify(backup, null, 2)], {type:'application/json;charset=utf-8;'});
+  const url = URL.createObjectURL(blob);
+  const dateTag = new Date().toISOString().slice(0,10);
+  const a = document.createElement('a');
+  a.href = url; a.download = `backup_mitose_${dateTag}.json`;
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+  statusEl.style.color = 'var(--ink-dim)';
+  statusEl.textContent = `Backup baixado com ${count} lâmina(s).`;
+}
+
+function handleImportChange(event){
+  const file = event.target.files[0];
+  if(!file) return;
+  const reader = new FileReader();
+  reader.onload = async () => {
+    await importBackup(reader.result);
+    event.target.value = '';
+  };
+  reader.readAsText(file);
+}
+
+async function importBackup(text){
+  const statusEl = document.getElementById('backupStatus');
+  let backup;
+  try{ backup = JSON.parse(text); }catch(e){
+    statusEl.style.color = 'var(--stain)';
+    statusEl.textContent = 'Esse arquivo não parece um backup válido.';
+    return;
+  }
+  const laminas = backup.laminas || {};
+  const names = Object.keys(laminas);
+  if(names.length === 0){
+    statusEl.style.color = 'var(--stain)';
+    statusEl.textContent = 'O backup não tem nenhuma lâmina.';
+    return;
+  }
+  const existingList = await getSlideList();
+  for(const name of names){
+    const reconciled = reconcilePhases(laminas[name]);
+    await storageSet('mitose:lamina:' + name, JSON.stringify(reconciled));
+    if(!existingList.includes(name)) existingList.push(name);
+  }
+  await saveSlideList(existingList);
+  await renderSlideList();
+  statusEl.style.color = 'var(--normal)';
+  statusEl.textContent = `Importado: ${names.length} lâmina(s) — ${names.join(', ')}.`;
+}
+
+function render(){
+  // phase cards
+  const grid = document.getElementById('phaseGrid');
+  grid.innerHTML = PHASES.map(p=>{
+    const pd = data.phases[p];
+    const a = countAbnormal(pd);
+    return `<div class="phase-card">
+      <h3>${p}</h3>
+      <div class="counts">
+        <div class="count-pill n">${pd.normal}<span class="lbl">normal</span></div>
+        <div class="count-pill a">${a}<span class="lbl">anormal</span></div>
+      </div>
+      <div class="btn-row">
+        <button class="b-normal" onclick="logNormal('${p}')">+ Normal</button>
+        <button class="b-abn" onclick="openAbnormalModal('${p}')">+ Anormal</button>
+      </div>
+    </div>`;
+  }).join('');
+
+  // summary table
+  const body = document.getElementById('summaryBody');
+  let totN=0, totA=0;
+  body.innerHTML = PHASES.map(p=>{
+    const pd = data.phases[p];
+    const a = countAbnormal(pd);
+    const tot = pd.normal + a;
+    totN += pd.normal; totA += a;
+    const pct = tot ? ((a/tot)*100).toFixed(1)+'%' : '—';
+    const types = formatAbnormalTypes(pd, ', ') || '—';
+    return `<tr><td>${p}</td><td class="num">${pd.normal}</td><td class="num">${a}</td><td class="num">${tot}</td><td class="num">${pct}</td><td class="abn-types">${types}</td></tr>`;
+  }).join('');
+  document.getElementById('totalNormal').textContent = totN;
+  document.getElementById('totalAbnormal').textContent = totA;
+  document.getElementById('totalAll').textContent = totN+totA;
+  document.getElementById('totalPct').textContent = (totN+totA) ? ((totA/(totN+totA))*100).toFixed(1)+'%' : '0%';
+
+  // índice mitótico
+  const im = computeIM(data);
+  document.getElementById('imStat').innerHTML =
+    `Índice Mitótico (IM) = ${im.divisionCells} / ${im.totalCells} = ${im.im.toFixed(4)} (${(im.im*100).toFixed(2)}%)` +
+    `<div class="goal">Meta de contagem: ${im.totalCells} / ${CELLS_TARGET} células nesta lâmina</div>`;
+
+  // history — agrupado por dia, mais recente primeiro
+  const hist = document.getElementById('histList');
+  document.getElementById('undoBtn').disabled = data.history.length === 0;
+  if(data.history.length === 0){
+    hist.innerHTML = '<div class="empty">Nenhuma célula registrada ainda.</div>';
+  } else {
+    const dayKey = d => d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
+    const dayLabel = d => {
+      const today = new Date(); today.setHours(0,0,0,0);
+      const yesterday = new Date(today); yesterday.setDate(today.getDate()-1);
+      const cmp = new Date(d); cmp.setHours(0,0,0,0);
+      if(cmp.getTime() === today.getTime()) return 'Hoje';
+      if(cmp.getTime() === yesterday.getTime()) return 'Ontem';
+      const s = d.toLocaleDateString('pt-BR', {weekday:'long', day:'2-digit', month:'2-digit', year:'numeric'});
+      return s.charAt(0).toUpperCase() + s.slice(1);
+    };
+
+    const groups = {};
+    data.history.forEach(h=>{
+      const d = new Date(h.t);
+      const key = dayKey(d);
+      if(!groups[key]) groups[key] = { date: d, items: [] };
+      groups[key].items.push(h);
+    });
+    const orderedKeys = Object.keys(groups).sort().reverse();
+
+    hist.innerHTML = orderedKeys.map(key=>{
+      const group = groups[key];
+      const itemsHTML = [...group.items].reverse().map(h=>{
+        const time = new Date(h.t).toLocaleTimeString('pt-BR', {hour:'2-digit', minute:'2-digit', second:'2-digit'});
+        const label = h.status === 'Normal' ? 'Normal' : `Anormal — ${h.type}`;
+        return `<div class="hist-item">
+          <span>${h.phase} · ${label}</span>
+          <span class="hist-right"><span class="tag">${time}</span><button class="hist-edit-btn" onclick="openEditHistory('${h.id}')">editar</button></span>
+        </div>`;
+      }).join('');
+      return `<div class="hist-day-label">${dayLabel(group.date)} — ${key.split('-').reverse().join('/')}</div>${itemsHTML}`;
+    }).join('');
+  }
+}
+
+renderSlideList();
+(function showStorageStatus(){
+  const el = document.getElementById('storageStatus');
+  if(window.storage){
+    el.textContent = 'Dados salvos automaticamente.';
+  } else if(hasLocalStorage){
+    el.textContent = 'Dados salvos neste navegador — reabra este mesmo arquivo pra continuar de onde parou.';
+  } else {
+    el.textContent = 'Atenção: este navegador bloqueou o armazenamento — os dados somem ao fechar a aba. Exporte o CSV/relatório antes de sair.';
+    el.style.color = 'var(--stain)';
+  }
+})();
+</script>
+</body>
+</html>

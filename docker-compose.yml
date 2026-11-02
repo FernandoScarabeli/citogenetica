@@ -1,0 +1,95 @@
+name: citogenetica
+
+services:
+  api:
+    build:
+      context: ./apps/api
+    depends_on:
+      db:
+        condition: service_healthy
+      rustfs:
+        condition: service_healthy
+      mailpit:
+        condition: service_healthy
+    ports:
+      - "${SERVER_PORT:?Defina SERVER_PORT no arquivo .env}:${SERVER_PORT:?Defina SERVER_PORT no arquivo .env}"
+    environment:
+      SERVER_PORT: ${SERVER_PORT:?Defina SERVER_PORT no arquivo .env}
+      SPRING_DATASOURCE_HOST: db
+      SPRING_DATASOURCE_PORT: ${SPRING_DATASOURCE_PORT:?Defina SPRING_DATASOURCE_PORT no arquivo .env}
+      SPRING_DATASOURCE_DATABASE: ${SPRING_DATASOURCE_DATABASE:?Defina SPRING_DATASOURCE_DATABASE no arquivo .env}
+      SPRING_DATASOURCE_USERNAME: ${SPRING_DATASOURCE_USERNAME:?Defina SPRING_DATASOURCE_USERNAME no arquivo .env}
+      SPRING_DATASOURCE_PASSWORD: ${SPRING_DATASOURCE_PASSWORD:?Defina SPRING_DATASOURCE_PASSWORD no arquivo .env}
+      SPRING_MAIL_HOST: ${SPRING_MAIL_HOST:?Defina SPRING_MAIL_HOST no arquivo .env}
+      SPRING_MAIL_PORT: ${SPRING_MAIL_PORT:?Defina SPRING_MAIL_PORT no arquivo .env}
+      SPRING_MAIL_USERNAME: ${SPRING_MAIL_USERNAME:?Defina SPRING_MAIL_USERNAME no arquivo .env}
+      SPRING_MAIL_PASSWORD: ${SPRING_MAIL_PASSWORD:?Defina SPRING_MAIL_PASSWORD no arquivo .env}
+      SPRING_MAIL_AUTH: ${SPRING_MAIL_AUTH:?Defina SPRING_MAIL_AUTH no arquivo .env}
+      SPRING_MAIL_STARTTLS_ENABLE: ${SPRING_MAIL_STARTTLS_ENABLE:?Defina SPRING_MAIL_STARTTLS_ENABLE no arquivo .env}
+      API_SECURITY_JWT_SECRET: ${API_SECURITY_JWT_SECRET:?Defina API_SECURITY_JWT_SECRET no arquivo .env}
+      API_SECURITY_TOKEN_RECOVERY_EXPIRATION_MINUTES: ${API_SECURITY_TOKEN_RECOVERY_EXPIRATION_MINUTES:?Defina API_SECURITY_TOKEN_RECOVERY_EXPIRATION_MINUTES no arquivo .env}
+      API_FRONTEND_URL: ${API_FRONTEND_URL:?Defina API_FRONTEND_URL no arquivo .env}
+      API_EMAIL_FROM: ${API_EMAIL_FROM:?Defina API_EMAIL_FROM no arquivo .env}
+      STORAGE_INTERNAL_ENDPOINT: http://rustfs:9000
+      STORAGE_PUBLIC_ENDPOINT: ${STORAGE_PUBLIC_ENDPOINT:?Defina STORAGE_PUBLIC_ENDPOINT no arquivo .env}
+      STORAGE_REGION: ${STORAGE_REGION:?Defina STORAGE_REGION no arquivo .env}
+      STORAGE_PATH_STYLE: ${STORAGE_PATH_STYLE:?Defina STORAGE_PATH_STYLE no arquivo .env}
+      STORAGE_BUCKET: ${STORAGE_BUCKET:?Defina STORAGE_BUCKET no arquivo .env}
+      STORAGE_ACCESS_KEY: ${STORAGE_ACCESS_KEY:?Defina STORAGE_ACCESS_KEY no arquivo .env}
+      STORAGE_SECRET_KEY: ${STORAGE_SECRET_KEY:?Defina STORAGE_SECRET_KEY no arquivo .env}
+      STORAGE_PRESIGNED_URL_VALIDITY_SECONDS: ${STORAGE_PRESIGNED_URL_VALIDITY_SECONDS:?Defina STORAGE_PRESIGNED_URL_VALIDITY_SECONDS no arquivo .env}
+      SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE:?Defina SPRING_PROFILES_ACTIVE no arquivo .env}
+    env_file:
+      - .env
+
+  db:
+    image: postgres:${POSTGRES_VERSION:?Defina POSTGRES_VERSION no arquivo .env}-alpine
+    environment:
+      POSTGRES_DB: ${SPRING_DATASOURCE_DATABASE:?Defina SPRING_DATASOURCE_DATABASE no arquivo .env}
+      POSTGRES_USER: ${SPRING_DATASOURCE_USERNAME:?Defina SPRING_DATASOURCE_USERNAME no arquivo .env}
+      POSTGRES_PASSWORD: ${SPRING_DATASOURCE_PASSWORD:?Defina SPRING_DATASOURCE_PASSWORD no arquivo .env}
+    ports:
+      - "${SPRING_DATASOURCE_PORT:?Defina SPRING_DATASOURCE_PORT no arquivo .env}:5432"
+    volumes:
+      - db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -U ${SPRING_DATASOURCE_USERNAME:?Defina SPRING_DATASOURCE_USERNAME no arquivo .env} -d ${SPRING_DATASOURCE_DATABASE:?Defina SPRING_DATASOURCE_DATABASE no arquivo .env}" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  rustfs:
+    image: rustfs/rustfs:1.0.3
+    environment:
+      RUSTFS_ACCESS_KEY: ${STORAGE_ACCESS_KEY:?Defina STORAGE_ACCESS_KEY no arquivo .env}
+      RUSTFS_SECRET_KEY: ${STORAGE_SECRET_KEY:?Defina STORAGE_SECRET_KEY no arquivo .env}
+      RUSTFS_ADDRESS: :9000
+      RUSTFS_CONSOLE_ADDRESS: :9001
+      RUSTFS_CONSOLE_ENABLE: "true"
+      RUSTFS_CORS_ALLOWED_ORIGINS: ${API_FRONTEND_URL:?Defina API_FRONTEND_URL no arquivo .env}
+    ports:
+      - "${STORAGE_PORT:?Defina STORAGE_PORT no arquivo .env}:9000"
+      - "${STORAGE_CONSOLE_PORT:?Defina STORAGE_CONSOLE_PORT no arquivo .env}:9001"
+    volumes:
+      - rustfs-data:/data
+    command: [ "/data" ]
+    healthcheck:
+      test: [ "CMD-SHELL", "curl -fsS http://localhost:9000/health/ready >/dev/null" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  mailpit:
+    image: axllent/mailpit:v1.33.0
+    ports:
+      - "127.0.0.1:${MAILPIT_WEB_PORT:?Defina MAILPIT_WEB_PORT no arquivo .env}:8025"
+    healthcheck:
+      test: [ "CMD", "/mailpit", "readyz" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 5s
+
+volumes:
+  db-data:
+  rustfs-data:

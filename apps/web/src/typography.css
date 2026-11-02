@@ -1,0 +1,27 @@
+/* App composition over the installed scale. Keep registry files unchanged. */
+@layer components {
+  :root { font-optical-sizing: auto; }
+
+  :where(body, button, input, select, textarea) {
+    font-variation-settings: "opsz" 14;
+  }
+
+  h1, h2, h3, h4, h5, h6 { text-wrap: balance; }
+  p { text-wrap: pretty; }
+
+  :is(.page-heading, .detail-heading, .access-intro) h1 {
+    font-weight: 700;
+    font-variation-settings: "opsz" 25;
+  }
+
+  h2, h3, h4, h5, h6, strong, b {
+    font-variation-settings: "opsz" 18;
+  }
+
+  /* Keep editable fields large enough to avoid focus zoom on iOS. */
+  @media (pointer: coarse) {
+    form input, form select, .search input, .notes textarea {
+      font-size: 16px;
+    }
+  }
+}

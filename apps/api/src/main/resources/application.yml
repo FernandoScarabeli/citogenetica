@@ -1,0 +1,73 @@
+server:
+  port: ${SERVER_PORT:8080}
+
+spring:
+  application:
+    name: citogenetica-api
+
+  datasource:
+    url: jdbc:postgresql://${SPRING_DATASOURCE_HOST}:${SPRING_DATASOURCE_PORT}/${SPRING_DATASOURCE_DATABASE}
+    username: ${SPRING_DATASOURCE_USERNAME}
+    password: ${SPRING_DATASOURCE_PASSWORD}
+    driver-class-name: org.postgresql.Driver
+
+  jpa:
+    show-sql: true
+    properties:
+      hibernate:
+        format_sql: true
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+    hibernate:
+      ddl-auto: validate
+
+  flyway:
+    enabled: true
+    baseline-on-migrate: true
+    baseline-version: 1
+    out-of-order: false
+    locations: classpath:db/migration
+
+springdoc:
+  swagger-ui:
+    path: /swagger-ui.html
+
+api:
+  security:
+    jwt:
+      secret: ${API_SECURITY_JWT_SECRET}
+    token:
+      recovery-expiration-minutes: ${API_SECURITY_TOKEN_RECOVERY_EXPIRATION_MINUTES:15}
+  frontend:
+    url: ${API_FRONTEND_URL}
+  email:
+    from: ${API_EMAIL_FROM}
+
+app:
+  datasource:
+    password: ${SPRING_DATASOURCE_PASSWORD}
+  email:
+    host: ${SPRING_MAIL_HOST}
+    port: ${SPRING_MAIL_PORT}
+    username: ${SPRING_MAIL_USERNAME}
+    password: ${SPRING_MAIL_PASSWORD}
+    auth: ${SPRING_MAIL_AUTH}
+    starttls-enable: ${SPRING_MAIL_STARTTLS_ENABLE}
+
+storage:
+  internal-endpoint: ${STORAGE_INTERNAL_ENDPOINT:http://localhost:9000}
+  public-endpoint: ${STORAGE_PUBLIC_ENDPOINT:http://localhost:9000}
+  region: ${STORAGE_REGION:us-east-1}
+  path-style: ${STORAGE_PATH_STYLE:true}
+  bucket: ${STORAGE_BUCKET:citogenetica}
+  access-key: ${STORAGE_ACCESS_KEY}
+  secret-key: ${STORAGE_SECRET_KEY}
+  presigned-url-validity-seconds: ${STORAGE_PRESIGNED_URL_VALIDITY_SECONDS:900}
+
+management:
+  endpoint:
+    health:
+      show-details: always
+  endpoints:
+    web:
+      exposure:
+        include: health,info
