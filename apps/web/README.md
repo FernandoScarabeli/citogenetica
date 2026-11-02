@@ -4,7 +4,7 @@ Aplicação de registro de lâminas de meiose e mitose para o Laboratório de Ci
 
 ## Executar
 
-Requisitos: Node.js 22 e npm.
+Requisitos: Node.js 26 LTS e npm. A versão principal do Node está em `.nvmrc`.
 
 ```sh
 npm install
