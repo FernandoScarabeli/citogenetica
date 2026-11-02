@@ -56,7 +56,7 @@ Suba PostgreSQL e RustFS usando os serviços do Compose:
 docker compose up -d db rustfs
 ```
 
-Carregue o `.env` da raiz no shell e inicie a aplicação:
+Carregue explicitamente no shell as variáveis do `.env` da raiz e inicie a aplicação. A API não lê arquivos `.env` automaticamente:
 
 ```bash
 cd apps/api
@@ -64,7 +64,7 @@ set -a; source ../../.env; set +a
 ./mvnw spring-boot:run
 ```
 
-Para depurar pela IDE, configure o carregamento das variáveis do `.env` na raiz e mantenha o diretório de trabalho em `apps/api/`.
+Para depurar pela IDE, configure a exportação das variáveis do `.env` da raiz na configuração de execução e mantenha o diretório de trabalho em `apps/api/`. Os testes da API não dependem dessas variáveis: `./mvnw test` usa propriedades isoladas e o PostgreSQL do Testcontainers.
 
 ## Estrutura
 
