@@ -24,7 +24,7 @@ Detalhes da [API](apps/api/README.md) e da [aplicação web](apps/web/README.md)
 
 ## Como rodar
 
-Pré-requisitos: Docker com Compose. Para desenvolver fora do Docker, use Node.js 22 para a aplicação web e Java 17 para a API.
+Pré-requisitos: Docker com Compose. Para desenvolver fora do Docker, use Node.js 26 LTS para a aplicação web e Java 17 para a API. A versão principal do Node está em `apps/web/.nvmrc`.
 
 Na raiz do repositório, gere as configurações locais e inicie os serviços:
 
