@@ -62,7 +62,7 @@ public class SecurityConfiguration {
     }
 
     @Bean
-    public SecurityFilterChain securityFilterChain(HttpSecurity http, AuthenticationEntryPoint authenticationEntryPoint) throws Exception {
+    public SecurityFilterChain securityFilterChain(HttpSecurity http, ApiAuthenticationEntryPoint authenticationEntryPoint) throws Exception {
         return http
                 .csrf(AbstractHttpConfigurer::disable)
                 .cors(cors -> cors.configurationSource(corsConfigurationSource()))
@@ -92,7 +92,8 @@ public class SecurityConfiguration {
                         // GESTÃO DE USUÁRIOS
                         .requestMatchers(HttpMethod.POST, "/api/v1/auth/register").hasRole("ADMIN")
                         .requestMatchers(HttpMethod.GET, "/api/v1/usuarios/me").authenticated()
-                        .requestMatchers(HttpMethod.PUT, "/api/v1/usuarios/atualizar-senha/**").authenticated()
+                        .requestMatchers(HttpMethod.PUT, "/api/v1/usuarios/me").authenticated()
+                        .requestMatchers(HttpMethod.PUT, "/api/v1/usuarios/me/senha").authenticated()
 
                         // Regras genéricas de ADMIN para usuários (Delete, Update geral, Listar todos)
                         .requestMatchers("/api/v1/usuarios/**").hasRole("ADMIN")
@@ -115,15 +116,6 @@ public class SecurityConfiguration {
     @Bean
     public PasswordEncoder passwordEncoder() {
         return new BCryptPasswordEncoder();
-    }
-
-    @Bean
-    public AuthenticationEntryPoint customAuthenticationEntryPoint() {
-        return (request, response, authException) -> {
-            response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
-            response.setContentType("application/json;charset=UTF-8");
-            response.getWriter().write("{\"status\":401,\"error\":\"Unauthorized\",\"message\":\"Falha na autenticação. Token inválido ou ausente.\",\"path\":\"" + request.getRequestURI() + "\"}");
-        };
     }
 
     private AccessDeniedHandler customAccessDeniedHandler(AuthenticationEntryPoint authenticationEntryPoint) {

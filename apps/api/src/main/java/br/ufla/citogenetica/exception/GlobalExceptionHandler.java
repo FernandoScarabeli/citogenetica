@@ -70,8 +70,8 @@ public class GlobalExceptionHandler {
         return new ResponseEntity<>(errorResponse, HttpStatus.CONFLICT);
     }
 
-    @ExceptionHandler(BadCredentialsException.class)
-    public ResponseEntity<ErrorResponseDTO> handleBadCredentialsException(BadCredentialsException ex, HttpServletRequest request) {
+    @ExceptionHandler({BadCredentialsException.class, DisabledException.class})
+    public ResponseEntity<ErrorResponseDTO> handleInvalidCredentials(AuthenticationException ex, HttpServletRequest request) {
         ErrorResponseDTO errorResponse = new ErrorResponseDTO(
                 HttpStatus.UNAUTHORIZED.value(),
                 HttpStatus.UNAUTHORIZED.getReasonPhrase(),
@@ -79,17 +79,6 @@ public class GlobalExceptionHandler {
                 request.getRequestURI()
         );
         return new ResponseEntity<>(errorResponse, HttpStatus.UNAUTHORIZED);
-    }
-
-    @ExceptionHandler(DisabledException.class)
-    public ResponseEntity<ErrorResponseDTO> handleDisabledException(DisabledException ex, HttpServletRequest request) {
-        ErrorResponseDTO errorResponse = new ErrorResponseDTO(
-                HttpStatus.FORBIDDEN.value(),
-                HttpStatus.FORBIDDEN.getReasonPhrase(),
-                "Usuário desabilitado.",
-                request.getRequestURI()
-        );
-        return new ResponseEntity<>(errorResponse, HttpStatus.FORBIDDEN);
     }
 
     @ExceptionHandler(AccessDeniedException.class)
