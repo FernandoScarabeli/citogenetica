@@ -6,6 +6,7 @@ import br.ufla.citogenetica.mapper.UsuarioMapper;
 import br.ufla.citogenetica.model.type.RolesEnum;
 import br.ufla.citogenetica.model.type.StatusEnum;
 import br.ufla.citogenetica.model.usuario.Usuario;
+import br.ufla.citogenetica.model.usuario.dto.request.AtualizarMeuPerfilRequestDTO;
 import br.ufla.citogenetica.model.usuario.dto.request.AtualizarSenhaRequestDTO;
 import br.ufla.citogenetica.model.usuario.dto.request.AtualizarUsuarioRequestDTO;
 import br.ufla.citogenetica.repository.UsuarioRepository;
@@ -42,20 +43,15 @@ public class UsuarioService {
 
     @Transactional
     public Usuario atualizar(Long id, AtualizarUsuarioRequestDTO dto) {
-
-        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
-        Usuario usuarioLogado = (Usuario) authentication.getPrincipal();
-
-        boolean isAdmin = usuarioLogado.getRole().getNome().equals(RolesEnum.ADMIN);
-        boolean isSelf = usuarioLogado.getId().equals(id);
-
-        if (!isAdmin && !isSelf) {
-            throw new AccessDeniedException("Você não tem permissão para editar os dados de outro usuário.");
+        Usuario usuarioLogado = usuarioAutenticado();
+        if (!usuarioLogado.getRole().getNome().equals(RolesEnum.ADMIN)) {
+            throw new AccessDeniedException("Você não tem permissão para editar dados de outros usuários.");
         }
 
         Usuario entidade = this.usuarioRepository.findById(id)
                 .orElseThrow(() -> new NotFoundException(Usuario.class, id));
 
+        boolean isSelf = usuarioLogado.getId().equals(id);
         if (entidade.getRole().getNome().equals(RolesEnum.ADMIN) && !isSelf) {
             throw new ValidationConflictException("Não é permitido alterar os dados de um usuário ADMIN.");
         }
@@ -63,10 +59,6 @@ public class UsuarioService {
         entidade.setNome(dto.nome());
 
         if (!entidade.getEmail().equals(dto.email())) {
-            if (!isAdmin) {
-                throw new AccessDeniedException("Apenas administradores podem alterar o endereço de e-mail.");
-            }
-
             if (this.usuarioRepository.existsByEmail(dto.email())) {
                 throw new ValidationConflictException("Já existe um usuário cadastrado com este e-mail.");
             }
@@ -78,9 +70,18 @@ public class UsuarioService {
     }
 
     @Transactional
+    public Usuario atualizarMeuPerfil(AtualizarMeuPerfilRequestDTO dto) {
+        Usuario usuarioLogado = usuarioAutenticado();
+        Usuario entidade = this.usuarioRepository.findById(usuarioLogado.getId())
+                .orElseThrow(() -> new NotFoundException(Usuario.class, usuarioLogado.getId()));
+
+        entidade.setNome(dto.nome());
+        return this.usuarioRepository.save(entidade);
+    }
+
+    @Transactional
     public void trocarStatus(Long id) {
-        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
-        Usuario usuarioLogado = (Usuario) authentication.getPrincipal();
+        Usuario usuarioLogado = usuarioAutenticado();
 
         boolean isAdmin = usuarioLogado.getRole().getNome().equals(RolesEnum.ADMIN);
 
@@ -102,9 +103,10 @@ public class UsuarioService {
     }
 
     @Transactional
-    public Usuario atualizarSenha(Long id, AtualizarSenhaRequestDTO dto) {
-        Usuario entidade = this.usuarioRepository.findById(id)
-                .orElseThrow(() -> new NotFoundException(Usuario.class, id));
+    public void atualizarMinhaSenha(AtualizarSenhaRequestDTO dto) {
+        Usuario usuarioLogado = usuarioAutenticado();
+        Usuario entidade = this.usuarioRepository.findById(usuarioLogado.getId())
+                .orElseThrow(() -> new NotFoundException(Usuario.class, usuarioLogado.getId()));
 
         if (!passwordEncoder.matches(dto.senhaAtual(), entidade.getPassword())) {
             throw new ValidationConflictException("A senha atual está incorreta.");
@@ -112,6 +114,14 @@ public class UsuarioService {
 
         String encryptedPassword = this.passwordEncoder.encode(dto.novaSenha());
         entidade.setSenha(encryptedPassword);
-        return this.usuarioRepository.save(entidade);
+        this.usuarioRepository.save(entidade);
+    }
+
+    private Usuario usuarioAutenticado() {
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        if (authentication == null || !(authentication.getPrincipal() instanceof Usuario usuario)) {
+            throw new AccessDeniedException("É necessário estar autenticado.");
+        }
+        return usuario;
     }
 }

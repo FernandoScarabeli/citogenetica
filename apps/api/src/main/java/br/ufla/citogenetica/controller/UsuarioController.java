@@ -2,6 +2,7 @@ package br.ufla.citogenetica.controller;
 
 import br.ufla.citogenetica.filter.CriteriaCreator;
 import br.ufla.citogenetica.mapper.UsuarioMapper;
+import br.ufla.citogenetica.model.usuario.dto.request.AtualizarMeuPerfilRequestDTO;
 import br.ufla.citogenetica.model.usuario.Usuario;
 import br.ufla.citogenetica.model.usuario.dto.request.AtualizarSenhaRequestDTO;
 import br.ufla.citogenetica.model.usuario.dto.request.AtualizarUsuarioRequestDTO;
@@ -66,8 +67,11 @@ public class UsuarioController {
     }
 
     @PutMapping("/{id}")
-    @Operation(summary = "Atualizar usuário", description = "Atualiza os dados de um usuário existente")
-    @ApiResponse(responseCode = "204", description = "Usuário alterado com sucesso")
+    @Operation(summary = "Atualizar usuário", description = "Atualiza os dados de um usuário existente. Disponível para administradores.")
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "200", description = "Usuário alterado com sucesso"),
+            @ApiResponse(responseCode = "403", description = "Acesso negado")
+    })
     public ResponseEntity<UsuarioResponseDTO> atualizarUsuario(
             @PathVariable Long id,
             @RequestBody @Valid AtualizarUsuarioRequestDTO requestDTO) {
@@ -83,14 +87,30 @@ public class UsuarioController {
         return ResponseEntity.status(HttpStatus.NO_CONTENT).build();
     }
 
-    @PutMapping("/atualizar-senha/{id}")
-    @Operation(summary = "Atualizar senha", description = "Atualiza a senha de um usuário")
-    @ApiResponse(responseCode = "204", description = "Senha atualizada com sucesso")
-    public ResponseEntity<Void> atualizarSenhaUsuario(
-            @PathVariable Long id,
+    @PutMapping("/me/senha")
+    @Operation(summary = "Trocar minha senha", description = "Atualiza a senha do usuário autenticado após validar a senha atual")
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "204", description = "Senha atualizada com sucesso"),
+            @ApiResponse(responseCode = "401", description = "Usuário não autenticado"),
+            @ApiResponse(responseCode = "409", description = "Senha atual incorreta")
+    })
+    public ResponseEntity<Void> atualizarMinhaSenha(
             @RequestBody @Valid AtualizarSenhaRequestDTO requestDTO) {
-        this.usuarioService.atualizarSenha(id, requestDTO);
+        this.usuarioService.atualizarMinhaSenha(requestDTO);
         return ResponseEntity.status(HttpStatus.NO_CONTENT).build();
+    }
+
+    @PutMapping("/me")
+    @Operation(summary = "Atualizar meu perfil", description = "Atualiza o nome do usuário autenticado. A alteração de e-mail é exclusiva de administradores.")
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "200", description = "Perfil atualizado com sucesso"),
+            @ApiResponse(responseCode = "401", description = "Usuário não autenticado"),
+            @ApiResponse(responseCode = "403", description = "Acesso negado")
+    })
+    public ResponseEntity<UsuarioResponseDTO> atualizarMeuPerfil(
+            @RequestBody @Valid AtualizarMeuPerfilRequestDTO requestDTO) {
+        Usuario usuarioAtualizado = this.usuarioService.atualizarMeuPerfil(requestDTO);
+        return ResponseEntity.ok(usuarioMapper.toResponseDTO(usuarioAtualizado));
     }
 
     @GetMapping("/me")
