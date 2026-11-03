@@ -13,6 +13,7 @@ import './laboratories.css';
 import { loadPreferences, savePreferences } from './preferences';
 import type { UsuarioResponseDTO } from './api/contracts/usuario';
 import { ProfileSettings } from './app/ProfileSettings';
+import { NotificationCenter } from './NotificationCenter';
 
 const initialPreferences = loadPreferences();
 type View = 'list' | 'manage' | 'slides' | 'profile';
@@ -492,7 +493,7 @@ export function Laboratories({ user, onLogout, onUserUpdate, renderSlides }: {
   return <div className="labs-app">
     <header className="topbar"><div className="topbar-inner">
       <Link className="brand" to="/laboratorios"><span className="brand-mark"><Microscope size={21} aria-hidden="true" /></span><span>citogenética<small>Laboratório de Citogenética · UFLA</small></span></Link>
-      <div className="lab-account"><AccountMenu name={user.nome} email={user.email} photo={preferences.photo} dark={preferences.dark}
+      <div className="lab-account"><NotificationCenter/><AccountMenu name={user.nome} email={user.email} photo={preferences.photo} dark={preferences.dark}
         onProfile={() => { if (location.pathname !== '/perfil') navigate('/perfil'); setView('profile'); setPageError(''); setNotice(''); }}
         onAppearance={() => updatePreferences({ ...preferences, dark: !preferences.dark })}
         onLogout={onLogout} /></div>

@@ -54,6 +54,8 @@ function mockApi(options: {
       return response(204);
     }
     if (path === '/api/v1/usuarios/me') return options.me ? options.me() : unauthorized(path);
+    if (path === '/api/v1/notificacoes/nao-lidas/count') return response(200, { count: 0 });
+    if (path === '/api/v1/notificacoes') return response(200, { content: [], number: 0, totalPages: 0, last: true });
     if (path === '/api/v1/laboratorios' && method === 'GET') return response(200, []);
     if (path === '/api/v1/auth/login') return options.login ? options.login() : response(204);
     if (path === '/api/v1/auth/logout') return options.logout ? options.logout() : response(204);

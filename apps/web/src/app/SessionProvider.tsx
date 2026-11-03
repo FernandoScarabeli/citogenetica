@@ -3,6 +3,7 @@ import { useLocation, useNavigate } from 'react-router';
 import { authApi, type createAuthApi } from '../api/auth-api';
 import { httpClient, type HttpClient } from '../api/http-client';
 import { usuarioApi, type createUsuarioApi } from '../api/usuario-api';
+import { notificacaoApi } from '../api/notificacao-api';
 import { isUnauthorized, type NetworkError } from '../api/errors';
 import type { UsuarioResponseDTO } from '../api/contracts/usuario';
 import { currentInternalPath } from './return-path';
@@ -26,11 +27,12 @@ interface SessionProviderProps {
   auth?: AuthApi;
   usuario?: ReturnType<typeof createUsuarioApi>;
   client?: HttpClient;
+  notifications?: Pick<typeof notificacaoApi, 'startRealtime' | 'stopRealtime'>;
 }
 
 const SessionContext = createContext<SessionContextValue | null>(null);
 
-export function SessionProvider({ children, auth = authApi, usuario = usuarioApi, client = httpClient }: SessionProviderProps) {
+export function SessionProvider({ children, auth = authApi, usuario = usuarioApi, client = httpClient, notifications = notificacaoApi }: SessionProviderProps) {
   const [user, setUser] = useState<UsuarioResponseDTO | null>(null);
   const [status, setStatus] = useState<SessionStatus>('loading');
   const [loadError, setLoadError] = useState<unknown>(null);
@@ -86,7 +88,13 @@ export function SessionProvider({ children, auth = authApi, usuario = usuarioApi
       );
       navigate('/entrar', { replace: true, state: { returnTo } });
     }
-  }), [client, navigate]);
+    notifications.stopRealtime();
+  }), [client, navigate, notifications]);
+
+  useEffect(() => {
+    if (status !== 'authenticated' || user === null) return;
+    return notifications.startRealtime(user.id);
+  }, [notifications, status, user?.id]);
 
   const login = useCallback(async (email: string, senha: string) => {
     const requestGeneration = ++sessionGenerationRef.current;
@@ -108,13 +116,15 @@ export function SessionProvider({ children, auth = authApi, usuario = usuarioApi
   }, []);
 
   const clearSession = useCallback(() => {
+    notifications.stopRealtime();
     sessionGenerationRef.current += 1;
     setUser(null);
     setLoadError(null);
     setStatus('unauthenticated');
-  }, []);
+  }, [notifications]);
 
   const logout = useCallback(async () => {
+    notifications.stopRealtime();
     const requestGeneration = ++sessionGenerationRef.current;
     let notice: string | undefined;
     try {
@@ -129,7 +139,7 @@ export function SessionProvider({ children, auth = authApi, usuario = usuarioApi
         navigate('/entrar', { replace: true, state: notice ? { notice } : null });
       }
     }
-  }, [auth, navigate]);
+  }, [auth, navigate, notifications]);
 
   return <SessionContext.Provider value={{ user, status, loadError, retry, login, logout, updateUser, clearSession }}>
     {children}
