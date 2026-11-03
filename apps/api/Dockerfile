@@ -1,6 +1,6 @@
 # syntax=docker/dockerfile:1
 
-FROM maven:3.10.0-eclipse-temurin-17 AS deps
+FROM maven:3-eclipse-temurin-27 AS deps
 WORKDIR /build
 COPY pom.xml pom.xml
 RUN --mount=type=cache,id=api-maven-repository,target=/root/.m2 \
