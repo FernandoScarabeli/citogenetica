@@ -1,3 +1,4 @@
+import { FloatingNotice } from './components/ui/floating-notice';
 import { useCallback, useEffect, useRef, useState, type FormEvent } from 'react';
 import { RefreshCw, X } from 'lucide-react';
 import { conviteApi } from './api/convite-api';
@@ -45,7 +46,7 @@ function CancelInvitationDialog({ invitation, busy, onClose, onConfirm }: {
   </dialog>;
 }
 
-export function LaboratoryInvitations({ laboratorioId }: { laboratorioId: string }) {
+export function LaboratoryInvitations({ laboratorioId, onNotice }: { laboratorioId: string; onNotice?: (message: string) => void }) {
   const [invitations, setInvitations] = useState<ConviteLaboratorioResponseDTO[]>([]);
   const [loadStatus, setLoadStatus] = useState<InvitationLoadStatus>('loading');
   const [email, setEmail] = useState('');
@@ -54,6 +55,12 @@ export function LaboratoryInvitations({ laboratorioId }: { laboratorioId: string
   const [cancelCandidate, setCancelCandidate] = useState<ConviteLaboratorioResponseDTO | null>(null);
   const [errorMessage, setErrorMessage] = useState('');
   const [notice, setNotice] = useState('');
+  useEffect(() => {
+    if (notice && onNotice) {
+      onNotice(notice);
+      setNotice('');
+    }
+  }, [notice, onNotice]);
   const [rateLimitedWithoutRetryAfter, setRateLimitedWithoutRetryAfter] = useState(false);
   const countdown = useRetryCountdown();
 
@@ -178,7 +185,7 @@ export function LaboratoryInvitations({ laboratorioId }: { laboratorioId: string
     <section className="invitation-management" aria-labelledby="invitations-title">
       <div className="invitation-management-heading">
         <div><h2 id="invitations-title">Convidar participantes</h2><p>O papel Membro será incluído em toda participação.</p></div>
-        <button className="text-button" type="button" onClick={() => void refresh()} disabled={loadStatus === 'loading'}><RefreshCw size={15} aria-hidden="true" />Atualizar convites</button>
+        <button className="text-button" type="button" aria-label="Atualizar convites" onClick={() => void refresh()} disabled={loadStatus === 'loading'}><RefreshCw size={15} aria-hidden="true" /><span>Atualizar convites</span></button>
       </div>
       <form className="invitation-create-form" onSubmit={event => void createInvitation(event)}>
         <div className="invitation-email-field"><label htmlFor="invitation-email">E-mail</label><input id="invitation-email" name="email" type="email" autoComplete="email" required maxLength={254} value={email} onChange={event => setEmail(event.target.value)} placeholder="nome@instituicao.br" /></div>
@@ -188,7 +195,7 @@ export function LaboratoryInvitations({ laboratorioId }: { laboratorioId: string
       {errorMessage && <p className={errorMessage === 'rate-limited' && !countdown.isWaiting ? 'invitation-notice' : 'invitation-error'} role={errorMessage === 'rate-limited' && !countdown.isWaiting ? 'status' : 'alert'}>
         {errorMessage === 'rate-limited' ? (rateLimitedWithoutRetryAfter ? 'Muitas solicitações. Tente novamente mais tarde.' : rateLimitMessage) : errorMessage}
       </p>}
-      {notice && <p className="invitation-notice" role="status">{notice}</p>}
+      {!onNotice && <FloatingNotice message={notice} onClose={() => setNotice('')} />}
 
       <section className="pending-invitations" aria-labelledby="pending-invitations-title" aria-busy={loadStatus === 'loading'}>
         <div className="section-heading"><h2 id="pending-invitations-title">Convites pendentes</h2></div>

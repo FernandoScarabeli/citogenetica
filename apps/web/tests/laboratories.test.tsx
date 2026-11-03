@@ -87,7 +87,7 @@ function renderPage(renderSlides = vi.fn(() => <p>Lâminas</p>)) {
 async function openLaboratoryManagement(user: ReturnType<typeof userEvent.setup>) {
   await screen.findByRole('heading', { name: 'Meus laboratórios' });
   await user.click(screen.getByRole('button', { name: 'Gerenciar' }));
-  await screen.findByRole('heading', { name: 'Membros do laboratório' });
+  await screen.findByRole('heading', { name: 'Equipe do laboratório' });
 }
 
 async function openInvitations(user: ReturnType<typeof userEvent.setup>) {
@@ -248,7 +248,7 @@ describe('gestão de laboratórios reais', () => {
     await user.click(screen.getByRole('button', { name: 'Orientação' }));
 
     expect(await screen.findByRole('heading', { name: 'Vínculos ativos' })).toBeTruthy();
-    expect(screen.getByText('Bruna Almeida')).toBeTruthy();
+    expect(within(screen.getByRole('region', { name: 'Orientação', exact: true })).getByText('Bruna Almeida')).toBeTruthy();
     expect(orientationApi.listarVinculos).toHaveBeenCalledWith(ACTIVE_LAB.id, expect.any(AbortSignal));
     expect(orientationApi.listarConvites).not.toHaveBeenCalled();
   });
@@ -360,6 +360,8 @@ describe('gestão de laboratórios reais', () => {
     expect(await screen.findByText(/É necessário manter ao menos um Administrador ativo/)).toBeTruthy();
 
     await user.click(screen.getByRole('button', { name: 'Cancelar' }));
+    expect(screen.queryByRole('button', { name: 'Sair do laboratório' })).toBeNull();
+    await user.click(screen.getByRole('button', { name: 'Configurações' }));
     await user.click(screen.getByRole('button', { name: 'Sair do laboratório' }));
     const dialog = screen.getByRole('dialog');
     await user.click(within(dialog).getByRole('button', { name: 'Sair do laboratório' }));
