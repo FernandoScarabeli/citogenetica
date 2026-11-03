@@ -59,6 +59,8 @@ class CitogeneticaApplicationTests extends AbstractIntegrationTest {
                 "/api/v1/auth/login",
                 "/api/v1/auth/logout",
                 "/api/v1/auth/register",
+                "/api/v1/auth/confirmar-email",
+                "/api/v1/auth/reenviar-confirmacao",
                 "/api/v1/auth/recuperar-senha",
                 "/api/v1/auth/redefinir-senha",
                 "/api/v1/auth/validar-codigo",

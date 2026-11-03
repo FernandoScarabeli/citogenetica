@@ -35,6 +35,7 @@ public abstract class AbstractIntegrationTest {
         properties.add("api.security.recovery.hmac-secret", () -> RECOVERY_HMAC_SECRET);
         properties.add("api.cors.allowed-origins", () -> "http://localhost:5173");
         properties.add("api.frontend.url", () -> "http://localhost:3000");
+        properties.add("api.security.email-confirmation.frontend-url", () -> "https://front.citogenetica.test/confirmar-email");
         properties.add("api.email.from", () -> "testes@citogenetica.test");
 
         properties.add("app.datasource.password", () -> TestcontainersConfiguration.DATABASE_PASSWORD);

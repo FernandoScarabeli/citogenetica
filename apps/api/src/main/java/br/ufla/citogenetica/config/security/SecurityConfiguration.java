@@ -152,6 +152,9 @@ public class SecurityConfiguration {
                         // CSRF também protege login e recuperação, inclusive para clientes anônimos.
                         .requestMatchers(HttpMethod.POST,
                                 "/api/v1/auth/login",
+                                "/api/v1/auth/register",
+                                "/api/v1/auth/reenviar-confirmacao",
+                                "/api/v1/auth/confirmar-email",
                                 "/api/v1/auth/recuperar-senha",
                                 "/api/v1/auth/redefinir-senha",
                                 "/api/v1/auth/validar-codigo").permitAll()
@@ -160,12 +163,11 @@ public class SecurityConfiguration {
                         .requestMatchers(HttpMethod.GET, "/api/events/**").authenticated()
                         .requestMatchers("/api/v1/notificacoes/**").authenticated()
 
-                        .requestMatchers(HttpMethod.POST, "/api/v1/auth/register").hasRole("ADMIN")
                         .requestMatchers(HttpMethod.GET, "/api/v1/usuarios/me").authenticated()
                         .requestMatchers(HttpMethod.PUT, "/api/v1/usuarios/me").authenticated()
                         .requestMatchers(HttpMethod.PUT, "/api/v1/usuarios/me/senha").authenticated()
                         .requestMatchers("/api/v1/usuarios/**").hasRole("ADMIN")
-                        .requestMatchers("/api/v1/exemplos/**").authenticated()
+                        .requestMatchers("/api/v1/exemplos/**").hasRole("ADMIN")
                         .anyRequest().authenticated())
                 .addFilterAfter(sessionUserValidationFilter, SecurityContextHolderFilter.class)
                 .build();

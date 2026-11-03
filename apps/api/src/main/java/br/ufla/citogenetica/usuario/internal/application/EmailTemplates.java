@@ -2,6 +2,27 @@ package br.ufla.citogenetica.usuario.internal.application;
 
 public class EmailTemplates {
 
+    public static String templateConfirmacaoEmail(String confirmationUrl, long expirationHours) {
+        String safeUrl = confirmationUrl.replace("&", "&amp;").replace("\"", "&quot;");
+        return String.format(
+                """
+                        <!DOCTYPE html>
+                        <html lang="pt-BR">
+                        <head><meta charset="UTF-8"><title>Confirme seu e-mail</title></head>
+                        <body style="font-family: Arial, sans-serif; background-color: #f0eded; padding: 24px;">
+                          <main style="max-width: 600px; margin: auto; background: #fff; padding: 32px;">
+                            <h1 style="color: #00A859;">Citogenética UFLA</h1>
+                            <h2>Confirme seu e-mail</h2>
+                            <p>Para concluir seu cadastro, confirme que este endereço de e-mail é seu.</p>
+                            <p><a href="%s">Confirmar meu e-mail</a></p>
+                            <p>Este link expira em %d horas e só pode ser usado uma vez.</p>
+                            <p>Se você não criou esta conta, ignore esta mensagem.</p>
+                          </main>
+                        </body>
+                        </html>
+                        """, safeUrl, expirationHours);
+    }
+
     public static String templateRecuperacaoSenha(String codigo, long expirationMinutes) {
         return String.format(
                 """

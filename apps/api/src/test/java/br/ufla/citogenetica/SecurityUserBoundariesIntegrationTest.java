@@ -211,6 +211,7 @@ class SecurityUserBoundariesIntegrationTest extends AbstractIntegrationTest {
                 .email(UUID.randomUUID() + "@citogenetica.test")
                 .senha(passwordEncoder.encode(SENHA_ATUAL))
                 .status(status)
+                .emailConfirmadoEm(java.time.Instant.now())
                 .role(role)
                 .build());
     }

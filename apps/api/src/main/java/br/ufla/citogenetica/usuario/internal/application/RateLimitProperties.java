@@ -15,7 +15,10 @@ public record RateLimitProperties(
         @NotNull @Valid Limits login,
         @NotNull @Valid Limits recoveryRequest,
         @NotNull @Valid Limits validate,
-        @NotNull @Valid Limits reset) {
+        @NotNull @Valid Limits reset,
+        @NotNull @Valid Limits register,
+        @NotNull @Valid Limits resendConfirmation,
+        @NotNull @Valid Limits emailConfirmation) {
 
     public record Limits(@Min(1) int ip, @Min(1) int email) {
     }

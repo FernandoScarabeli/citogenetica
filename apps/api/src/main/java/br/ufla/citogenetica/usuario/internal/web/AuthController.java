@@ -7,10 +7,11 @@ import br.ufla.citogenetica.usuario.internal.web.dto.request.LoginRequestDTO;
 import br.ufla.citogenetica.usuario.internal.web.dto.request.RecuperarSenhaRequestDTO;
 import br.ufla.citogenetica.usuario.internal.web.dto.request.RedefinirSenhaRequestDTO;
 import br.ufla.citogenetica.usuario.internal.web.dto.request.UsuarioRequestDTO;
+import br.ufla.citogenetica.usuario.internal.web.dto.request.EmailConfirmationRequestDTO;
+import br.ufla.citogenetica.usuario.internal.web.dto.request.ResendEmailConfirmationRequestDTO;
 import br.ufla.citogenetica.usuario.internal.web.dto.request.ValidarCodigoRequestDTO;
 import br.ufla.citogenetica.usuario.internal.domain.Usuario;
 import br.ufla.citogenetica.usuario.api.UsuarioPrincipal;
-import br.ufla.citogenetica.usuario.internal.web.dto.response.UsuarioResponseDTO;
 import br.ufla.citogenetica.usuario.internal.application.AuthService;
 
 import io.swagger.v3.oas.annotations.Operation;
@@ -94,15 +95,41 @@ public class AuthController {
     }
 
     @PostMapping("/register")
-    @SecurityRequirement(name = "sessao-cookie")
-    @Operation(summary = "Registrar novo usuário", description = "Cria uma nova conta de usuário. Exige o cabeçalho X-XSRF-TOKEN.")
+    @SecurityRequirement(name = "csrf-token")
+    @Operation(summary = "Registrar novo usuário", description = "Solicita cadastro e envia confirmação por e-mail. A resposta não revela se o endereço já está cadastrado.")
     @ApiResponses(value = {
-            @ApiResponse(responseCode = "201", description = "Usuário criado com sucesso"),
-            @ApiResponse(responseCode = "400", description = "Dados inválidos")
+            @ApiResponse(responseCode = "202", description = "Solicitação aceita"),
+            @ApiResponse(responseCode = "400", description = "Dados inválidos ou senha fora da política"),
+            @ApiResponse(responseCode = "429", description = "Limite de solicitações atingido")
     })
-    public ResponseEntity<UsuarioResponseDTO> register(@RequestBody @Valid UsuarioRequestDTO requestDTO) {
-        UsuarioResponseDTO response = this.authService.register(requestDTO);
-        return ResponseEntity.status(HttpStatus.CREATED).body(response);
+    public ResponseEntity<Void> register(@RequestBody @Valid UsuarioRequestDTO requestDTO) {
+        this.authService.register(requestDTO);
+        return ResponseEntity.status(HttpStatus.ACCEPTED).build();
+    }
+
+    @PostMapping("/reenviar-confirmacao")
+    @SecurityRequirement(name = "csrf-token")
+    @Operation(summary = "Reenviar confirmação de e-mail", description = "Solicita um novo link sem revelar se o e-mail existe ou já foi confirmado.")
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "202", description = "Solicitação aceita"),
+            @ApiResponse(responseCode = "429", description = "Limite de solicitações atingido")
+    })
+    public ResponseEntity<Void> reenviarConfirmacao(@RequestBody @Valid ResendEmailConfirmationRequestDTO requestDTO) {
+        authService.reenviarConfirmacao(requestDTO);
+        return ResponseEntity.accepted().build();
+    }
+
+    @PostMapping("/confirmar-email")
+    @SecurityRequirement(name = "csrf-token")
+    @Operation(summary = "Confirmar e-mail", description = "Consome uma única vez o token enviado ao e-mail. Não cria sessão; é necessário fazer login depois.")
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "204", description = "E-mail confirmado"),
+            @ApiResponse(responseCode = "400", description = "Link inválido ou expirado"),
+            @ApiResponse(responseCode = "429", description = "Limite de solicitações atingido")
+    })
+    public ResponseEntity<Void> confirmarEmail(@RequestBody @Valid EmailConfirmationRequestDTO requestDTO) {
+        authService.confirmarEmail(requestDTO);
+        return ResponseEntity.noContent().build();
     }
 
     @PostMapping("/recuperar-senha")
