@@ -25,4 +25,20 @@ public interface ParticipacaoPapelRepository extends JpaRepository<ParticipacaoP
             + "and papel.papel = :papel and papel.revogadoEm is null")
     long contarParticipacoesAtivasComPapel(@Param("laboratorioId") UUID laboratorioId,
                                            @Param("papel") PapelLaboratorio papel);
+
+    @Query("select distinct participacao.laboratorio.id as laboratorioId, "
+            + "participacao.usuarioId as usuarioId "
+            + "from ParticipacaoPapel papel join papel.participacao participacao "
+            + "where participacao.laboratorio.id in :laboratorioIds "
+            + "and participacao.estado = br.ufla.citogenetica.laboratorio.internal.domain.EstadoParticipacao.ATIVA "
+            + "and papel.papel = br.ufla.citogenetica.laboratorio.internal.domain.PapelLaboratorio.ADMIN "
+            + "and papel.revogadoEm is null")
+    List<AdministradorAtivo> listarAdministradoresAtivosPorLaboratorio(
+            @Param("laboratorioIds") Collection<UUID> laboratorioIds);
+
+    interface AdministradorAtivo {
+        UUID getLaboratorioId();
+
+        Long getUsuarioId();
+    }
 }

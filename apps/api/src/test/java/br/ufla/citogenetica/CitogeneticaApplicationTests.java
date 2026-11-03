@@ -54,6 +54,11 @@ class CitogeneticaApplicationTests extends AbstractIntegrationTest {
         Set<String> encontrados = new HashSet<>();
         paths.fieldNames().forEachRemaining(encontrados::add);
 
+        JsonNode listagemAdminLaboratorios = paths.path("/api/v1/admin/laboratorios").path("get");
+        assertThat(listagemAdminLaboratorios.isObject()).isTrue();
+        assertThat(listagemAdminLaboratorios.path("parameters").findValuesAsText("name"))
+                .contains("page", "size", "sortBy", "sortDirection", "nome", "estado");
+
         assertThat(encontrados).containsExactlyInAnyOrder(
                 "/api/v1/auth/csrf",
                 "/api/v1/auth/login",
@@ -86,6 +91,7 @@ class CitogeneticaApplicationTests extends AbstractIntegrationTest {
                 "/api/v1/convites/recusar",
                 "/api/v1/orientacoes/convites/aceitar",
                 "/api/v1/orientacoes/convites/recusar",
+                "/api/v1/admin/laboratorios",
                 "/api/v1/admin/laboratorios/{laboratorioId}/desativar",
                 "/api/v1/admin/laboratorios/{laboratorioId}/reativar",
                 "/api/v1/notificacoes",
