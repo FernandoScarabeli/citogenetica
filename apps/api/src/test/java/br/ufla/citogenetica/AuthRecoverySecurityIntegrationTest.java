@@ -1,14 +1,14 @@
 package br.ufla.citogenetica;
 
 import br.ufla.citogenetica.config.TestSecrets;
-import br.ufla.citogenetica.model.roles.Role;
-import br.ufla.citogenetica.model.type.RolesEnum;
-import br.ufla.citogenetica.model.type.StatusEnum;
-import br.ufla.citogenetica.model.usuario.Usuario;
-import br.ufla.citogenetica.repository.RoleRepository;
-import br.ufla.citogenetica.repository.UsuarioRepository;
+import br.ufla.citogenetica.usuario.internal.domain.Role;
+import br.ufla.citogenetica.usuario.api.RolesEnum;
+import br.ufla.citogenetica.usuario.internal.domain.StatusEnum;
+import br.ufla.citogenetica.usuario.internal.domain.Usuario;
+import br.ufla.citogenetica.usuario.internal.persistence.RoleRepository;
+import br.ufla.citogenetica.usuario.internal.persistence.UsuarioRepository;
 import br.ufla.citogenetica.infra.email.EmailService;
-import br.ufla.citogenetica.service.RecoveryHmacService;
+import br.ufla.citogenetica.usuario.internal.application.RecoveryHmacService;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;

@@ -12,7 +12,7 @@ Os nomes de módulos de domínio são em português (`usuario`, `notificacao`, `
 
 ```text
 usuario        → shared
-notificacao    → shared, laboratorio.api.event, contagem.api.event, colaboracao.api.event
+notificacao    → shared, usuario.api, laboratorio.api.event, contagem.api.event, colaboracao.api.event
 exemplo        → shared
 laboratorio    → shared, usuario.api
 protocolo      → shared
@@ -26,7 +26,7 @@ analise        → shared, contagem.api, protocolo.api, pesquisa.api
 
 `notificacao` consome eventos públicos dos módulos produtores de convites, contagens e colaboração (`laboratorio`, `contagem`, `colaboracao`). Os produtores não dependem de `notificacao`, evitando ciclos. Consultas/comandos que precisem de resposta imediata usam uma fachada pública. Eventos representam fatos já ocorridos, são imutáveis, não carregam entidades JPA e são tratados após commit quando houver efeito externo.
 
-`infra.email` e `infra.storage` concentram os adaptadores SMTP e RustFS/S3 e suas propriedades. Os utilitários de segredo (`SecretValue`, `@ValidSecret` e validador) ficam em `shared.secret` porque são usados pela configuração da aplicação e pelos dois adaptadores; o conversor Spring fica em `config.secret`. Prefixos de propriedades não mudam. Templates e intenção dos e-mails pertencem ao módulo que inicia cada fluxo; o template e o listener de recuperação continuam no legado até o PR 3. Até lá, esse listener legado ainda chama o adaptador SMTP diretamente.
+`infra.email` e `infra.storage` concentram os adaptadores SMTP e RustFS/S3 e suas propriedades. O e-mail implementa a porta `shared.email.EmailSender`; módulos não dependem da implementação SMTP. Os utilitários de segredo (`SecretValue`, `@ValidSecret` e validador) ficam em `shared.secret` porque são usados pela configuração da aplicação e pelos dois adaptadores; o conversor Spring fica em `config.secret`. Prefixos de propriedades não mudam. Templates e intenção dos e-mails pertencem ao módulo que inicia cada fluxo.
 
 ## Responsabilidades
 
@@ -44,9 +44,15 @@ analise        → shared, contagem.api, protocolo.api, pesquisa.api
 
 ## Infraestrutura e persistência
 
-`config` reúne segurança HTTP, sessão, CSRF, CORS, proxy confiável, OpenAPI, SSE e configuração global. As propriedades de banco ficam em `config.properties`; propriedades de e-mail e storage ficam junto dos adaptadores. `SecurityConfiguration` ainda compõe temporariamente `SessionUserValidationFilter` e `UsuarioPrincipal` do legado e chama `EventPublisherService` no logout. O acoplamento direto ao SSE será substituído por evento de sessão no PR 4, sem alteração neste PR. Rate limit e executor da recuperação continuam no legado para o PR 3.
+`usuario.api` contém somente contratos que `config` ou outros módulos consomem: `UsuarioPrincipal`, `RolesEnum`, as exceções traduzidas pelo handler HTTP e `SessoesRevogadasEvent`. A entidade, DTOs, serviços, repositórios e integração de segurança ficam em `usuario.internal`. A enumeração de papéis globais não representa participação ou papel de laboratório.
 
-O contrato HTTP de erro, `NotFoundException` e `BusinessException` compartilhada ficam reunidos em `shared.web.error`; `FiltroInvalidoException` permanece em `shared.filter`. O handler global fica em `config.web`. Ele ainda mapeia exceções específicas de autenticação/perfil que estão no legado; essas exceções acompanham `usuario` no PR 3, sem dependência de `shared` para negócio.
+`config` reúne segurança HTTP, sessão, CSRF, CORS, proxy confiável, OpenAPI, SSE e configuração global. As propriedades de banco ficam em `config.properties`; propriedades de e-mail e storage ficam junto dos adaptadores; as propriedades de recuperação e rate limit ficam no módulo `usuario`. `CustomUserDetailsService` e `SessionUserValidationFilter` são beans registrados pelo próprio módulo. `SecurityConfiguration` usa o tipo Spring `Filter`, qualificado pelo nome estável `sessionUserValidationFilter`, em vez de importar a classe interna; o filtro recebe `AuthenticationEntryPoint` e `SecurityContextRepository` pelas interfaces Spring. A configuração ainda usa `UsuarioPrincipal` da API pública e chama o `EventPublisherService` legado no logout. O acoplamento direto ao SSE será substituído por evento de sessão no PR 4.
+
+O `GlobalExceptionHandler` permanece em `config.web` porque padroniza erros HTTP da aplicação. Exceções específicas que ele traduz ficam em `usuario.api.error`, como contratos públicos mínimos para essa composição; assim o handler não conhece `usuario.internal`. Uma advice por módulo duplicaria o formato comum e exigiria coordenar precedência com o handler genérico.
+
+`UsuarioPrincipal` implementa `Serializable` e é persistido dentro do `SecurityContext` na sessão JDBC. Mover sua classe para `usuario.api` altera o nome totalmente qualificado serializado; sessões gravadas pelo pacote antigo não serão compatíveis. Em desenvolvimento, é aceitável exigir novo login após a atualização. Em ambiente com sessões ativas, o deploy deve invalidá-las/limpar os registros antigos antes de servir tráfego.
+
+O contrato HTTP de erro, `NotFoundException` e `BusinessException` compartilhada ficam reunidos em `shared.web.error`; `FiltroInvalidoException` permanece em `shared.filter`. O handler global fica em `config.web` e traduz as exceções específicas de autenticação/perfil publicadas em `usuario.api.error`, sem dependência de `shared` para negócio.
 
 `CriteriaCreator` e `CamposPermitidos` ficam em `shared.filter`; `PageableFactory`, constantes e resposta paginada em `shared.pagination`; contratos e interfaces de mapper genérico em `shared.mapper`; auditoria/versionamento comum em `shared.persistence`. A base atual usa `IDENTITY` para IDs numéricos. `GenericDTO` também mantém o ID `Long` legado; ambos devem ser revistos antes de atender entidades UUID geradas no cliente.
 
@@ -54,7 +60,7 @@ Os pacotes permanecem abaixo de `br.ufla.citogenetica`, raiz de `@SpringBootAppl
 
 ## Verificação e migração
 
-ArchUnit, em escopo de teste, verifica acesso apenas a APIs públicas, ausência de dependências de `shared` para negócio/config, ausência de dependências de módulos para `config` e aciclicidade. Há também um teste de regressão do conjunto de paths em `/v3/api-docs`. O teste documenta os pacotes legados ainda tolerados (`controller`, `exception`, `filter`, `mapper`, `model`, `repository` e `service`); os PRs 3–4 removem os pacotes correspondentes da lista.
+ArchUnit, em escopo de teste, verifica acesso apenas a APIs públicas, ausência de dependências de `shared` para negócio/config/infra/legado, ausência de dependências de módulos para `config`, uso somente de `usuario.api` por `config` e aciclicidade. Há também um teste de regressão do conjunto de paths em `/v3/api-docs`. Os pacotes legados tolerados são `controller`, `exception`, `mapper`, `model`, `repository` e `service`. `model` e `service` ainda acessam `usuario.internal` durante a transição da notificação; essa tolerância se encerra no PR 4. `exception` mantém duas classes antigas sem uso para revisão na limpeza final.
 
 Migração aprovada em quatro PRs:
 

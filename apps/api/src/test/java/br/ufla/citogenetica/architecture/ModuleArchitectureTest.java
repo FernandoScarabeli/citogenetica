@@ -57,16 +57,15 @@ class ModuleArchitectureTest {
 
     /**
      * Pacotes legados tolerados durante a migração, mas proibidos como dependência dos módulos
-     * novos. PRs 3–4 removem os demais conforme os módulos migram.
+     * novos. No PR 4, notificacao sai desses pacotes e deixa de acessar usuario.internal.
      */
     private static final List<String> LEGACY_PACKAGES = List.of(
-            BASE + ".controller",     // PRs 3–4: controllers legados de usuario e notificacao.
-            BASE + ".exception",      // PR 3: exceções específicas de usuario ainda usadas pelo handler global.
-            BASE + ".filter",         // PR 3: filtros específicos de usuario; filtros comuns já migraram.
-            BASE + ".mapper",         // PRs 3–4: mappers concretos de usuario e notificacao.
-            BASE + ".model",          // PRs 3–4: entidades, tipos e DTOs dos módulos legados.
-            BASE + ".repository",     // PRs 3–4: repositórios legados.
-            BASE + ".service"         // PRs 3–4: serviços legados específicos de usuario e notificacao.
+            BASE + ".controller",    // PR 4: controllers legados de notificacao.
+            BASE + ".exception",     // PR 4: ConflictException e ModelException antigos, sem uso.
+            BASE + ".mapper",        // PR 4: mapper legado de notificacao.
+            BASE + ".model",         // PR 4: entidades, eventos e DTOs de notificacao.
+            BASE + ".repository",    // PR 4: repositório legado de notificacao.
+            BASE + ".service"        // PR 4: notificacao ainda acessa usuario.internal; inclui SSE legado.
     );
 
     private static final String[] LEGACY_PACKAGE_PATTERNS = LEGACY_PACKAGES.stream()
@@ -125,6 +124,12 @@ class ModuleArchitectureTest {
             .that().resideInAnyPackage(MODULES_AND_INFRA_PACKAGES)
             .should().dependOnClassesThat().resideInAnyPackage(CONFIG_PACKAGES)
             .as("Módulos e adaptadores não dependem da raiz de composição config");
+
+    @ArchTest
+    static final ArchRule config_uses_only_public_usuario_api = noClasses()
+            .that().resideInAPackage(BASE + ".config..")
+            .should().dependOnClassesThat().resideInAPackage(BASE + ".usuario.internal..")
+            .as("config usa somente a API pública de usuario");
 
     @ArchTest
     static void grafo_de_dependencias_entre_modulos_nao_tem_ciclos(JavaClasses importedClasses) {

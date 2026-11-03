@@ -1,7 +1,7 @@
 package br.ufla.citogenetica.controller;
 
 import br.ufla.citogenetica.model.notificacao.dto.NotificacaoResponseDTO;
-import br.ufla.citogenetica.model.usuario.UsuarioPrincipal;
+import br.ufla.citogenetica.usuario.api.UsuarioPrincipal;
 import br.ufla.citogenetica.shared.pagination.PaginationConstants;
 import br.ufla.citogenetica.shared.pagination.PageableFactory;
 import br.ufla.citogenetica.service.NotificacaoService;

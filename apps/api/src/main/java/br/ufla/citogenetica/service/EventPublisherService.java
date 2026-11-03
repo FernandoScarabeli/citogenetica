@@ -3,7 +3,7 @@ package br.ufla.citogenetica.service;
 import br.ufla.citogenetica.config.sse.SseProperties;
 import br.ufla.citogenetica.model.event.NotificacaoCriadaEvent;
 import br.ufla.citogenetica.model.event.ServerEvent;
-import br.ufla.citogenetica.model.event.SessoesRevogadasEvent;
+import br.ufla.citogenetica.usuario.api.event.SessoesRevogadasEvent;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.session.FindByIndexNameSessionRepository;
