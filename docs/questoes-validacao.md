@@ -26,12 +26,23 @@ Quando uma resposta mudar, atualize o item e a data, não apague o histórico da
 | Um pesquisador pode ter mais de um orientador? | decidido (2026-11-03, mantenedor) | Sim (orientação e coorientação). |
 | Quem vê as lâminas e contagens de um pesquisador? | decidido (2026-11-03, mantenedor) | O próprio pesquisador, seus orientadores e os administradores do laboratório. Os demais membros não veem. |
 | O que acontece com os dados de quem sai do laboratório? | decidido (2026-11-03, mantenedor) | Ficam no laboratório, somente leitura. A pessoa perde o acesso. |
+| Uma pessoa pode ter mais de um papel no laboratório? | decidido (2026-11-03, mantenedor) | Sim. Os papéis (membro, administrador, orientador) se combinam. |
+| Quem concede os papéis de administrador e orientador? | decidido (2026-11-03, mantenedor) | Somente administradores do laboratório. |
+| O que acontece quando um laboratório é desativado? | decidido (2026-11-03, mantenedor) | Ninguém altera nada nem envia convites; os dados ficam e os membros continuam vendo. |
+| Quem vê a lista de membros? | decidido (2026-11-03, mantenedor) | Todos os membros ativos veem nome, e-mail e papel dos colegas. |
+| Quanto tempo vale um convite? | decidido (2026-11-03, mantenedor) | 7 dias. Reenviar invalida o link anterior. |
+| Pode haver laboratórios com o mesmo nome? | decidido (2026-11-03, mantenedor) | Sim. |
+| Quem encerra um vínculo de orientação? | decidido (2026-11-03, mantenedor) | O orientador ou um administrador do laboratório (o pesquisador não). |
+| Quem saiu ou foi removido pode voltar? | decidido (2026-11-03, mantenedor) | Sim, somente com um convite novo. |
+| Como o orientador convida? | decidido (2026-11-03, mantenedor) | Convida para orientação; se a pessoa ainda não for membro, o mesmo convite a coloca no laboratório. |
 
 ## Contagem (Etapa 2)
 
 | Questão | Status | Decisão |
 |---|---|---|
 | Uma célula pode ter mais de uma anormalidade? | decidido (2026-11-03, mantenedor) | Sim. |
+| O que pode ser criado sem internet? | decidido (2026-11-03, mantenedor) | Somente lâminas e contagens. Laboratórios e convites exigem conexão. |
+| Guardar a hora do aparelho? | decidido (2026-11-03, mantenedor) | Sim, como dado separado e apenas informativo; a hora oficial é a do servidor. |
 | Limites do lote, meta configurável, casas decimais | pendente (Etapa 2) | Perguntar ao laboratório. |
 | Alcance do "desfazer" entre aparelhos | pendente (Etapa 2/4) | Perguntar ao laboratório. |
 | Quais eventos geram notificação (convite, comentário, conflito...) | pendente (Etapa 1 em diante) | Definir junto com cada etapa. |
