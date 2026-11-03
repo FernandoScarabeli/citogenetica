@@ -103,6 +103,7 @@ class NotificacaoOwnershipIntegrationTest extends AbstractIntegrationTest {
         inserirNotificacao(alice, "alice-1", false);
         inserirNotificacao(alice, "alice-2", true);
         inserirNotificacao(bruno, "bruno-1", false);
+        inserirNotificacao(bruno, "bruno-2", true);
 
         requisicaoAutenticada(sessaoAlice, get("/api/v1/notificacoes"))
                 .andExpect(status().isOk())
@@ -113,6 +114,11 @@ class NotificacaoOwnershipIntegrationTest extends AbstractIntegrationTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.content", hasSize(1)))
                 .andExpect(jsonPath("$.content[*].titulo", hasItem("alice-1")));
+
+        requisicaoAutenticada(sessaoAlice, get("/api/v1/notificacoes").param("lida", "true"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.content", hasSize(1)))
+                .andExpect(jsonPath("$.content[*].titulo", hasItem("alice-2")));
     }
 
     @Test

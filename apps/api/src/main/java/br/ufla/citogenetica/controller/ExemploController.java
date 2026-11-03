@@ -7,12 +7,15 @@ import br.ufla.citogenetica.model.crudExemplo.Exemplo;
 import br.ufla.citogenetica.model.crudExemplo.dto.request.ExemploRequestDTO;
 import br.ufla.citogenetica.model.crudExemplo.dto.response.ExemploResponseDTO;
 import br.ufla.citogenetica.model.genericDto.PageResponseDTO;
+import br.ufla.citogenetica.pagination.PaginationConstants;
+import br.ufla.citogenetica.pagination.PageableFactory;
 import br.ufla.citogenetica.service.ExemploService;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import jakarta.validation.Valid;
+import jakarta.validation.constraints.Max;
+import jakarta.validation.constraints.Min;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
-import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.http.HttpStatus;
@@ -41,15 +44,19 @@ public class ExemploController {
             @RequestParam MultiValueMap<String, String> params,
 
             // Parâmetros de paginação e ordenação recebidos individualmente
-            @RequestParam(defaultValue = "0") int page,
-            @RequestParam(defaultValue = "10") int size,
+            @RequestParam(defaultValue = "0")
+            @Min(value = 0, message = "a página não pode ser negativa") int page,
+            @RequestParam(defaultValue = "10")
+            @Min(value = 1, message = "o tamanho da página deve ser no mínimo 1")
+            @Max(value = PaginationConstants.MAX_PAGE_SIZE,
+                    message = "o tamanho da página deve ser no máximo {value}") int size,
             @RequestParam(defaultValue = "id") String sortBy,
             @RequestParam(defaultValue = "asc") String sortDirection) {
 
 
-        Specification<Exemplo> spec = CriteriaCreator.byFilterMap(params, Exemplo.class, CAMPOS_LISTAGEM, sortBy, sortDirection);
+        Specification<Exemplo> spec = CriteriaCreator.byFilterMap(params, CAMPOS_LISTAGEM);
 
-        Pageable pageable = PageRequest.of(page, size);
+        Pageable pageable = PageableFactory.criar(page, size, sortBy, sortDirection, CAMPOS_LISTAGEM);
 
         Page<Exemplo> pageResult = exemploService.buscarTodos(spec, pageable);
 

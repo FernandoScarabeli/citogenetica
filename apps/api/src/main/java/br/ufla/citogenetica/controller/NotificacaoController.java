@@ -2,6 +2,8 @@ package br.ufla.citogenetica.controller;
 
 import br.ufla.citogenetica.model.notificacao.dto.NotificacaoResponseDTO;
 import br.ufla.citogenetica.model.usuario.UsuarioPrincipal;
+import br.ufla.citogenetica.pagination.PaginationConstants;
+import br.ufla.citogenetica.pagination.PageableFactory;
 import br.ufla.citogenetica.service.NotificacaoService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
@@ -12,7 +14,6 @@ import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
-import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -26,8 +27,6 @@ import java.util.Map;
 @Tag(name = "Notificações", description = "Endpoints para gerenciamento de notificações (sininho)")
 @SecurityRequirement(name = "sessao-cookie")
 public class NotificacaoController {
-
-    static final int TAMANHO_MAXIMO_PAGINA = 100;
 
     private final NotificacaoService notificacaoService;
 
@@ -43,14 +42,16 @@ public class NotificacaoController {
             @Min(value = 0, message = "a página não pode ser negativa") int page,
             @RequestParam(defaultValue = "20")
             @Min(value = 1, message = "o tamanho da página deve ser no mínimo 1")
-            @Max(value = TAMANHO_MAXIMO_PAGINA, message = "o tamanho da página deve ser no máximo {value}") int size,
+            @Max(value = PaginationConstants.MAX_PAGE_SIZE, message = "o tamanho da página deve ser no máximo {value}") int size,
             @RequestParam(required = false) Boolean lida) {
 
-        Pageable pageable = PageRequest.of(page, size);
+        Pageable pageable = PageableFactory.criar(page, size);
 
         Page<NotificacaoResponseDTO> notificacoes;
         if (Boolean.FALSE.equals(lida)) {
             notificacoes = notificacaoService.buscarNaoLidas(usuario.id(), pageable);
+        } else if (Boolean.TRUE.equals(lida)) {
+            notificacoes = notificacaoService.buscarLidas(usuario.id(), pageable);
         } else {
             notificacoes = notificacaoService.buscarTodas(usuario.id(), pageable);
         }
