@@ -10,26 +10,39 @@ import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 import java.time.LocalDateTime;
+import java.util.Optional;
 
+/**
+ * Toda consulta recebe o destinatário: não há método que leia ou altere notificações
+ * sem filtrar pelo dono.
+ */
 @Repository
 public interface NotificacaoRepository extends JpaRepository<Notificacao, Long> {
 
-    Page<Notificacao> findByLidaFalseOrderByCreatedDateDesc(Pageable pageable);
+    Page<Notificacao> findByDestinatarioIdAndLidaFalseOrderByCreatedDateDesc(Long destinatarioId, Pageable pageable);
 
-    Page<Notificacao> findAllByOrderByCreatedDateDesc(Pageable pageable);
+    Page<Notificacao> findByDestinatarioIdOrderByCreatedDateDesc(Long destinatarioId, Pageable pageable);
 
-    long countByLidaFalse();
+    long countByDestinatarioIdAndLidaFalse(Long destinatarioId);
 
-    @Modifying
-    @Query("UPDATE Notificacao n SET n.lida = true WHERE n.lida = false")
-    int marcarTodasComoLidas();
+    Optional<Notificacao> findByIdAndDestinatarioId(Long id, Long destinatarioId);
+
+    @Modifying(flushAutomatically = true, clearAutomatically = true)
+    @Query("""
+            UPDATE Notificacao n
+               SET n.lida = true, n.version = n.version + 1, n.lastModifiedDate = CURRENT_TIMESTAMP
+             WHERE n.destinatario.id = :destinatarioId AND n.lida = false
+            """)
+    int marcarTodasComoLidas(@Param("destinatarioId") Long destinatarioId);
 
     /**
-     * Deleta notificações lidas mais antigas que a data informada.
-     * Usado para limpeza automática de notificações antigas.
+     * Deleta notificações lidas do destinatário mais antigas que a data informada.
      */
-    @Modifying
-    @Query("DELETE FROM Notificacao n WHERE n.lida = true AND n.createdDate < :dataLimite")
-    int deletarAntigasLidas(@Param("dataLimite") LocalDateTime dataLimite);
+    @Modifying(flushAutomatically = true, clearAutomatically = true)
+    @Query("""
+            DELETE FROM Notificacao n
+             WHERE n.destinatario.id = :destinatarioId AND n.lida = true AND n.createdDate < :dataLimite
+            """)
+    int deletarAntigasLidas(@Param("destinatarioId") Long destinatarioId,
+                            @Param("dataLimite") LocalDateTime dataLimite);
 }
-
