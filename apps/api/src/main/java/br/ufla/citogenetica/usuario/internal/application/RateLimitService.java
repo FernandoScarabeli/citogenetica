@@ -4,6 +4,8 @@ import br.ufla.citogenetica.usuario.api.error.TooManyRequestsException;
 import org.springframework.dao.EmptyResultDataAccessException;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.sql.Timestamp;
 import java.time.Clock;
@@ -15,6 +17,7 @@ public class RateLimitService {
 
     private static final String EMAIL_KEY_TYPE = "EMAIL";
     private static final String IP_KEY_TYPE = "IP";
+    private static final String USER_KEY_TYPE = "USER";
 
     private final JdbcTemplate jdbcTemplate;
     private final RateLimitProperties properties;
@@ -31,11 +34,16 @@ public class RateLimitService {
 
     public void enforceIp(AuthRateLimitRoute route, String ipAddress) {
         String key = ipAddress == null || ipAddress.isBlank() ? "endereco-indisponivel" : ipAddress;
-        check(route, IP_KEY_TYPE, hmacService.ipRateKey(key), limits(route).ip());
+        check(route, IP_KEY_TYPE, hmacService.ipRateKey(key), ipLimit(route));
     }
 
     public void enforceEmail(AuthRateLimitRoute route, String normalizedEmail) {
         check(route, EMAIL_KEY_TYPE, hmacService.emailRateKey(normalizedEmail), limits(route).email());
+    }
+
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    public void enforceUser(AuthRateLimitRoute route, long userId) {
+        check(route, USER_KEY_TYPE, hmacService.userRateKey(Long.toString(userId)), userLimit(route));
     }
 
     public int removeExpiredWindows() {
@@ -74,6 +82,24 @@ public class RateLimitService {
             case REGISTER -> properties.register();
             case RESEND_CONFIRMATION -> properties.resendConfirmation();
             case EMAIL_CONFIRMATION -> properties.emailConfirmation();
+            case CHANGE_EMAIL, CONFIRM_EMAIL_CHANGE -> throw new IllegalArgumentException(
+                    "Esta rota não possui limite por e-mail.");
+        };
+    }
+
+    private int ipLimit(AuthRateLimitRoute route) {
+        return switch (route) {
+            case CHANGE_EMAIL -> properties.changeEmail().ip();
+            case CONFIRM_EMAIL_CHANGE -> properties.confirmEmailChange().ip();
+            default -> limits(route).ip();
+        };
+    }
+
+    private int userLimit(AuthRateLimitRoute route) {
+        return switch (route) {
+            case CHANGE_EMAIL -> properties.changeEmail().user();
+            case CONFIRM_EMAIL_CHANGE -> properties.confirmEmailChange().user();
+            default -> throw new IllegalArgumentException("Esta rota não possui limite por usuário.");
         };
     }
 }

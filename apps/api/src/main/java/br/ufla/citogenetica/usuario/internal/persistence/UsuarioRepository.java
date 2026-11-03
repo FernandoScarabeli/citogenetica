@@ -14,6 +14,9 @@ import java.util.Optional;
 @Repository
 public interface UsuarioRepository extends JpaRepository<Usuario, Long>, JpaSpecificationExecutor<Usuario> {
     Optional<Usuario> findByEmail(String email);
+    @Query("select count(usuario) > 0 from Usuario usuario "
+            + "where lower(usuario.email) = lower(:email) and usuario.id <> :id")
+    boolean existsByEmailIgnoreCaseAndIdNot(@Param("email") String email, @Param("id") Long id);
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("select usuario from Usuario usuario where usuario.email = :email")
     Optional<Usuario> findByEmailForUpdate(@Param("email") String email);
