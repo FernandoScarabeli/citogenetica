@@ -49,8 +49,21 @@ public class LaboratorioAccessPolicy {
         return laboratorio;
     }
 
+    /** Obtém o lock do laboratório sem exigir que ele esteja ativo; o chamador decide como tratar o estado. */
+    public Laboratorio bloquearLaboratorio(UUID laboratorioId) {
+        return laboratorioRepository.findByIdForUpdate(laboratorioId)
+                .orElseThrow(() -> new NotFoundException(NAO_ENCONTRADO));
+    }
+
     public Laboratorio bloquearLaboratorioParaAdmin(UUID laboratorioId, Long usuarioId) {
         Laboratorio laboratorio = bloquearLaboratorio(laboratorioId, usuarioId);
+        exigirAdmin(laboratorioId, usuarioId);
+        return laboratorio;
+    }
+
+    /** Revogar convite continua permitido em laboratório desativado, pois apenas invalida acesso futuro. */
+    public Laboratorio bloquearLaboratorioParaAdminSemExigirAtivo(UUID laboratorioId, Long usuarioId) {
+        Laboratorio laboratorio = bloquearLaboratorio(laboratorioId);
         exigirAdmin(laboratorioId, usuarioId);
         return laboratorio;
     }

@@ -13,7 +13,7 @@ Os módulos de domínio usam nomes em português (`usuario`, `notificacao`, `exe
 ```text
 config          → shared, usuario.api
 usuario         → shared
-notificacao     → shared, usuario.api
+notificacao     → shared, usuario.api, laboratorio.api
 exemplo         → shared
 laboratorio     → shared, usuario.api
 infra.email     → shared
@@ -21,9 +21,9 @@ infra.storage   → shared
 shared          → (nenhum módulo)
 ```
 
-`notificacao` não precisa de pacote `api` próprio: nenhum outro módulo consome seus serviços. Sua entrega SSE e seus controllers são detalhes internos. O módulo usa `UsuarioExistenceQuery` em `usuario.api` para preservar a validação do destinatário sem conhecer a entidade ou o repositório de usuário.
+`notificacao` não precisa de pacote `api` próprio: nenhum outro módulo consome seus serviços. Sua entrega SSE e seus controllers são detalhes internos. O módulo usa `UsuarioExistenceQuery` e `UsuarioConviteQuery` em `usuario.api` para preservar a validação do destinatário sem conhecer entidades ou repositórios de usuário, e consome `ConviteLaboratorioCriadoEvent` publicado pela API pública de `laboratorio` após o commit.
 
-O planejamento prevê convites, protocolo, contagem, dados/importação/exportação, sincronização offline, pesquisa/projetos, colaboração/fotos/comentários e análise. Ao serem implementados, devem publicar eventos ou fachadas públicas e manter o grafo sem ciclos.
+O planejamento prevê protocolo, contagem, dados/importação/exportação, sincronização offline, pesquisa/projetos, colaboração/fotos/comentários e análise. Ao serem implementados, devem publicar eventos ou fachadas públicas e manter o grafo sem ciclos.
 
 ## Responsabilidades e pacotes
 
@@ -41,6 +41,7 @@ br.ufla.citogenetica
 │   ├── email
 │   └── storage
 ├── laboratorio
+│   ├── api/event
 │   └── internal/{application,domain,persistence,web}
 ├── notificacao
 │   └── internal/{application,domain/event,mapper,persistence,sse,web}
@@ -60,14 +61,14 @@ br.ufla.citogenetica
 - `usuario`: conta, autenticação, perfil, papéis globais e recuperação. O papel global de administrador da plataforma é separado dos papéis por laboratório.
 - `notificacao`: notificações do destinatário e entrega em tempo real por SSE.
 - `exemplo`: CRUD vertical mantido como padrão de referência para novos módulos.
-- `laboratorio`: laboratórios, participações e papéis locais. O papel global `usuario.ADMIN` não concede acesso a laboratórios; convite e orientação serão adicionados em etapas posteriores.
+- `laboratorio`: laboratórios, participações, papéis locais e convites. O papel global `usuario.ADMIN` não concede acesso a laboratórios. Convites são enviados após commit; notificações recebem somente o evento público sem token de ação. Em laboratório desativado, envio, reenvio e aceite ficam bloqueados; a revogação permanece disponível ao admin local. Vínculos de orientação serão adicionados em etapa posterior.
 - `config`: segurança HTTP, sessão, CSRF, CORS, proxy confiável, OpenAPI e tratamento global de erros.
 - `infra.email` e `infra.storage`: adaptadores SMTP e RustFS/S3. O envio de e-mail é exposto por `shared.email.EmailSender`.
 - `shared`: paginação, filtros, mappers genéricos, persistência comum, erros HTTP, segredos e portas técnicas compartilhadas.
 
 ## Contratos e eventos
 
-`usuario.api` publica `UsuarioPrincipal`, `RolesEnum`, as exceções de usuário traduzidas pelo handler global, `UsuarioExistenceQuery`, `UsuarioRosterQuery` e eventos de sessão. As consultas são implementadas em `usuario.internal` sobre o repositório interno e retornam somente projeções, nunca entidades JPA. O módulo `laboratorio` mantém `usuario_id` como ID escalar `BIGINT` e filtra por participação ativa; ele não depende de tipos internos de usuário. A notificação grava `destinatarioId` como ID escalar; a coluna `usuario_id`, a FK `fk_notificacao_usuario` e o `ON DELETE CASCADE` existentes permanecem. A FK protege a integridade no banco e a consulta pública preserva a resposta de usuário inexistente.
+`usuario.api` publica `UsuarioPrincipal`, `RolesEnum`, as exceções de usuário traduzidas pelo handler global, `UsuarioExistenceQuery`, `UsuarioRosterQuery`, `UsuarioConviteQuery` e eventos de sessão. As consultas são implementadas em `usuario.internal` sobre o repositório interno e retornam somente projeções, nunca entidades JPA. O módulo `laboratorio` mantém `usuario_id` como ID escalar `BIGINT` e filtra por participação ativa; ele não depende de tipos internos de usuário. `laboratorio.api.event` publica o evento pós-commit de convite sem token; `notificacao` consulta `usuario.api` e cria a notificação em nova transação. A notificação grava `destinatarioId` como ID escalar; a coluna `usuario_id`, a FK `fk_notificacao_usuario` e o `ON DELETE CASCADE` existentes permanecem. A FK protege a integridade no banco e a consulta pública preserva a resposta de usuário inexistente.
 
 `config.security` publica `SessaoEncerradaEvent` no logout. O listener interno de `notificacao` fecha apenas os emissores associados à sessão do evento. A requisição de logout não tem transação; o listener usa fallback síncrono e o handler de logout é executado antes de `SecurityContextLogoutHandler` invalidar a sessão. Se houver uma transação ativa, o listener processa após o commit. Revogação de outras sessões também é tratada após o commit. Eventos de criação de notificação seguem publicados somente após o commit.
 
