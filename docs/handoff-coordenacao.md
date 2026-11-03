@@ -121,13 +121,18 @@ PRs #1–#23: isolamento de testes (Testcontainers), CI, correções de seguran�
 | #27 | `feat/troca-email-confirmacao` | #26 | Troca de e-mail com confirmação no endereço novo, V8 |
 | #28 | `feat/base-uuid` | #27 | `UuidEntity`, `UuidFactory`, `@CanonicalUuidV4`, filtro `Instant`, ADR 0003 |
 | #29 | `feat/modulo-laboratorio` | #28 | Laboratório, participação, papéis, regra do último admin, V9 |
-| (próximo) | `feat/convites-laboratorio` | #29 | Convites de participação, V10 — ver seção 4.3 |
-| (este) | `docs/handoff-coordenacao` | `dev` | Este documento (independente) |
+| (sem PR) | `feat/convites-laboratorio` | #29 | Convites de participação, V10 — **enviado sem revisão**, ver seção 4.3 |
+| #30 | `docs/handoff-coordenacao` | `dev` | Este documento (independente) |
 
 Verifique com `gh pr list` — os números dos dois últimos estarão lá se já tiverem sido abertos.
 
 ### 4.3 Em andamento / falta no back da Etapa 1
-- **Convites de participação (PR B, V10):** estava sendo implementado pelo Codex no PC antigo; o coordenador anterior ia revisar, testar e abrir o PR empilhado sobre o #29. Se a branch `feat/convites-laboratorio` existir no GitHub com PR aberto, está feito. Se não existir, refaça a partir do prompt da seção 6.2.
+- **Convites de participação (PR B, V10): SUA PRIMEIRA TAREFA.** O Codex implementou no PC antigo e o código foi enviado **sem revisão** para a branch `feat/convites-laboratorio` (empilhada sobre `feat/modulo-laboratorio`), num commit marcado como "não revisado". **Não há PR ainda.** Faça:
+  1. `git fetch && git switch feat/convites-laboratorio`.
+  2. Revise o diff contra `feat/modulo-laboratorio` com o checklist da seção 3.5 e o escopo do prompt 6.2 (token só como hash; nada de token em log/evento; aceite exige e-mail confirmado igual ao destino; lock do laboratório antes das linhas filhas; laboratório desativado bloqueia; respostas genéricas; limites; `notificacao` sem importar `laboratorio.internal`).
+  3. Rode a suíte completa. Corrija o que achar (você mesmo, se for pequeno; ou uma sessão do Codex com contexto 6.4 + a correção).
+  4. Commit das correções, push, e abra o PR com base `feat/modulo-laboratorio` (corpo em pt-BR simples, sem atribuição a IA). O relatório do Codex sobre esta entrega está em `docs/handoff-convites-relatorio.md` nesta mesma branch (apague esse arquivo no seu commit de correção — não deve ir para o PR).
+  5. Se a branch não existir, refaça a partir do prompt da seção 6.2.
 - **Orientação (PR C, V11):** **não começou.** Especificação completa na seção 6.3.
 
 ---
