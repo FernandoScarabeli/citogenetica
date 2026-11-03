@@ -14,16 +14,23 @@ import { CreateAccountPage } from './CreateAccountPage';
 import { ConfirmEmailPage } from './ConfirmEmailPage';
 import { ConfirmEmailChangePage } from './ConfirmEmailChangePage';
 import { RecoverPasswordPage } from './RecoverPasswordPage';
-import { prepareInitialConfirmationToken } from './confirmation-token';
+import { InvitationAcceptancePage } from './InvitationAcceptancePage';
+import { prepareInitialRouteToken, takeInvitationToken } from './confirmation-token';
+import { InvitationTokenProvider, useInvitationToken } from './invitation-token-context';
 import { SessionProvider, isSessionNetworkError, useSession } from './SessionProvider';
 import { currentInternalPath } from './return-path';
 
 function PrepareConfirmationToken({ children }: { children: ReactNode }) {
   const location = useLocation();
+  const invitationToken = useInvitationToken();
 
   useLayoutEffect(() => {
-    prepareInitialConfirmationToken();
-  }, [location.pathname, location.search, location.hash]);
+    prepareInitialRouteToken();
+    if (location.pathname === '/convites/aceitar') {
+      const token = takeInvitationToken();
+      if (token) invitationToken.setToken(token);
+    }
+  }, [location.pathname, location.search, location.hash, invitationToken.setToken]);
 
   return children;
 }
@@ -81,6 +88,7 @@ function RouteTable() {
     <Route path="/criar-conta" element={<CreateAccountPage/>}/>
     <Route path="/confirmar-email" element={<ConfirmEmailPage/>}/>
     <Route path="/confirmar-troca-email" element={<ConfirmEmailChangePage/>}/>
+    <Route path="/convites/aceitar" element={<InvitationAcceptancePage/>}/>
     <Route path="/recuperar-senha" element={<RecoverPasswordPage/>}/>
     <Route element={<ProtectedRoutes/>}>
       <Route path="/app" element={<AuthenticatedApp/>}/>
@@ -94,11 +102,13 @@ function RouteTable() {
 export function App() {
   return <SizeProvider>
     <BrowserRouter>
-      <PrepareConfirmationToken>
-        <SessionProvider>
-          <RouteTable/>
-        </SessionProvider>
-      </PrepareConfirmationToken>
+      <InvitationTokenProvider>
+        <PrepareConfirmationToken>
+          <SessionProvider>
+            <RouteTable/>
+          </SessionProvider>
+        </PrepareConfirmationToken>
+      </InvitationTokenProvider>
     </BrowserRouter>
   </SizeProvider>;
 }
