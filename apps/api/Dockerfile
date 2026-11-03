@@ -15,7 +15,7 @@ RUN --mount=type=cache,id=api-maven-repository,target=/root/.m2 \
 FROM package AS extract
 RUN java -Djarmode=tools -jar target/app.jar extract --layers --launcher --destination target/extracted
 
-FROM eclipse-temurin:17-jre-jammy AS final
+FROM eclipse-temurin:25-jre-jammy AS final
 WORKDIR /application
 
 # curl é usado pelo healthcheck do Compose para consultar /actuator/health.
