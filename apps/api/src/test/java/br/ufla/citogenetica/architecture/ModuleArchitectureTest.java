@@ -37,7 +37,7 @@ class ModuleArchitectureTest {
     private static final Set<String> MODULES = Set.of(
             "shared", "config", "usuario", "notificacao", "exemplo", "laboratorio",
             "protocolo", "contagem", "dados", "sincronizacao", "pesquisa",
-            "colaboracao", "analise");
+            "colaboracao", "analise", "infra");
 
     private static final List<String> BUSINESS_MODULES = List.of(
             "shared", "usuario", "notificacao", "exemplo", "laboratorio", "protocolo",
@@ -47,24 +47,26 @@ class ModuleArchitectureTest {
             .map(module -> BASE + "." + module + "..")
             .toArray(String[]::new);
 
+    private static final String[] MODULES_AND_INFRA_PACKAGES = combine(
+            BUSINESS_MODULE_PACKAGES,
+            new String[]{BASE + ".infra.."});
+
     private static final String[] CONFIG_PACKAGES = {
-            BASE + ".config..",
-            BASE + ".configuration.."
+            BASE + ".config.."
     };
 
     /**
      * Pacotes legados tolerados durante a migração, mas proibidos como dependência dos módulos
-     * novos. PR 2 remove configuration; PRs 3–4 removem os demais conforme os módulos migram.
+     * novos. PRs 3–4 removem os demais conforme os módulos migram.
      */
     private static final List<String> LEGACY_PACKAGES = List.of(
-            BASE + ".configuration", // PR 2: segurança, sessão, OpenAPI, e-mail, segredos e storage.
             BASE + ".controller",     // PRs 3–4: controllers legados de usuario e notificacao.
-            BASE + ".exception",      // PR 2: handler global e exceções específicas de autenticação.
-            BASE + ".filter",         // PR 2: interceptor de rate limit; filtros comuns já migraram.
+            BASE + ".exception",      // PR 3: exceções específicas de usuario ainda usadas pelo handler global.
+            BASE + ".filter",         // PR 3: filtros específicos de usuario; filtros comuns já migraram.
             BASE + ".mapper",         // PRs 3–4: mappers concretos de usuario e notificacao.
             BASE + ".model",          // PRs 3–4: entidades, tipos e DTOs dos módulos legados.
             BASE + ".repository",     // PRs 3–4: repositórios legados.
-            BASE + ".service"         // PRs 2–4: serviços legados e adaptadores ainda não movidos.
+            BASE + ".service"         // PRs 3–4: serviços legados específicos de usuario e notificacao.
     );
 
     private static final String[] LEGACY_PACKAGE_PATTERNS = LEGACY_PACKAGES.stream()
@@ -77,10 +79,11 @@ class ModuleArchitectureTest {
                     .map(module -> BASE + "." + module + "..")
                     .toArray(String[]::new),
             CONFIG_PACKAGES,
+            new String[]{BASE + ".infra.."},
             LEGACY_PACKAGE_PATTERNS);
 
     private static final ArchCondition<JavaClass> USES_ONLY_PUBLIC_MODULE_APIS =
-            new ArchCondition<>("depend only on another module's public API") {
+            new ArchCondition<>("depender somente da API pública de outro módulo") {
                 @Override
                 public void check(JavaClass origin, ConditionEvents events) {
                     String originModule = moduleOf(origin.getPackageName());
@@ -99,8 +102,8 @@ class ModuleArchitectureTest {
                         }
 
                         events.add(SimpleConditionEvent.violated(origin,
-                                origin.getName() + " depends on non-public type " + target.getName()
-                                        + " in module " + targetModule));
+                                origin.getName() + " depende do tipo não público " + target.getName()
+                                        + " no módulo " + targetModule));
                     }
                 }
             };
@@ -108,20 +111,23 @@ class ModuleArchitectureTest {
     @ArchTest
     static final ArchRule modules_use_only_public_apis = classes()
             .that().resideInAnyPackage(BUSINESS_MODULE_PACKAGES)
-            .should(USES_ONLY_PUBLIC_MODULE_APIS);
+            .should(USES_ONLY_PUBLIC_MODULE_APIS)
+            .as("Módulos de domínio dependem somente de APIs públicas de outros módulos");
 
     @ArchTest
     static final ArchRule shared_has_no_business_config_or_legacy_dependencies = noClasses()
             .that().resideInAPackage(BASE + ".shared..")
-            .should().dependOnClassesThat().resideInAnyPackage(SHARED_FORBIDDEN_PACKAGES);
+            .should().dependOnClassesThat().resideInAnyPackage(SHARED_FORBIDDEN_PACKAGES)
+            .as("shared não depende de negócio, configuração, infra nem legado");
 
     @ArchTest
     static final ArchRule modules_do_not_depend_on_config = noClasses()
-            .that().resideInAnyPackage(BUSINESS_MODULE_PACKAGES)
-            .should().dependOnClassesThat().resideInAnyPackage(CONFIG_PACKAGES);
+            .that().resideInAnyPackage(MODULES_AND_INFRA_PACKAGES)
+            .should().dependOnClassesThat().resideInAnyPackage(CONFIG_PACKAGES)
+            .as("Módulos e adaptadores não dependem da raiz de composição config");
 
     @ArchTest
-    static void module_dependency_graph_has_no_cycles(JavaClasses importedClasses) {
+    static void grafo_de_dependencias_entre_modulos_nao_tem_ciclos(JavaClasses importedClasses) {
         Map<String, Set<String>> graph = new HashMap<>();
         MODULES.forEach(module -> graph.put(module, new HashSet<>()));
 

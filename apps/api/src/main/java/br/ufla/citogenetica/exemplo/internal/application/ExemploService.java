@@ -4,7 +4,7 @@ import br.ufla.citogenetica.exemplo.internal.domain.Exemplo;
 import br.ufla.citogenetica.exemplo.internal.mapper.ExemploMapper;
 import br.ufla.citogenetica.exemplo.internal.persistence.ExemploRepository;
 import br.ufla.citogenetica.exemplo.internal.web.dto.request.ExemploRequestDTO;
-import br.ufla.citogenetica.shared.error.NotFoundException;
+import br.ufla.citogenetica.shared.web.error.NotFoundException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;

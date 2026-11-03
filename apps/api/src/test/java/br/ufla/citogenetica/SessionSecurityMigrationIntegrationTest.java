@@ -5,6 +5,7 @@ import br.ufla.citogenetica.model.type.StatusEnum;
 import br.ufla.citogenetica.model.usuario.Usuario;
 import br.ufla.citogenetica.repository.RoleRepository;
 import br.ufla.citogenetica.repository.UsuarioRepository;
+
 import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.servlet.http.Cookie;
 import org.junit.jupiter.api.Test;

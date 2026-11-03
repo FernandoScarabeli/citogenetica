@@ -1,6 +1,6 @@
 package br.ufla.citogenetica.service;
 
-import br.ufla.citogenetica.shared.error.NotFoundException;
+import br.ufla.citogenetica.shared.web.error.NotFoundException;
 import br.ufla.citogenetica.mapper.NotificacaoMapper;
 import br.ufla.citogenetica.model.event.NotificacaoCriadaEvent;
 import br.ufla.citogenetica.model.notificacao.Notificacao;

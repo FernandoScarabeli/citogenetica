@@ -1,8 +1,6 @@
 package br.ufla.citogenetica.service;
 
-import br.ufla.citogenetica.configuration.security.RecoveryProperties;
-import br.ufla.citogenetica.configuration.security.RecoveryExpirationProperties;
-import br.ufla.citogenetica.exception.BusinessException;
+import br.ufla.citogenetica.shared.web.error.BusinessException;
 import br.ufla.citogenetica.exception.ValidationConflictException;
 import br.ufla.citogenetica.mapper.UsuarioMapper;
 import br.ufla.citogenetica.model.roles.Role;

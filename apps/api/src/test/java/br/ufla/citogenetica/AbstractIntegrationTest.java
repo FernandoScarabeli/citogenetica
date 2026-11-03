@@ -1,7 +1,8 @@
 package br.ufla.citogenetica;
 
-import br.ufla.citogenetica.configuration.TestSecrets;
-import br.ufla.citogenetica.configuration.TestcontainersConfiguration;
+import br.ufla.citogenetica.config.TestSecrets;
+import br.ufla.citogenetica.config.TestcontainersConfiguration;
+
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.context.annotation.Import;

@@ -1,6 +1,5 @@
 package br.ufla.citogenetica.service;
 
-import br.ufla.citogenetica.configuration.security.RecoveryProperties;
 import org.springframework.stereotype.Service;
 
 import javax.crypto.Mac;

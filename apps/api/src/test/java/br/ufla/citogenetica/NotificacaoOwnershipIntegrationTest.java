@@ -10,6 +10,7 @@ import br.ufla.citogenetica.repository.NotificacaoRepository;
 import br.ufla.citogenetica.repository.RoleRepository;
 import br.ufla.citogenetica.repository.UsuarioRepository;
 import br.ufla.citogenetica.service.NotificacaoService;
+
 import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.PersistenceContext;
