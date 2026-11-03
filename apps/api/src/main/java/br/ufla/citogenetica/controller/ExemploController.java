@@ -1,5 +1,6 @@
 package br.ufla.citogenetica.controller;
 
+import br.ufla.citogenetica.filter.CamposPermitidos;
 import br.ufla.citogenetica.filter.CriteriaCreator;
 import br.ufla.citogenetica.mapper.ExemploMapper;
 import br.ufla.citogenetica.model.crudExemplo.Exemplo;
@@ -19,11 +20,17 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.util.MultiValueMap;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.Set;
+
 @RestController
 @RequestMapping("/api/v1/exemplos")
 @RequiredArgsConstructor
 @SecurityRequirement(name = "sessao-cookie")
 public class ExemploController {
+
+    private static final CamposPermitidos CAMPOS_LISTAGEM = new CamposPermitidos(
+            Set.of("id", "enumType", "descricao", "valor", "dataExemplo", "ativo", "createdDate"),
+            Set.of("id", "enumType", "descricao", "valor", "dataExemplo", "ativo", "createdDate"));
 
     private final ExemploService exemploService;
     private final ExemploMapper exemploMapper;
@@ -40,7 +47,7 @@ public class ExemploController {
             @RequestParam(defaultValue = "asc") String sortDirection) {
 
 
-        Specification<Exemplo> spec = CriteriaCreator.byFilterMap(params, Exemplo.class, sortBy, sortDirection);
+        Specification<Exemplo> spec = CriteriaCreator.byFilterMap(params, Exemplo.class, CAMPOS_LISTAGEM, sortBy, sortDirection);
 
         Pageable pageable = PageRequest.of(page, size);
 

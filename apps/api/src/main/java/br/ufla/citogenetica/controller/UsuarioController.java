@@ -1,5 +1,6 @@
 package br.ufla.citogenetica.controller;
 
+import br.ufla.citogenetica.filter.CamposPermitidos;
 import br.ufla.citogenetica.filter.CriteriaCreator;
 import br.ufla.citogenetica.mapper.UsuarioMapper;
 import br.ufla.citogenetica.model.usuario.dto.request.AtualizarMeuPerfilRequestDTO;
@@ -28,12 +29,19 @@ import org.springframework.util.MultiValueMap;
 import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.Set;
+
 @RestController
 @RequestMapping("/api/v1/usuarios")
 @RequiredArgsConstructor
 @Tag(name = "Usuários", description = "Endpoints para gerenciamento de usuários")
 @SecurityRequirement(name = "sessao-cookie")
 public class UsuarioController {
+
+    // Nunca incluir senha ou outros campos internos: filtro por eles vira oráculo de dados.
+    private static final CamposPermitidos CAMPOS_LISTAGEM = new CamposPermitidos(
+            Set.of("id", "nome", "email", "status", "role.nome", "createdDate"),
+            Set.of("id", "nome", "email", "status", "createdDate"));
 
     private final UsuarioService usuarioService;
     private final UsuarioMapper usuarioMapper;
@@ -47,7 +55,7 @@ public class UsuarioController {
             @RequestParam(defaultValue = "10") int size,
             @RequestParam(defaultValue = "id") String sortBy,
             @RequestParam(defaultValue = "asc") String sortDirection) {
-        Specification<Usuario> spec = CriteriaCreator.byFilterMap(params, Usuario.class, sortBy, sortDirection);
+        Specification<Usuario> spec = CriteriaCreator.byFilterMap(params, Usuario.class, CAMPOS_LISTAGEM, sortBy, sortDirection);
         Pageable pageable = PageRequest.of(page, size);
         Page<Usuario> pageResult = this.usuarioService.buscarTodos(spec, pageable);
         PageResponseDTO<Usuario, UsuarioResponseDTO> response = new PageResponseDTO<>(pageResult,

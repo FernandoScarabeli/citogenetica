@@ -30,10 +30,8 @@ spring:
     # Sem Open Session In View: a conexão JDBC volta ao pool ao fim da transação, e não ao fim
     # da requisição. Com ele ligado, cada stream SSE aberto prendia uma conexão até fechar.
     open-in-view: false
-    show-sql: true
     properties:
       hibernate:
-        format_sql: true
         dialect: org.hibernate.dialect.PostgreSQLDialect
     hibernate:
       ddl-auto: validate
@@ -107,11 +105,13 @@ storage:
   secret-key: ${STORAGE_SECRET_KEY}
   presigned-url-validity-seconds: ${STORAGE_PRESIGNED_URL_VALIDITY_SECONDS:900}
 
+# Fora do perfil dev, o health público responde só o status (padrão do Spring: never),
+# sem versão do banco, caminhos ou espaço em disco. Nenhum outro endpoint é exposto.
 management:
   endpoint:
     health:
-      show-details: always
+      show-details: never
   endpoints:
     web:
       exposure:
-        include: health,info
+        include: health
