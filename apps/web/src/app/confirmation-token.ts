@@ -1,5 +1,6 @@
 let preparedToken: string | null | undefined;
 let preparedUrl: string | undefined;
+const confirmationPaths = new Set(['/confirmar-email', '/confirmar-troca-email']);
 
 function readAndRemoveToken(): string | null {
   const token = new URLSearchParams(window.location.hash.slice(1)).get('token');
@@ -11,9 +12,9 @@ function readAndRemoveToken(): string | null {
   return token;
 }
 
-/** Remove o fragmento com o token antes que os providers façam qualquer requisição de sessão. */
+/** Remove o fragmento de qualquer confirmação antes que os providers façam requisições de sessão. */
 export function prepareInitialConfirmationToken(): void {
-  if (typeof window === 'undefined' || window.location.pathname !== '/confirmar-email') return;
+  if (typeof window === 'undefined' || !confirmationPaths.has(window.location.pathname)) return;
   const currentUrl = `${window.location.pathname}${window.location.search}${window.location.hash}`;
   if (preparedUrl === currentUrl) return;
   preparedToken = readAndRemoveToken();

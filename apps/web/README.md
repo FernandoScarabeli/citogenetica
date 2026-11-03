@@ -82,6 +82,6 @@ A meta é opcional e pode ser definida ao criar ou editar a lâmina. Lâminas de
 
 A ação de quantidade adiciona ou remove células por fase e classificação; para anormais, o tipo é obrigatório. A remoção seleciona os registros mais recentes da classificação e não permite remover mais do que existe. Desfazer restaura a última alteração de contagem feita na sessão, inclusive um lote; após recarregar, o desfazer volta a remover apenas o último registro. A confirmação de regras científicas e do uso de contagem em lote com o laboratório continua necessária.
 
-O nome de exibição, a foto de perfil e a aparência são preferências salvas apenas neste navegador; não alteram os dados de membros dos laboratórios nem constituem uma conta autenticada.
+O nome e o e-mail exibidos no perfil vêm da conta autenticada. O nome é atualizado em /api/v1/usuarios/me; a senha é atualizada em /api/v1/usuarios/me/senha, mantendo a sessão atual e encerrando as demais. Foto e aparência continuam salvas apenas neste navegador. O campo name de versões antigas das preferências é ignorado, sem impedir a leitura da foto e do tema.
 
-A gestão de dispositivos conectados e a alteração de senha dependem de autenticação e de uma API de sessões, ainda não implementadas.
+A troca de e-mail no front segue o contrato registrado em docs/handoff-coordenacao.md (POST /api/v1/usuarios/me/email e POST /api/v1/auth/confirmar-troca-email). Os controllers presentes neste checkout ainda não expõem essas rotas; até a implementação correspondente na API, as duas chamadas retornarão erro. A API também não oferece gerenciamento de dispositivos, por isso o perfil não mostra essa aba.
