@@ -3,14 +3,28 @@ import '../theme.css';
 import '../styles.css';
 import '../typography.css';
 import './app.css';
+import { useLayoutEffect, type ReactNode } from 'react';
 import { BrowserRouter, Link, Navigate, Outlet, Route, Routes, useLocation } from 'react-router';
 import { SizeProvider } from '../lib/size-context';
 import { Landing } from '../Landing';
 import { Laboratories } from '../Laboratories';
 import { Slides } from '../Slides';
 import { LoginPage } from './LoginPage';
+import { CreateAccountPage } from './CreateAccountPage';
+import { ConfirmEmailPage } from './ConfirmEmailPage';
+import { prepareInitialConfirmationToken } from './confirmation-token';
 import { SessionProvider, isSessionNetworkError, useSession } from './SessionProvider';
 import { currentInternalPath } from './return-path';
+
+function PrepareConfirmationToken({ children }: { children: ReactNode }) {
+  const location = useLocation();
+
+  useLayoutEffect(() => {
+    if (location.pathname === '/confirmar-email') prepareInitialConfirmationToken();
+  }, [location.pathname, location.search, location.hash]);
+
+  return children;
+}
 
 function ProtectedRoutes() {
   const { status, loadError, retry } = useSession();
@@ -61,6 +75,8 @@ function RouteTable() {
   return <Routes>
     <Route path="/" element={<Landing/>}/>
     <Route path="/entrar" element={<LoginPage/>}/>
+    <Route path="/criar-conta" element={<CreateAccountPage/>}/>
+    <Route path="/confirmar-email" element={<ConfirmEmailPage/>}/>
     <Route element={<ProtectedRoutes/>}>
       <Route path="/app" element={<AuthenticatedApp/>}/>
       <Route path="/laboratorios" element={<AuthenticatedApp/>}/>
@@ -73,9 +89,11 @@ function RouteTable() {
 export function App() {
   return <SizeProvider>
     <BrowserRouter>
-      <SessionProvider>
-        <RouteTable/>
-      </SessionProvider>
+      <PrepareConfirmationToken>
+        <SessionProvider>
+          <RouteTable/>
+        </SessionProvider>
+      </PrepareConfirmationToken>
     </BrowserRouter>
   </SizeProvider>;
 }

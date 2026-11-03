@@ -37,10 +37,26 @@ export function createAuthApi(client: HttpClient = httpClient) {
       await client.renewCsrf(options);
     },
 
-    register(data: UsuarioRequestDTO, options?: AuthApiOptions): Promise<UsuarioResponseDTO> {
-      return client.request<UsuarioResponseDTO>('/api/v1/auth/register', {
+    register(data: UsuarioRequestDTO, options?: AuthApiOptions): Promise<void> {
+      return client.request<void>('/api/v1/auth/register', {
         method: 'POST',
         json: data,
+        signal: options?.signal,
+      });
+    },
+
+    resendEmailConfirmation(email: string, options?: AuthApiOptions): Promise<void> {
+      return client.request<void>('/api/v1/auth/reenviar-confirmacao', {
+        method: 'POST',
+        json: { email },
+        signal: options?.signal,
+      });
+    },
+
+    confirmEmail(token: string, options?: AuthApiOptions): Promise<void> {
+      return client.request<void>('/api/v1/auth/confirmar-email', {
+        method: 'POST',
+        json: { token },
         signal: options?.signal,
       });
     },

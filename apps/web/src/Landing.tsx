@@ -12,6 +12,7 @@ export function Landing() {
         <div className="access-intro"><h1 id="access-title" className={type.display}>Bem-vindo de volta.</h1><p className={type.body}>Acesse seu espaço de pesquisa e acompanhe suas análises de lâminas.</p></div>
         <div className="access-form">
           <Link className="access-signin" to="/entrar">Entrar <ArrowRight size={17} aria-hidden="true"/></Link>
+          <Link className="auth-secondary-link landing-create-account" to="/criar-conta">Criar conta</Link>
         </div>
         <section className="access-local" aria-labelledby="local-title"><div><h2 id="local-title">Acessar pesquisa</h2><p>Acesse seus laboratórios e acompanhe suas lâminas.</p></div><Link to="/laboratorios">Acessar laboratórios <ArrowRight size={17} aria-hidden="true"/></Link></section>
       </div>

@@ -25,31 +25,95 @@
     outline-offset: 3px;
   }
 
-  .login-page .access-form .access-field input {
+  .auth-page .access-form .access-field input {
     background: var(--access-white);
     color: var(--access-ink);
   }
 
-  .login-page .access-form .access-field input[aria-invalid="true"] {
+  .auth-page .access-form .access-field input[aria-invalid="true"] {
     border-color: #a7433d;
   }
 
-  .login-page .access-signin:not(:disabled) {
+  .auth-page .access-signin:not(:disabled) {
     background: var(--access-green);
     color: var(--access-white);
     cursor: pointer;
     transition: background-color 160ms ease-out;
   }
 
-  .login-page .access-signin:not(:disabled):hover {
+  .auth-page .access-signin:not(:disabled):hover {
     background: var(--access-hover);
   }
 
-  .login-page .access-signin:disabled {
+  .auth-page .access-signin:disabled {
     background: var(--access-disabled);
     color: var(--access-muted);
     opacity: 1;
   }
+
+  .auth-page .access-intro h1:focus {
+    outline: 3px solid var(--access-focus);
+    outline-offset: 4px;
+  }
+
+  .auth-page .access-password-toggle {
+    position: absolute;
+    top: 2px;
+    right: 2px;
+    min-width: 68px;
+    min-height: 44px;
+    padding: 0 8px;
+    border: 0;
+    background: transparent;
+    color: var(--access-green);
+    font-size: var(--fs-caption);
+    font-weight: 600;
+    cursor: pointer;
+  }
+
+  .auth-page .access-password-toggle:focus-visible {
+    outline: 3px solid var(--access-focus);
+    outline-offset: 0;
+    border-radius: 3px;
+  }
+
+  .password-input-wrap { position: relative; }
+  .auth-page .password-input-wrap input { padding-right: 82px; }
+
+  .access-field-help,
+  .access-field-error {
+    margin: -2px 0 0;
+    font-size: var(--fs-caption);
+    line-height: var(--lh-caption);
+  }
+
+  .access-field-help { color: var(--access-muted); }
+  .access-field-error { color: #762b27; }
+
+  .auth-switch {
+    margin: 20px 0 0;
+    color: var(--access-muted);
+    font-size: var(--fs-body);
+    line-height: var(--lh-body);
+  }
+
+  .auth-switch a,
+  .auth-secondary-link {
+    color: var(--access-green);
+    font-weight: 600;
+    text-decoration: underline;
+    text-underline-offset: 3px;
+  }
+
+  .auth-secondary-link {
+    display: inline-flex;
+    align-items: center;
+    min-height: 44px;
+    width: fit-content;
+    font-size: var(--fs-body);
+  }
+
+  .landing-create-account { justify-content: center; }
 
   .session-state,
   .not-found {

@@ -1,10 +1,10 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react';
-import { ArrowRight, Microscope } from 'lucide-react';
-import { useLocation, useNavigate } from 'react-router';
+import { ArrowRight } from 'lucide-react';
+import { Link, useLocation, useNavigate } from 'react-router';
 import { isRateLimited, isUnauthorized, NetworkError } from '../api/errors';
-import { useSize } from '../lib/size-context';
 import { useSession } from './SessionProvider';
 import { safeInternalPath } from './return-path';
+import { AuthLayout } from './AuthLayout';
 
 interface LoginLocationState {
   returnTo?: unknown;
@@ -16,7 +16,6 @@ function loginNotice(value: unknown): string | undefined {
 }
 
 export function LoginPage() {
-  const { type } = useSize();
   const { login } = useSession();
   const location = useLocation();
   const navigate = useNavigate();
@@ -94,64 +93,49 @@ export function LoginPage() {
     ? `Muitas tentativas. Tente novamente em ${retrySeconds} ${retrySeconds === 1 ? 'segundo' : 'segundos'}.`
     : message;
 
-  return <main className="access-page login-page">
-    <section className="access-main" aria-labelledby="login-title">
-      <div className="access-brand">
-        <span className="access-brand-mark"><Microscope size={22} aria-hidden="true"/></span>
-        <span>citogenética<small>Laboratório de Citogenética · UFLA</small></span>
+  return <AuthLayout
+    title="Acesse sua pesquisa."
+    titleId="login-title"
+    description="Entre para continuar no seu espaço de pesquisa."
+  >
+    {notice && <p className="login-notice" role="status">{notice}</p>}
+    {errorMessage && <div ref={errorRef} id="login-error" className="login-error" role="alert" tabIndex={-1}>{errorMessage}</div>}
+    {retryReady && <p className="login-notice" role="status">Você já pode tentar novamente.</p>}
+    <form className="access-form" onSubmit={submit}>
+      <div className="access-field">
+        <label htmlFor="login-email">E-mail</label>
+        <input
+          id="login-email"
+          name="email"
+          type="email"
+          autoComplete="username"
+          required
+          maxLength={254}
+          value={email}
+          aria-invalid={credentialsInvalid || undefined}
+          aria-describedby={descriptionId}
+          onChange={(event) => { setEmail(event.target.value); setMessage(null); setCredentialsInvalid(false); }}
+        />
       </div>
-      <div className="access-content">
-        <div className="access-intro">
-          <h1 id="login-title" className={type.display}>Acesse sua pesquisa.</h1>
-          <p className={type.body}>Entre para continuar no seu espaço de pesquisa.</p>
-        </div>
-        {notice && <p className="login-notice" role="status">{notice}</p>}
-        {errorMessage && <div ref={errorRef} id="login-error" className="login-error" role="alert" tabIndex={-1}>{errorMessage}</div>}
-        {retryReady && <p className="login-notice" role="status">Você já pode tentar novamente.</p>}
-        <form className="access-form" onSubmit={submit}>
-          <div className="access-field">
-            <label htmlFor="login-email">E-mail</label>
-            <input
-              id="login-email"
-              name="email"
-              type="email"
-              autoComplete="username"
-              required
-              maxLength={254}
-              value={email}
-              aria-invalid={credentialsInvalid || undefined}
-              aria-describedby={descriptionId}
-              onChange={(event) => { setEmail(event.target.value); setMessage(null); setCredentialsInvalid(false); }}
-            />
-          </div>
-          <div className="access-field">
-            <label htmlFor="login-password">Senha</label>
-            <input
-              id="login-password"
-              name="senha"
-              type="password"
-              autoComplete="current-password"
-              required
-              value={senha}
-              aria-invalid={credentialsInvalid || undefined}
-              aria-describedby={descriptionId}
-              onChange={(event) => { setSenha(event.target.value); setMessage(null); setCredentialsInvalid(false); }}
-            />
-          </div>
-          <button className="access-signin" type="submit" disabled={submitting || !!countdown}>
-            {submitting ? 'Entrando…' : countdown ?? 'Entrar'}
-            {!submitting && !countdown && <ArrowRight size={17} aria-hidden="true"/>}
-          </button>
-        </form>
+      <div className="access-field">
+        <label htmlFor="login-password">Senha</label>
+        <input
+          id="login-password"
+          name="senha"
+          type="password"
+          autoComplete="current-password"
+          required
+          value={senha}
+          aria-invalid={credentialsInvalid || undefined}
+          aria-describedby={descriptionId}
+          onChange={(event) => { setSenha(event.target.value); setMessage(null); setCredentialsInvalid(false); }}
+        />
       </div>
-      <p className="access-footer">Laboratório de Citogenética<br/>Universidade Federal de Lavras</p>
-    </section>
-    <aside className="access-visual" aria-label="Imagem de microscopia">
-      <img src="/images/mitose-raiz-cebola.jpg" alt="Células da ponta de raiz de cebola observadas ao microscópio"/>
-      <div className="access-visual-caption">
-        <div><span>Um olhar mais próximo.</span><p>Ciência começa<br/>com observação.</p></div>
-        <small>Raiz de cebola · microscopia de contraste de fase<br/><a href="https://commons.wikimedia.org/wiki/File:Onion_Root_Tip_Cells_Mitosis.jpg" target="_blank" rel="noreferrer">Catfaster / Wikimedia Commons · CC BY-SA 4.0</a></small>
-      </div>
-    </aside>
-  </main>;
+      <button className="access-signin" type="submit" disabled={submitting || !!countdown}>
+        {submitting ? 'Entrando…' : countdown ?? 'Entrar'}
+        {!submitting && !countdown && <ArrowRight size={17} aria-hidden="true"/>}
+      </button>
+    </form>
+    <p className="auth-switch">Ainda não tem uma conta? <Link to="/criar-conta">Criar conta</Link></p>
+  </AuthLayout>;
 }

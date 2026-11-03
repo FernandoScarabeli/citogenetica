@@ -10,7 +10,6 @@ export interface UsuarioRequestDTO {
   nome: string;
   email: string;
   senha: string;
-  roleName: string;
 }
 
 export interface RecuperarSenhaRequestDTO {
