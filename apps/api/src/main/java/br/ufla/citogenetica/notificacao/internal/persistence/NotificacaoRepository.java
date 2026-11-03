@@ -1,6 +1,6 @@
-package br.ufla.citogenetica.repository;
+package br.ufla.citogenetica.notificacao.internal.persistence;
 
-import br.ufla.citogenetica.model.notificacao.Notificacao;
+import br.ufla.citogenetica.notificacao.internal.domain.Notificacao;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -33,7 +33,7 @@ public interface NotificacaoRepository extends JpaRepository<Notificacao, Long> 
     @Query("""
             UPDATE Notificacao n
                SET n.lida = true, n.version = n.version + 1, n.lastModifiedDate = CURRENT_TIMESTAMP
-             WHERE n.destinatario.id = :destinatarioId AND n.lida = false
+             WHERE n.destinatarioId = :destinatarioId AND n.lida = false
             """)
     int marcarTodasComoLidas(@Param("destinatarioId") Long destinatarioId);
 
@@ -43,7 +43,7 @@ public interface NotificacaoRepository extends JpaRepository<Notificacao, Long> 
     @Modifying(flushAutomatically = true, clearAutomatically = true)
     @Query("""
             DELETE FROM Notificacao n
-             WHERE n.destinatario.id = :destinatarioId AND n.lida = true AND n.createdDate < :dataLimite
+             WHERE n.destinatarioId = :destinatarioId AND n.lida = true AND n.createdDate < :dataLimite
             """)
     int deletarAntigasLidas(@Param("destinatarioId") Long destinatarioId,
                             @Param("dataLimite") LocalDateTime dataLimite);

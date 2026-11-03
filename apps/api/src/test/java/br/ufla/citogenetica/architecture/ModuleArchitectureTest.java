@@ -35,51 +35,33 @@ class ModuleArchitectureTest {
     private static final String BASE = "br.ufla.citogenetica";
 
     private static final Set<String> MODULES = Set.of(
-            "shared", "config", "usuario", "notificacao", "exemplo", "laboratorio",
-            "protocolo", "contagem", "dados", "sincronizacao", "pesquisa",
-            "colaboracao", "analise", "infra");
+            "shared", "config", "usuario", "notificacao", "exemplo", "infra");
 
-    private static final List<String> BUSINESS_MODULES = List.of(
-            "shared", "usuario", "notificacao", "exemplo", "laboratorio", "protocolo",
-            "contagem", "dados", "sincronizacao", "pesquisa", "colaboracao", "analise");
+    private static final Set<String> APPROVED_ROOTS = Set.of(
+            "shared", "config", "usuario", "notificacao", "exemplo", "infra");
+
+    private static final List<String> BUSINESS_MODULES = List.of("usuario", "notificacao", "exemplo");
 
     private static final String[] BUSINESS_MODULE_PACKAGES = BUSINESS_MODULES.stream()
             .map(module -> BASE + "." + module + "..")
             .toArray(String[]::new);
 
+    private static final String[] INFRA_PACKAGES = {BASE + ".infra.."};
+
     private static final String[] MODULES_AND_INFRA_PACKAGES = combine(
             BUSINESS_MODULE_PACKAGES,
-            new String[]{BASE + ".infra.."});
+            INFRA_PACKAGES);
 
     private static final String[] CONFIG_PACKAGES = {
             BASE + ".config.."
     };
 
-    /**
-     * Pacotes legados tolerados durante a migração, mas proibidos como dependência dos módulos
-     * novos. No PR 4, notificacao sai desses pacotes e deixa de acessar usuario.internal.
-     */
-    private static final List<String> LEGACY_PACKAGES = List.of(
-            BASE + ".controller",    // PR 4: controllers legados de notificacao.
-            BASE + ".exception",     // PR 4: ConflictException e ModelException antigos, sem uso.
-            BASE + ".mapper",        // PR 4: mapper legado de notificacao.
-            BASE + ".model",         // PR 4: entidades, eventos e DTOs de notificacao.
-            BASE + ".repository",    // PR 4: repositório legado de notificacao.
-            BASE + ".service"        // PR 4: notificacao ainda acessa usuario.internal; inclui SSE legado.
-    );
-
-    private static final String[] LEGACY_PACKAGE_PATTERNS = LEGACY_PACKAGES.stream()
-            .map(packageName -> packageName + "..")
-            .toArray(String[]::new);
-
     private static final String[] SHARED_FORBIDDEN_PACKAGES = combine(
             BUSINESS_MODULES.stream()
-                    .filter(module -> !"shared".equals(module))
                     .map(module -> BASE + "." + module + "..")
                     .toArray(String[]::new),
             CONFIG_PACKAGES,
-            new String[]{BASE + ".infra.."},
-            LEGACY_PACKAGE_PATTERNS);
+            INFRA_PACKAGES);
 
     private static final ArchCondition<JavaClass> USES_ONLY_PUBLIC_MODULE_APIS =
             new ArchCondition<>("depender somente da API pública de outro módulo") {
@@ -126,10 +108,22 @@ class ModuleArchitectureTest {
             .as("Módulos e adaptadores não dependem da raiz de composição config");
 
     @ArchTest
-    static final ArchRule config_uses_only_public_usuario_api = noClasses()
-            .that().resideInAPackage(BASE + ".config..")
-            .should().dependOnClassesThat().resideInAPackage(BASE + ".usuario.internal..")
-            .as("config usa somente a API pública de usuario");
+    static final ArchRule infra_does_not_depend_on_business_modules = noClasses()
+            .that().resideInAnyPackage(INFRA_PACKAGES)
+            .should().dependOnClassesThat().resideInAnyPackage(BUSINESS_MODULE_PACKAGES)
+            .as("infra não depende de módulos de negócio");
+
+    @ArchTest
+    static final ArchRule business_modules_do_not_depend_on_infra = noClasses()
+            .that().resideInAnyPackage(BUSINESS_MODULE_PACKAGES)
+            .should().dependOnClassesThat().resideInAnyPackage(INFRA_PACKAGES)
+            .as("Módulos de negócio dependem das portas em shared, não de infra");
+
+    @ArchTest
+    static final ArchRule config_uses_only_public_module_apis = classes()
+            .that().resideInAnyPackage(CONFIG_PACKAGES)
+            .should(USES_ONLY_PUBLIC_MODULE_APIS)
+            .as("config usa somente APIs públicas dos módulos e contratos de shared");
 
     @ArchTest
     static void grafo_de_dependencias_entre_modulos_nao_tem_ciclos(JavaClasses importedClasses) {
@@ -154,6 +148,34 @@ class ModuleArchitectureTest {
                 .isFalse();
     }
 
+    @ArchTest
+    static void classes_ficam_somente_nas_raizes_modulares_aprovadas(JavaClasses importedClasses) {
+        Set<String> raizesNaoAprovadas = new HashSet<>();
+        for (JavaClass classe : importedClasses) {
+            String pacote = classe.getPackageName();
+            if (pacote.equals(BASE)) {
+                if (!classe.getName().equals(BASE + ".CitogeneticaApplication")) {
+                    raizesNaoAprovadas.add(pacote + " (" + classe.getSimpleName() + ")");
+                }
+                continue;
+            }
+            if (!pacote.startsWith(BASE + ".")) {
+                continue;
+            }
+
+            String relativo = pacote.substring(BASE.length() + 1);
+            String raiz = relativo.substring(0, relativo.indexOf('.') < 0
+                    ? relativo.length() : relativo.indexOf('.'));
+            if (!APPROVED_ROOTS.contains(raiz)) {
+                raizesNaoAprovadas.add(raiz);
+            }
+        }
+
+        assertThat(raizesNaoAprovadas)
+                .as("não devem existir pacotes técnicos fora das raízes modulares aprovadas")
+                .isEmpty();
+    }
+
     @Test
     void regra_rejeita_dependencia_de_exemplo_para_internal_de_usuario() {
         JavaClasses fixtureClasses = new ClassFileImporter().importClasses(
@@ -166,18 +188,13 @@ class ModuleArchitectureTest {
     }
 
     private static String moduleOf(String packageName) {
-        if (isLegacyPackage(packageName) || !packageName.startsWith(BASE + ".")) {
+        if (!packageName.startsWith(BASE + ".")) {
             return null;
         }
         String relativePackage = packageName.substring(BASE.length() + 1);
         int separator = relativePackage.indexOf('.');
         String module = separator < 0 ? relativePackage : relativePackage.substring(0, separator);
         return MODULES.contains(module) ? module : null;
-    }
-
-    private static boolean isLegacyPackage(String packageName) {
-        return LEGACY_PACKAGES.stream().anyMatch(legacy ->
-                packageName.equals(legacy) || packageName.startsWith(legacy + "."));
     }
 
     private static boolean isPublicApi(String module, String packageName) {

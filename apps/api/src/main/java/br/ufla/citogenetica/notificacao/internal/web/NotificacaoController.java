@@ -1,10 +1,10 @@
-package br.ufla.citogenetica.controller;
+package br.ufla.citogenetica.notificacao.internal.web;
 
-import br.ufla.citogenetica.model.notificacao.dto.NotificacaoResponseDTO;
+import br.ufla.citogenetica.notificacao.internal.web.dto.response.NotificacaoResponseDTO;
 import br.ufla.citogenetica.usuario.api.UsuarioPrincipal;
 import br.ufla.citogenetica.shared.pagination.PaginationConstants;
 import br.ufla.citogenetica.shared.pagination.PageableFactory;
-import br.ufla.citogenetica.service.NotificacaoService;
+import br.ufla.citogenetica.notificacao.internal.application.NotificacaoService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;

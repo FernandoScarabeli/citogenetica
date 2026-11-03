@@ -1,7 +1,7 @@
-package br.ufla.citogenetica.controller;
+package br.ufla.citogenetica.notificacao.internal.web;
 
 import br.ufla.citogenetica.usuario.api.UsuarioPrincipal;
-import br.ufla.citogenetica.service.EventPublisherService;
+import br.ufla.citogenetica.notificacao.internal.sse.EventPublisherService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;

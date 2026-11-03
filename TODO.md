@@ -30,7 +30,7 @@ Nada é commitado até o fim da sequência.
 ### Docs
 - [ ] Converter o PDF da proposta em Markdown versionado em `docs/`:
   - [ ] `docs/requisitos.md`
-  - [ ] `docs/arquitetura.md` (monólito modular, módulos, dependências)
+  - [x] `docs/arquitetura.md` (monólito modular, módulos, dependências) + ADR 0001
   - [ ] `docs/modelagem.md` + `docs/modelagem/entidades.mmd` (Mermaid citado no doc)
   - [ ] `docs/glossario.md` (termos da citogenética ↔ entidades)
   - [ ] `docs/questoes-validacao.md` (com status de cada questão)
@@ -65,10 +65,12 @@ Nada é commitado até o fim da sequência.
 - [ ] ⚠️ Definir quais eventos geram notificação (convite, comentário, conflito...)
 
 ### 1.3 Base do domínio
+- [x] Monólito modular: pacotes por módulo (`usuario`, `notificacao`, `exemplo`) + `shared`, `config`, `infra`, com regras verificadas por ArchUnit
 - [ ] **Primeira tarefa depois do primeiro commit: auto-cadastro com confirmação de e-mail** (sem isso ninguém cria conta, porque o admin padrão foi removido na T04)
 - [x] `./mvnw test` precisa passar num clone limpo, sem `.env` nem banco rodando: perfil de teste + Postgres via Testcontainers no teste de contexto (hoje ele exige variáveis de e-mail e banco no ar)
 - [ ] IDs UUID nas entidades novas (gerados no cliente quando vierem offline)
 - [ ] Papel por laboratório (Participação), não global no usuário
+- [ ] Admin global da plataforma (acima dos laboratórios): parâmetros do sistema e, depois, um painel (dashboard)
 - [ ] Auto-cadastro + verificação de e-mail
 - [ ] Testes de integração com Testcontainers + OpenAPI atualizado a cada etapa
 

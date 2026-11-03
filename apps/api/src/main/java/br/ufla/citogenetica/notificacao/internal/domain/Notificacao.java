@@ -1,8 +1,6 @@
-package br.ufla.citogenetica.model.notificacao;
+package br.ufla.citogenetica.notificacao.internal.domain;
 
 import br.ufla.citogenetica.shared.persistence.BaseEntity;
-import br.ufla.citogenetica.model.type.TipoNotificacao;
-import br.ufla.citogenetica.usuario.internal.domain.Usuario;
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
@@ -23,9 +21,8 @@ import java.util.Map;
 @AllArgsConstructor
 public class Notificacao extends BaseEntity<Long> {
 
-    @ManyToOne(fetch = FetchType.LAZY, optional = false)
-    @JoinColumn(name = "usuario_id", nullable = false, updatable = false)
-    private Usuario destinatario;
+    @Column(name = "usuario_id", nullable = false, updatable = false)
+    private Long destinatarioId;
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 50)

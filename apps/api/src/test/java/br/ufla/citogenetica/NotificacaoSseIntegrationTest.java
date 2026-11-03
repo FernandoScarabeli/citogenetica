@@ -3,12 +3,13 @@ package br.ufla.citogenetica;
 import br.ufla.citogenetica.usuario.internal.domain.Role;
 import br.ufla.citogenetica.usuario.api.RolesEnum;
 import br.ufla.citogenetica.usuario.internal.domain.StatusEnum;
-import br.ufla.citogenetica.model.type.TipoNotificacao;
+import br.ufla.citogenetica.notificacao.internal.domain.TipoNotificacao;
 import br.ufla.citogenetica.usuario.internal.domain.Usuario;
 import br.ufla.citogenetica.usuario.internal.persistence.RoleRepository;
 import br.ufla.citogenetica.usuario.internal.persistence.UsuarioRepository;
-import br.ufla.citogenetica.service.EventPublisherService;
-import br.ufla.citogenetica.service.NotificacaoService;
+import br.ufla.citogenetica.notificacao.internal.sse.EventPublisherService;
+import br.ufla.citogenetica.notificacao.internal.application.NotificacaoService;
+import br.ufla.citogenetica.usuario.api.event.SessaoEncerradaEvent;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.servlet.http.Cookie;
@@ -17,9 +18,12 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.session.FindByIndexNameSessionRepository;
+import org.springframework.session.Session;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 import org.springframework.test.web.servlet.ResultActions;
@@ -77,6 +81,12 @@ class NotificacaoSseIntegrationTest extends AbstractIntegrationTest {
 
     @Autowired
     private TransactionTemplate transactionTemplate;
+
+    @Autowired
+    private ApplicationEventPublisher eventPublisher;
+
+    @Autowired
+    private FindByIndexNameSessionRepository<? extends Session> sessionRepository;
 
     @Autowired
     private NotificacaoService notificacaoService;
@@ -196,8 +206,29 @@ class NotificacaoSseIntegrationTest extends AbstractIntegrationTest {
     @Test
     void logoutDeveEncerrarAsConexoesDaquelaSessao() throws Exception {
         MvcResult streamAlice = assinar(sessaoAlice);
+        MvcResult streamOutraSessaoAlice = assinar(login(alice));
+        MvcResult streamBruno = assinar(sessaoBruno);
 
         requisicao(sessaoAlice, post("/api/v1/auth/logout")).andExpect(status().isNoContent());
+
+        assertDoesNotThrow(() -> streamAlice.getAsyncResult(ESPERA_MS));
+        assertThrows(IllegalStateException.class, () -> streamOutraSessaoAlice.getAsyncResult(200),
+                "Logout deve manter os streams das outras sessões do mesmo usuário.");
+        assertThrows(IllegalStateException.class, () -> streamBruno.getAsyncResult(200),
+                "Logout não pode encerrar streams de outros usuários.");
+    }
+
+    @Test
+    void encerramentoDeSessaoEmTransacaoSoFechaOEmitterDepoisDoCommit() throws Exception {
+        MvcResult streamAlice = assinar(sessaoAlice);
+        String sessionId = sessionRepository.findByPrincipalName(alice.getId().toString())
+                .keySet().stream().findFirst().orElseThrow();
+
+        transactionTemplate.executeWithoutResult(status -> {
+            eventPublisher.publishEvent(new SessaoEncerradaEvent(alice.getId(), sessionId));
+            assertThrows(IllegalStateException.class, () -> streamAlice.getAsyncResult(200),
+                    "O stream deve permanecer aberto até o commit.");
+        });
 
         assertDoesNotThrow(() -> streamAlice.getAsyncResult(ESPERA_MS));
     }

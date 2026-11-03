@@ -2,7 +2,7 @@ package br.ufla.citogenetica.config.security;
 
 import br.ufla.citogenetica.shared.web.error.ErrorResponseDTO;
 import br.ufla.citogenetica.usuario.api.UsuarioPrincipal;
-import br.ufla.citogenetica.service.EventPublisherService;
+import br.ufla.citogenetica.usuario.api.event.SessaoEncerradaEvent;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.servlet.Filter;
 import jakarta.servlet.http.HttpServletResponse;
@@ -11,6 +11,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
@@ -112,7 +113,7 @@ public class SecurityConfiguration {
             SecurityContextRepository securityContextRepository,
             SpaCsrfTokenRequestHandler csrfTokenRequestHandler,
             @Qualifier("sessionUserValidationFilter") Filter sessionUserValidationFilter,
-            EventPublisherService eventPublisherService) throws Exception {
+            ApplicationEventPublisher eventPublisher) throws Exception {
         return http
                 .csrf(csrf -> csrf
                         .csrfTokenRepository(csrfTokenRepository)
@@ -129,12 +130,12 @@ public class SecurityConfiguration {
                         .invalidateHttpSession(true)
                         .clearAuthentication(true)
                         .deleteCookies(SESSION_COOKIE_NAME)
-                        // Roda antes da invalidação da sessão: fecha os streams SSE abertos por ela.
+                        // Este handler roda antes do SecurityContextLogoutHandler invalidar a sessão.
                         .addLogoutHandler((request, response, authentication) -> {
                             HttpSession sessao = request.getSession(false);
                             if (sessao != null && authentication != null
                                     && authentication.getPrincipal() instanceof UsuarioPrincipal principal) {
-                                eventPublisherService.encerrarSessao(principal.id(), sessao.getId());
+                                eventPublisher.publishEvent(new SessaoEncerradaEvent(principal.id(), sessao.getId()));
                             }
                         })
                         .logoutSuccessHandler((request, response, authentication) ->
