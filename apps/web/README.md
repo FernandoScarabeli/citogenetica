@@ -19,6 +19,17 @@ npm run build
 npm run preview
 ```
 
+### Desenvolvimento com a API
+
+O front usa caminhos relativos em `/api` e o Vite os encaminha para `http://localhost:8080`, incluindo conexões SSE sem buffering. Suba a API e seus serviços locais conforme `../api/README.md`; em outro terminal:
+
+```sh
+cd apps/web
+npm run dev
+```
+
+Para apontar o proxy a outro host, defina `API_PROXY_TARGET` no ambiente ao iniciar o Vite (ex.: `API_PROXY_TARGET=http://localhost:9080 npm run dev`). O padrão é `http://localhost:8080`. A variável é lida só pelo servidor de desenvolvimento e não vai para o navegador. Cookies de sessão e CSRF seguem na mesma origem do Vite por meio do proxy.
+
 ## Tipografia
 
 O sistema [Fluid Functionalism](https://www.fluidfunctionalism.com/docs/typography) está instalado via registro shadcn, com Tailwind v4, alias `@/` e Inter Variable (incluindo o eixo óptico) servido pelo próprio app. As seis funções tipográficas são `display`, `title`, `subtitle`, `body`, `caption` e `micro`, com os tamanhos `default` e `compact`.
@@ -49,13 +60,13 @@ npx shadcn@latest add https://www.fluidfunctionalism.com/r/typography.json --ove
 
 ## Dados e integração
 
-Os registros são armazenados no `localStorage` do navegador, sob uma chave versionada. Use **Backup** para guardar uma cópia e **Importar** para restaurá-la; a aplicação apresenta quantas lâminas serão substituídas antes de confirmar. A importação atual aceita os backups JSON gerados por esta aplicação, não os arquivos das ferramentas anteriores.
+Os registros da interface atual são armazenados no `localStorage` do navegador, sob uma chave versionada. Use **Backup** para guardar uma cópia e **Importar** para restaurá-la; a aplicação apresenta quantas lâminas serão substituídas antes de confirmar. A importação atual aceita os backups JSON gerados por esta aplicação, não os arquivos das ferramentas anteriores.
 
-Não há autenticação, isolamento entre usuários, servidor, sincronização entre dispositivos ou garantia de recuperação dos dados locais. O navegador pode apagar esses dados; mantenha backups. Os protocolos e cálculos estão em `src/domain.ts` e o acesso ao armazenamento em `src/storage.ts`, para facilitar a futura integração com a API.
+A API oferece autenticação por sessão e proteção CSRF, e este front agora tem a base de transporte para consumi-la. A interface e os registros locais ainda não estão ligados à API; portanto, não há isolamento entre usuários nem sincronização dos dados locais entre dispositivos. O navegador pode apagar esses dados; mantenha backups. Os protocolos e cálculos estão em `src/domain.ts` e o acesso ao armazenamento em `src/storage.ts`.
 
 O relatório usa a impressão do navegador: na aba **Resumo**, escolha **Imprimir / PDF** e, na janela de impressão, selecione salvar em PDF.
 
-## Fluxo de laboratórios do protótipo
+## Fluxo local de laboratórios
 
 O acesso local em `/` abre `/laboratorios` (também disponível em `/app`). A conta demonstrativa `pesquisador@exemplo.com` permite explorar criação e alternância de laboratórios, aceite/recusa de convite recebido, membros, atribuição de papéis hierárquicos, criação/revogação de convites, edição do laboratório e saída. A hierarquia local é Administrador → Orientador → Pesquisador: cada nível inclui as capacidades disponíveis dos níveis abaixo. O último administrador não pode sair nem perder seu papel sem outro administrador ativo. Registros antigos com múltiplos papéis são preservados e interpretados pelo nível mais alto. A orientação e o acesso coletivo ainda não estão implementados; as permissões precisam ser garantidas também no backend.
 
