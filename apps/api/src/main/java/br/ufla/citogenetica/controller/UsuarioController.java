@@ -25,14 +25,14 @@ import org.springframework.data.jpa.domain.Specification;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.util.MultiValueMap;
-import org.springframework.security.core.Authentication;
+import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
 @RequestMapping("/api/v1/usuarios")
 @RequiredArgsConstructor
 @Tag(name = "Usuários", description = "Endpoints para gerenciamento de usuários")
-@SecurityRequirement(name = "bearer-jwt")
+@SecurityRequirement(name = "sessao-cookie")
 public class UsuarioController {
 
     private final UsuarioService usuarioService;
@@ -67,6 +67,7 @@ public class UsuarioController {
     }
 
     @PutMapping("/{id}")
+    @SecurityRequirement(name = "csrf-token")
     @Operation(summary = "Atualizar usuário", description = "Atualiza os dados de um usuário existente. Disponível para administradores.")
     @ApiResponses(value = {
             @ApiResponse(responseCode = "200", description = "Usuário alterado com sucesso"),
@@ -80,6 +81,7 @@ public class UsuarioController {
     }
 
     @PatchMapping("/{id}")
+    @SecurityRequirement(name = "csrf-token")
     @Operation(summary = "Trocar status do usuário", description = "Ativa ou desativa um usuário")
     @ApiResponse(responseCode = "204", description = "Status alterado com sucesso")
     public ResponseEntity<Void> trocarStatusUsuario(@PathVariable Long id) {
@@ -88,6 +90,7 @@ public class UsuarioController {
     }
 
     @PutMapping("/me/senha")
+    @SecurityRequirement(name = "csrf-token")
     @Operation(summary = "Trocar minha senha", description = "Atualiza a senha do usuário autenticado após validar a senha atual")
     @ApiResponses(value = {
             @ApiResponse(responseCode = "204", description = "Senha atualizada com sucesso"),
@@ -95,12 +98,17 @@ public class UsuarioController {
             @ApiResponse(responseCode = "409", description = "Senha atual incorreta")
     })
     public ResponseEntity<Void> atualizarMinhaSenha(
-            @RequestBody @Valid AtualizarSenhaRequestDTO requestDTO) {
-        this.usuarioService.atualizarMinhaSenha(requestDTO);
+            @RequestBody @Valid AtualizarSenhaRequestDTO requestDTO,
+            HttpServletRequest request) {
+        String sessionIdAtual = request.getSession(false) == null
+                ? null
+                : request.getSession(false).getId();
+        this.usuarioService.atualizarMinhaSenha(requestDTO, sessionIdAtual);
         return ResponseEntity.status(HttpStatus.NO_CONTENT).build();
     }
 
     @PutMapping("/me")
+    @SecurityRequirement(name = "csrf-token")
     @Operation(summary = "Atualizar meu perfil", description = "Atualiza o nome do usuário autenticado. A alteração de e-mail é exclusiva de administradores.")
     @ApiResponses(value = {
             @ApiResponse(responseCode = "200", description = "Perfil atualizado com sucesso"),
@@ -119,8 +127,8 @@ public class UsuarioController {
             @ApiResponse(responseCode = "200", description = "Dados do usuário retornados com sucesso"),
             @ApiResponse(responseCode = "401", description = "Usuário não autenticado")
     })
-    public ResponseEntity<UsuarioResponseDTO> buscarMeuPerfil(Authentication authentication) {
-        Usuario usuarioLogado = (Usuario) authentication.getPrincipal();
+    public ResponseEntity<UsuarioResponseDTO> buscarMeuPerfil() {
+        Usuario usuarioLogado = this.usuarioService.buscarMeuPerfil();
         UsuarioResponseDTO response = usuarioMapper.toResponseDTO(usuarioLogado);
         return ResponseEntity.status(HttpStatus.OK).body(response);
     }

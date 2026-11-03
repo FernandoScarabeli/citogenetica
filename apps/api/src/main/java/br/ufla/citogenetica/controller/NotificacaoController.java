@@ -20,7 +20,7 @@ import java.util.Map;
 @RequestMapping("/api/v1/notificacoes")
 @RequiredArgsConstructor
 @Tag(name = "Notificações", description = "Endpoints para gerenciamento de notificações (sininho)")
-@SecurityRequirement(name = "bearer-jwt")
+@SecurityRequirement(name = "sessao-cookie")
 public class NotificacaoController {
 
     private final NotificacaoService notificacaoService;
@@ -54,6 +54,7 @@ public class NotificacaoController {
     }
 
     @PatchMapping("/{id}/lida")
+    @SecurityRequirement(name = "csrf-token")
     @Operation(summary = "Marcar como lida", description = "Marca uma notificação específica como lida")
     @ApiResponses(value = {
             @ApiResponse(responseCode = "200", description = "Notificação marcada como lida"),
@@ -65,6 +66,7 @@ public class NotificacaoController {
     }
 
     @PatchMapping("/marcar-todas-lidas")
+    @SecurityRequirement(name = "csrf-token")
     @Operation(summary = "Marcar todas como lidas", description = "Marca todas as notificações não lidas como lidas")
     @ApiResponse(responseCode = "200", description = "Notificações marcadas como lidas")
     public ResponseEntity<Map<String, Integer>> marcarTodasComoLidas() {

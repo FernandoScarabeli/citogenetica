@@ -8,18 +8,32 @@ import br.ufla.citogenetica.model.usuario.dto.request.RecuperarSenhaRequestDTO;
 import br.ufla.citogenetica.model.usuario.dto.request.RedefinirSenhaRequestDTO;
 import br.ufla.citogenetica.model.usuario.dto.request.UsuarioRequestDTO;
 import br.ufla.citogenetica.model.usuario.dto.request.ValidarCodigoRequestDTO;
-import br.ufla.citogenetica.model.usuario.dto.response.LoginResponseDTO;
+import br.ufla.citogenetica.model.usuario.Usuario;
+import br.ufla.citogenetica.model.usuario.UsuarioPrincipal;
 import br.ufla.citogenetica.model.usuario.dto.response.UsuarioResponseDTO;
 import br.ufla.citogenetica.service.AuthService;
 
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
+import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
+import jakarta.servlet.http.HttpSession;
 import jakarta.validation.Valid;
+import org.springframework.http.CacheControl;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContext;
+import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.web.context.SecurityContextRepository;
+import org.springframework.security.web.authentication.session.SessionAuthenticationStrategy;
+import org.springframework.session.FindByIndexNameSessionRepository;
+import org.springframework.security.web.csrf.CsrfToken;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
@@ -30,21 +44,56 @@ public class AuthController {
 
     private final AuthService authService;
     private final UsuarioMapper usuarioMapper;
+    private final SecurityContextRepository securityContextRepository;
+    private final SessionAuthenticationStrategy sessionAuthenticationStrategy;
+
+    @GetMapping("/csrf")
+    @Operation(summary = "Obter token CSRF", description = "Cria o cookie XSRF-TOKEN que o SPA deve enviar no cabeçalho X-XSRF-TOKEN antes de operações POST, PUT, PATCH ou DELETE.")
+    @ApiResponse(responseCode = "204", description = "Cookie CSRF emitido")
+    public ResponseEntity<Void> csrf(CsrfToken csrfToken) {
+        csrfToken.getToken();
+        return ResponseEntity.noContent().cacheControl(CacheControl.noStore()).build();
+    }
 
     @PostMapping("/login")
-    @Operation(summary = "Realizar login", description = "Autentica um usuário e retorna um token JWT")
+    @SecurityRequirement(name = "csrf-token")
+    @Operation(summary = "Realizar login", description = "Autentica o usuário e estabelece uma sessão no cookie HttpOnly CITOGENETICA_SESSION")
     @ApiResponses(value = {
-            @ApiResponse(responseCode = "200", description = "Login realizado com sucesso"),
+            @ApiResponse(responseCode = "204", description = "Login realizado com sucesso; a sessão é enviada em cookie"),
             @ApiResponse(responseCode = "401", description = "Credenciais inválidas"),
             @ApiResponse(responseCode = "429", description = "Limite de tentativas atingido")
     })
-    public ResponseEntity<LoginResponseDTO> login(@RequestBody @Valid LoginRequestDTO requestDTO) {
-        LoginResponseDTO response = this.authService.login(requestDTO);
-        return ResponseEntity.status(HttpStatus.OK).body(response);
+    public ResponseEntity<Void> login(@RequestBody @Valid LoginRequestDTO requestDTO,
+                                      HttpServletRequest request,
+                                      HttpServletResponse response) {
+        Authentication authenticated = this.authService.login(requestDTO);
+        UsuarioPrincipal principal = UsuarioPrincipal.de((Usuario) authenticated.getPrincipal());
+        UsernamePasswordAuthenticationToken sessionAuthentication = new UsernamePasswordAuthenticationToken(
+                principal, null, principal.getAuthorities());
+        sessionAuthentication.setDetails(authenticated.getDetails());
+
+        var session = request.getSession(true);
+        session.setAttribute(FindByIndexNameSessionRepository.PRINCIPAL_NAME_INDEX_NAME, principal.chaveSessao());
+        sessionAuthenticationStrategy.onAuthentication(sessionAuthentication, request, response);
+
+        SecurityContext context = SecurityContextHolder.createEmptyContext();
+        context.setAuthentication(sessionAuthentication);
+        SecurityContextHolder.setContext(context);
+        securityContextRepository.saveContext(context, request, response);
+        return ResponseEntity.status(HttpStatus.NO_CONTENT).build();
+    }
+
+    @PostMapping("/logout")
+    @Operation(summary = "Encerrar sessão", description = "Invalida a sessão atual e limpa o cookie CITOGENETICA_SESSION. Exige a sessão autenticada e o cabeçalho X-XSRF-TOKEN.")
+    @SecurityRequirement(name = "sessao-cookie")
+    @ApiResponse(responseCode = "204", description = "Sessão encerrada")
+    public ResponseEntity<Void> logoutDocumentado() {
+        return ResponseEntity.noContent().build();
     }
 
     @PostMapping("/register")
-    @Operation(summary = "Registrar novo usuário", description = "Cria uma nova conta de usuário")
+    @SecurityRequirement(name = "sessao-cookie")
+    @Operation(summary = "Registrar novo usuário", description = "Cria uma nova conta de usuário. Exige o cabeçalho X-XSRF-TOKEN.")
     @ApiResponses(value = {
             @ApiResponse(responseCode = "201", description = "Usuário criado com sucesso"),
             @ApiResponse(responseCode = "400", description = "Dados inválidos")
@@ -55,6 +104,7 @@ public class AuthController {
     }
 
     @PostMapping("/recuperar-senha")
+    @SecurityRequirement(name = "csrf-token")
     @Operation(summary = "Solicitar recuperação de senha", description = "Registra a solicitação de forma uniforme, sem revelar se o e-mail existe")
     @ApiResponses(value = {
             @ApiResponse(responseCode = "202", description = "Solicitação aceita"),
@@ -66,20 +116,30 @@ public class AuthController {
     }
 
     @PostMapping("/redefinir-senha")
+    @SecurityRequirement(name = "csrf-token")
     @Operation(summary = "Redefinir senha", description = "Redefine a senha usando o código recebido por email")
     @ApiResponses(value = {
             @ApiResponse(responseCode = "204", description = "Senha redefinida com sucesso"),
             @ApiResponse(responseCode = "400", description = "Código inválido ou expirado"),
             @ApiResponse(responseCode = "429", description = "Limite de tentativas atingido")
     })
-    public ResponseEntity<Void> redefinirSenha(@RequestBody @Valid RedefinirSenhaRequestDTO requestDTO) {
-        if (!this.authService.redefinirSenha(requestDTO)) {
+    public ResponseEntity<Void> redefinirSenha(@RequestBody @Valid RedefinirSenhaRequestDTO requestDTO,
+                                               HttpServletRequest request) {
+        var usuarioRedefinido = this.authService.redefinirSenha(requestDTO);
+        if (usuarioRedefinido.isEmpty()) {
             throw new RecoveryChallengeException();
+        }
+        HttpSession sessaoAtual = request.getSession(false);
+        if (sessaoAtual != null && usuarioRedefinido.get().toString().equals(
+                sessaoAtual.getAttribute(FindByIndexNameSessionRepository.PRINCIPAL_NAME_INDEX_NAME))) {
+            sessaoAtual.invalidate();
+            SecurityContextHolder.clearContext();
         }
         return ResponseEntity.status(HttpStatus.NO_CONTENT).build();
     }
 
     @PostMapping("/validar-codigo")
+    @SecurityRequirement(name = "csrf-token")
     @Operation(summary = "Validar código", description = "Verifica o código sem revelar se a conta ou solicitação existe")
     @ApiResponses(value = {
             @ApiResponse(responseCode = "204", description = "Código válido"),

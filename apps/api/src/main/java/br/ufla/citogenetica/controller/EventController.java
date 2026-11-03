@@ -3,6 +3,7 @@ package br.ufla.citogenetica.controller;
 import br.ufla.citogenetica.service.EventPublisherService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.MediaType;
@@ -17,6 +18,7 @@ import java.util.Map;
 @RequestMapping("/api/events")
 @RequiredArgsConstructor
 @Tag(name = "Eventos SSE", description = "Endpoint para conexão Server-Sent Events (notificações em tempo real)")
+@SecurityRequirement(name = "sessao-cookie")
 public class EventController {
 
     private final EventPublisherService eventPublisherService;

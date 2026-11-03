@@ -3,7 +3,6 @@ package br.ufla.citogenetica.configuration.secret;
 import br.ufla.citogenetica.configuration.DatasourceSecretProperties;
 import br.ufla.citogenetica.configuration.StorageProperties;
 import br.ufla.citogenetica.configuration.email.EmailProperties;
-import br.ufla.citogenetica.configuration.security.JwtProperties;
 import br.ufla.citogenetica.configuration.security.RecoveryProperties;
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.autoconfigure.AutoConfigurations;
@@ -21,7 +20,6 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 class SecretPropertiesValidationTest {
 
-    private static final String JWT_SECRET = "43a7afc3a89e4f96b752b508b30f66fc";
     private static final String RECOVERY_SECRET = "2fa5a79b3d218c4f".repeat(4);
     private static final String STORAGE_SECRET = "c1b07af428cc48a89c3466e50741be70";
     private static final String DATABASE_SECRET = "fa61c0461cd44960b372e05d17c83340";
@@ -30,30 +28,6 @@ class SecretPropertiesValidationTest {
     @Test
     void startsWithValidSecretSettings() {
         context(validProperties()).run(context -> assertThat(context).hasNotFailed());
-    }
-
-    @Test
-    void rejectsMissingJwtSecretAndNamesTheEnvironmentVariableWithoutAValue() {
-        Map<String, String> properties = validProperties();
-        properties.remove("api.security.jwt.secret");
-
-        assertRejected(properties, "API_SECURITY_JWT_SECRET", "");
-    }
-
-    @Test
-    void rejectsShortJwtSecretAndNamesTheByteRequirementWithoutAValue() {
-        Map<String, String> properties = validProperties();
-        properties.put("api.security.jwt.secret", "short-test-value");
-
-        assertRejected(properties, "API_SECURITY_JWT_SECRET", "short-test-value");
-    }
-
-    @Test
-    void rejectsJwtPlaceholderAndRedactsItFromStartupFailure() {
-        Map<String, String> properties = validProperties();
-        properties.put("api.security.jwt.secret", "  TrOqUe-IsTo  ");
-
-        assertRejected(properties, "API_SECURITY_JWT_SECRET", "TrOqUe-IsTo");
     }
 
     @Test
@@ -153,7 +127,6 @@ class SecretPropertiesValidationTest {
 
     private static Map<String, String> validProperties() {
         Map<String, String> properties = new LinkedHashMap<>();
-        properties.put("api.security.jwt.secret", JWT_SECRET);
         properties.put("api.security.recovery.hmac-secret", RECOVERY_SECRET);
         properties.put("api.security.recovery.max-attempts", "5");
         properties.put("api.security.recovery.email-executor-core-size", "1");
@@ -187,7 +160,6 @@ class SecretPropertiesValidationTest {
 
     @Configuration(proxyBeanMethods = false)
     @EnableConfigurationProperties({
-            JwtProperties.class,
             RecoveryProperties.class,
             DatasourceSecretProperties.class,
             EmailProperties.class,

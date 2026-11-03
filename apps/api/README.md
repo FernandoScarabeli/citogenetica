@@ -8,7 +8,7 @@ Esta pasta contém a API do sistema de registro de lâminas de citogenética da 
 - Spring Boot 3.3.4
 - Maven
 - PostgreSQL e Flyway
-- Spring Security e JWT
+- Spring Security, sessão JDBC, cookie HttpOnly e proteção CSRF
 - SpringDoc OpenAPI (Swagger)
 - Docker Compose
 - RustFS com API compatível com S3
@@ -29,11 +29,13 @@ Na raiz do repositório, gere um `.env` local com segredos aleatórios:
 
 O script não sobrescreve um `.env` existente. Se faltarem variáveis novas, `./scripts/gerar-env.sh --add-missing` acrescenta somente as chaves ausentes, gera segredos apenas para as chaves ausentes e preserva o conteúdo existente; os valores não são impressos. `./scripts/gerar-env.sh --force` substitui o arquivo inteiro. O arquivo gerado recebe permissão restrita. O `.env.example` documenta as variáveis e usa marcadores nos segredos; copiar o exemplo diretamente sem gerar ou trocar os segredos faz a API recusar a inicialização.
 
-Por padrão, cabeçalhos de IP encaminhado não são confiáveis. Em produção atrás de proxy, configure `API_SECURITY_TRUSTED_PROXY_REGEX` com uma expressão que corresponda somente aos proxies confiáveis; o Tomcat processa esses cabeçalhos.
+Por padrão, cabeçalhos de IP encaminhado não são confiáveis. Em produção atrás de proxy, configure `API_SECURITY_TRUSTED_PROXY_REGEX` com uma expressão que corresponda somente aos proxies confiáveis; o Tomcat processa esses cabeçalhos. A API usa uma sessão armazenada no PostgreSQL, com cookie `CITOGENETICA_SESSION` HttpOnly, `SameSite=Lax` e `Secure` habilitado por padrão. O perfil local `dev` permite HTTP; configure `API_SECURITY_SESSION_TIMEOUT` para ajustar o tempo de inatividade.
 
 As variáveis principais incluem `SERVER_PORT`, as configurações `SPRING_DATASOURCE_*`, as configurações de segurança e e-mail, `API_FRONTEND_URL`, `MAILPIT_WEB_PORT` e as configurações `STORAGE_*`. No Compose local, a API envia e-mails pelo Mailpit; a interface fica em `http://localhost:8025` por padrão. Para outro servidor SMTP, configure `SPRING_MAIL_HOST`, `SPRING_MAIL_PORT`, `SPRING_MAIL_USERNAME`, `SPRING_MAIL_PASSWORD`, `SPRING_MAIL_AUTH` e `SPRING_MAIL_STARTTLS_ENABLE`. Com autenticação SMTP habilitada, STARTTLS também precisa estar habilitado.
 
-O Compose usa `API_FRONTEND_URL` como origem permitida para requisições CORS ao RustFS, incluindo o preflight do upload pelo navegador.
+`API_CORS_ALLOWED_ORIGINS` define, em uma lista separada por vírgulas, as origens exatas que podem acessar a API com credenciais. No exemplo local, a origem é `http://localhost:5173`, compatível com o Vite. `API_FRONTEND_URL` continua definindo a origem permitida pelo RustFS.
+
+Como Vite e API têm origens diferentes, o SPA deve usar `credentials: 'include'` nas chamadas. Chame `GET /api/v1/auth/csrf` antes do login e antes de cada nova sessão após autenticar ou sair. O endpoint emite o cookie legível `XSRF-TOKEN`; em cada `POST`, `PUT`, `PATCH` ou `DELETE`, envie o valor atual no cabeçalho `X-XSRF-TOKEN`. Com `credentials: 'include'`, o navegador envia automaticamente o cookie de sessão HttpOnly. O login retorna `204` e estabelece a sessão pelo cookie.
 
 ## Executando com Docker Compose
 

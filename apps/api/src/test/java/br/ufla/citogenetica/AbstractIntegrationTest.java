@@ -20,7 +20,6 @@ import software.amazon.awssdk.services.s3.S3Client;
 @Import(TestcontainersConfiguration.class)
 public abstract class AbstractIntegrationTest {
 
-    private static final String JWT_SECRET = TestSecrets.generate();
     private static final String RECOVERY_HMAC_SECRET = TestSecrets.generate();
     private static final String EMAIL_PASSWORD = TestSecrets.generate();
     private static final String STORAGE_ACCESS_KEY = "T" + TestSecrets.generate();
@@ -32,8 +31,8 @@ public abstract class AbstractIntegrationTest {
 
     @DynamicPropertySource
     static void registerTestProperties(DynamicPropertyRegistry properties) {
-        properties.add("api.security.jwt.secret", () -> JWT_SECRET);
         properties.add("api.security.recovery.hmac-secret", () -> RECOVERY_HMAC_SECRET);
+        properties.add("api.cors.allowed-origins", () -> "http://localhost:5173");
         properties.add("api.frontend.url", () -> "http://localhost:3000");
         properties.add("api.email.from", () -> "testes@citogenetica.test");
 

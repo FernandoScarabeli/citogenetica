@@ -1,0 +1,5 @@
+server:
+  servlet:
+    session:
+      cookie:
+        secure: ${API_SECURITY_SESSION_COOKIE_SECURE:false}

@@ -7,6 +7,7 @@ import br.ufla.citogenetica.model.crudExemplo.dto.request.ExemploRequestDTO;
 import br.ufla.citogenetica.model.crudExemplo.dto.response.ExemploResponseDTO;
 import br.ufla.citogenetica.model.genericDto.PageResponseDTO;
 import br.ufla.citogenetica.service.ExemploService;
+import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
@@ -21,6 +22,7 @@ import org.springframework.web.bind.annotation.*;
 @RestController
 @RequestMapping("/api/v1/exemplos")
 @RequiredArgsConstructor
+@SecurityRequirement(name = "sessao-cookie")
 public class ExemploController {
 
     private final ExemploService exemploService;
@@ -56,18 +58,21 @@ public class ExemploController {
     }
 
     @PostMapping
+    @SecurityRequirement(name = "csrf-token")
     public ResponseEntity<ExemploResponseDTO> criarExemplo(@RequestBody @Valid ExemploRequestDTO requestDTO) {
         Exemplo novoExemplo = exemploService.criar(requestDTO);
         return ResponseEntity.status(HttpStatus.CREATED).body(exemploMapper.toResponseDTO(novoExemplo));
     }
 
     @PutMapping("/{id}")
+    @SecurityRequirement(name = "csrf-token")
     public ResponseEntity<ExemploResponseDTO> atualizarExemplo(@PathVariable Long id, @RequestBody @Valid ExemploRequestDTO requestDTO) {
         Exemplo exemploAtualizado = exemploService.atualizar(id, requestDTO);
         return ResponseEntity.status(HttpStatus.OK).body(exemploMapper.toResponseDTO(exemploAtualizado));
     }
 
     @DeleteMapping("/{id}")
+    @SecurityRequirement(name = "csrf-token")
     public ResponseEntity<Void> deletarExemplo(@PathVariable Long id) {
         exemploService.deletar(id);
         return ResponseEntity.status(HttpStatus.NO_CONTENT).build();
