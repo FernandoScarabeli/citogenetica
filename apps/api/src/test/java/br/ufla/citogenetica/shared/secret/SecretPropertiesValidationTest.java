@@ -4,7 +4,7 @@ import br.ufla.citogenetica.config.properties.DatasourceSecretProperties;
 import br.ufla.citogenetica.config.secret.SecretValueConverterConfiguration;
 import br.ufla.citogenetica.infra.storage.StorageProperties;
 import br.ufla.citogenetica.infra.email.EmailProperties;
-import br.ufla.citogenetica.service.RecoveryProperties;
+import br.ufla.citogenetica.usuario.internal.application.RecoveryProperties;
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.autoconfigure.AutoConfigurations;
 import org.springframework.boot.autoconfigure.context.ConfigurationPropertiesAutoConfiguration;

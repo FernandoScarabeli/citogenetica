@@ -1,5 +1,6 @@
 package br.ufla.citogenetica.infra.email;
 
+import br.ufla.citogenetica.shared.email.EmailSender;
 import jakarta.mail.MessagingException;
 import jakarta.mail.internet.MimeMessage;
 import lombok.RequiredArgsConstructor;
@@ -12,13 +13,14 @@ import org.springframework.stereotype.Service;
 @Service
 @RequiredArgsConstructor
 @Slf4j
-public class EmailService {
+public class EmailService implements EmailSender {
 
     private final JavaMailSender mailSender;
 
     @Value("${api.email.from}")
     private String fromEmail;
 
+    @Override
     public void sendEmail(String toEmail, String emailSubject, String emailBody) {
         if (toEmail == null || toEmail.isBlank()) {
             throw new IllegalArgumentException("Email de destino não pode ser vazio");

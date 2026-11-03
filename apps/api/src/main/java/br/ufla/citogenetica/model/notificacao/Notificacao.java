@@ -2,7 +2,7 @@ package br.ufla.citogenetica.model.notificacao;
 
 import br.ufla.citogenetica.shared.persistence.BaseEntity;
 import br.ufla.citogenetica.model.type.TipoNotificacao;
-import br.ufla.citogenetica.model.usuario.Usuario;
+import br.ufla.citogenetica.usuario.internal.domain.Usuario;
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Getter;

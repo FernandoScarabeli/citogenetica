@@ -1,6 +1,6 @@
 package br.ufla.citogenetica.controller;
 
-import br.ufla.citogenetica.model.usuario.UsuarioPrincipal;
+import br.ufla.citogenetica.usuario.api.UsuarioPrincipal;
 import br.ufla.citogenetica.service.EventPublisherService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;

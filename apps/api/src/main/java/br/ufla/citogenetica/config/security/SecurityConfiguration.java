@@ -1,13 +1,14 @@
 package br.ufla.citogenetica.config.security;
 
-import br.ufla.citogenetica.filter.SessionUserValidationFilter;
 import br.ufla.citogenetica.shared.web.error.ErrorResponseDTO;
-import br.ufla.citogenetica.model.usuario.UsuarioPrincipal;
+import br.ufla.citogenetica.usuario.api.UsuarioPrincipal;
 import br.ufla.citogenetica.service.EventPublisherService;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import jakarta.servlet.Filter;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.servlet.http.HttpSession;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpMethod;
@@ -110,7 +111,7 @@ public class SecurityConfiguration {
             CsrfTokenRepository csrfTokenRepository,
             SecurityContextRepository securityContextRepository,
             SpaCsrfTokenRequestHandler csrfTokenRequestHandler,
-            SessionUserValidationFilter sessionUserValidationFilter,
+            @Qualifier("sessionUserValidationFilter") Filter sessionUserValidationFilter,
             EventPublisherService eventPublisherService) throws Exception {
         return http
                 .csrf(csrf -> csrf
