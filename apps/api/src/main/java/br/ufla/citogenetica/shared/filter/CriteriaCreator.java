@@ -4,6 +4,7 @@ import java.math.BigDecimal;
 import java.math.BigInteger;
 import java.text.Normalizer;
 import java.text.SimpleDateFormat;
+import java.time.Instant;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.*;
@@ -233,7 +234,8 @@ public class CriteriaCreator {
 
     private static boolean isDateType(Path<?> path) {
         Class<?> type = path.getJavaType();
-        return type.equals(LocalDate.class) || type.equals(LocalDateTime.class) || type.equals(Date.class);
+        return type.equals(LocalDate.class) || type.equals(LocalDateTime.class)
+                || type.equals(Instant.class) || type.equals(Date.class);
     }
 
     private static Predicate createDatePredicate(CriteriaBuilder cb, Path<?> path, List<String> values) {
@@ -303,6 +305,9 @@ public class CriteriaCreator {
             return compararPorLimite(cb, path.as(LocalDateTime.class), (LocalDateTime) value,
                     limiteInferior, inclusivo);
         }
+        if (type.equals(Instant.class)) {
+            return compararPorLimite(cb, path.as(Instant.class), (Instant) value, limiteInferior, inclusivo);
+        }
         if (type.equals(Date.class)) {
             return compararPorLimite(cb, path.as(Date.class), (Date) value, limiteInferior, inclusivo);
         }
@@ -346,6 +351,8 @@ public class CriteriaCreator {
             return ((LocalDate) date1).compareTo((LocalDate) date2);
         } else if (date1 instanceof LocalDateTime && date2 instanceof LocalDateTime) {
             return ((LocalDateTime) date1).compareTo((LocalDateTime) date2);
+        } else if (date1 instanceof Instant && date2 instanceof Instant) {
+            return ((Instant) date1).compareTo((Instant) date2);
         } else if (date1 instanceof Date && date2 instanceof Date) {
             return ((Date) date1).compareTo((Date) date2);
         }
@@ -362,11 +369,14 @@ public class CriteriaCreator {
                 } else {
                     return LocalDate.parse(value).atStartOfDay();
                 }
+            } else if (type.equals(Instant.class)) {
+                return Instant.parse(value);
             } else if (type.equals(Date.class)) {
                 return new SimpleDateFormat("yyyy-MM-dd").parse(value);
             }
         } catch (Exception e) {
-            throw new FiltroInvalidoException("Formato de data inválido: '" + value + "'. Use AAAA-MM-DD.");
+            String formatoEsperado = type.equals(Instant.class) ? "AAAA-MM-DDTHH:MM:SSZ (UTC)" : "AAAA-MM-DD";
+            throw new FiltroInvalidoException("Formato de data inválido: '" + value + "'. Use " + formatoEsperado + ".");
         }
         throw new UnsupportedOperationException("Tipo de data não suportado: " + type);
     }
@@ -523,6 +533,8 @@ public class CriteriaCreator {
                 return stringValue.contains("T")
                         ? LocalDateTime.parse(stringValue)
                         : LocalDate.parse(stringValue).atStartOfDay();
+            } else if (fieldType.equals(Instant.class)) {
+                return Instant.parse(stringValue);
             } else if (fieldType.equals(Date.class)) {
                 return new SimpleDateFormat("yyyy-MM-dd").parse(stringValue);
             } else if (fieldType.isEnum()) {
