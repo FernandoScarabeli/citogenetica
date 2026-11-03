@@ -160,6 +160,9 @@ public class SecurityConfiguration {
                                 "/api/v1/auth/redefinir-senha",
                                 "/api/v1/auth/validar-codigo").permitAll()
 
+                        .requestMatchers("/api/v1/admin/laboratorios/**").hasRole("ADMIN")
+                        .requestMatchers("/api/v1/laboratorios", "/api/v1/laboratorios/**").authenticated()
+
                         .requestMatchers(HttpMethod.GET, "/api/events/subscribe").authenticated()
                         .requestMatchers(HttpMethod.GET, "/api/events/**").authenticated()
                         .requestMatchers("/api/v1/notificacoes/**").authenticated()

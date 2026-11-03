@@ -3,6 +3,7 @@ package br.ufla.citogenetica.config.web;
 import br.ufla.citogenetica.shared.web.error.NotFoundException;
 import br.ufla.citogenetica.shared.filter.FiltroInvalidoException;
 import br.ufla.citogenetica.shared.web.error.BusinessException;
+import br.ufla.citogenetica.shared.web.error.ConflictException;
 import br.ufla.citogenetica.shared.web.error.ErrorResponseDTO;
 import br.ufla.citogenetica.usuario.api.error.RecoveryChallengeException;
 import br.ufla.citogenetica.usuario.api.error.EmailConfirmationException;
@@ -10,6 +11,7 @@ import br.ufla.citogenetica.usuario.api.error.PasswordPolicyException;
 import br.ufla.citogenetica.usuario.api.error.TooManyRequestsException;
 import br.ufla.citogenetica.usuario.api.error.ValidationConflictException;
 import jakarta.servlet.http.HttpServletRequest;
+import jakarta.validation.ConstraintViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.MethodArgumentNotValidException;
@@ -18,6 +20,7 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.method.annotation.HandlerMethodValidationException;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 import org.springframework.web.servlet.resource.NoResourceFoundException;
+import org.springframework.dao.OptimisticLockingFailureException;
 
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.authentication.BadCredentialsException;
@@ -63,6 +66,14 @@ public class GlobalExceptionHandler {
                 "Parâmetros inválidos",
                 request.getRequestURI(),
                 details);
+        return new ResponseEntity<>(errorResponse, HttpStatus.BAD_REQUEST);
+    }
+
+    @ExceptionHandler(ConstraintViolationException.class)
+    public ResponseEntity<ErrorResponseDTO> handleConstraintViolation(HttpServletRequest request) {
+        ErrorResponseDTO errorResponse = new ErrorResponseDTO(
+                HttpStatus.BAD_REQUEST.value(), HttpStatus.BAD_REQUEST.getReasonPhrase(),
+                "Parâmetros inválidos.", request.getRequestURI());
         return new ResponseEntity<>(errorResponse, HttpStatus.BAD_REQUEST);
     }
 
@@ -130,6 +141,23 @@ public class GlobalExceptionHandler {
                 ex.getMessage(),
                 request.getRequestURI()
         );
+        return new ResponseEntity<>(errorResponse, HttpStatus.CONFLICT);
+    }
+
+    @ExceptionHandler(ConflictException.class)
+    public ResponseEntity<ErrorResponseDTO> handleConflictException(ConflictException ex, HttpServletRequest request) {
+        ErrorResponseDTO errorResponse = new ErrorResponseDTO(
+                HttpStatus.CONFLICT.value(), HttpStatus.CONFLICT.getReasonPhrase(),
+                ex.getMessage(), request.getRequestURI());
+        return new ResponseEntity<>(errorResponse, HttpStatus.CONFLICT);
+    }
+
+    @ExceptionHandler(OptimisticLockingFailureException.class)
+    public ResponseEntity<ErrorResponseDTO> handleOptimisticLockingFailure(HttpServletRequest request) {
+        ErrorResponseDTO errorResponse = new ErrorResponseDTO(
+                HttpStatus.CONFLICT.value(), HttpStatus.CONFLICT.getReasonPhrase(),
+                "O registro foi alterado por outra operação. Atualize os dados e tente novamente.",
+                request.getRequestURI());
         return new ResponseEntity<>(errorResponse, HttpStatus.CONFLICT);
     }
 
