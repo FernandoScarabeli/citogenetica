@@ -1,7 +1,6 @@
 package br.ufla.citogenetica;
 
 import br.ufla.citogenetica.configuration.TestSecrets;
-import br.ufla.citogenetica.configuration.security.JWTConfig;
 import br.ufla.citogenetica.model.roles.Role;
 import br.ufla.citogenetica.model.type.RolesEnum;
 import br.ufla.citogenetica.model.type.StatusEnum;
@@ -12,6 +11,7 @@ import br.ufla.citogenetica.service.EmailService;
 import br.ufla.citogenetica.service.RecoveryHmacService;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
@@ -23,6 +23,9 @@ import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
+import org.springframework.test.web.servlet.ResultActions;
+import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
+import jakarta.servlet.http.Cookie;
 
 import java.security.SecureRandom;
 import java.nio.charset.StandardCharsets;
@@ -76,9 +79,6 @@ class AuthRecoverySecurityIntegrationTest extends AbstractIntegrationTest {
     private JdbcTemplate jdbcTemplate;
 
     @Autowired
-    private JWTConfig jwtConfig;
-
-    @Autowired
     private RecoveryHmacService recoveryHmacService;
 
     @MockBean
@@ -110,6 +110,27 @@ class AuthRecoverySecurityIntegrationTest extends AbstractIntegrationTest {
     void preparar() {
         roleUser = roleRepository.findByNome(RolesEnum.USER).orElseThrow();
         when(secureRandom.nextInt(1_000_000)).thenReturn(42);
+    }
+
+    @Test
+    void redefinicaoDeSenhaEncerraTodasAsSessoesAtivas() throws Exception {
+        Usuario usuario = criarUsuario(StatusEnum.ATIVO);
+        MvcResult loginRealizado = perform(login(usuario.getEmail(), SENHA, "198.51.100.61"))
+                .andExpect(status().isNoContent())
+                .andReturn();
+        Cookie sessaoAnterior = loginRealizado.getResponse().getCookie("CITOGENETICA_SESSION");
+        pedirRecuperacao(usuario.getEmail(), "198.51.100.62");
+        String codigo = capturarCodigo(usuario.getEmail());
+
+        perform(post("/api/v1/auth/redefinir-senha")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(json("email", usuario.getEmail(), "codigo", codigo,
+                                "novaSenha", "SenhaRedefinida789!")))
+                .andExpect(status().isNoContent());
+
+        perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders
+                        .get("/api/v1/usuarios/me").cookie(sessaoAnterior))
+                .andExpect(status().isUnauthorized());
     }
 
     @Test
@@ -185,7 +206,7 @@ class AuthRecoverySecurityIntegrationTest extends AbstractIntegrationTest {
         String codigo = capturarCodigo(usuario.getEmail());
 
         for (int tentativa = 0; tentativa < 5; tentativa++) {
-            mockMvc.perform(post("/api/v1/auth/redefinir-senha")
+            perform(post("/api/v1/auth/redefinir-senha")
                             .contentType(MediaType.APPLICATION_JSON)
                             .content(json("email", usuario.getEmail(), "codigo", CODIGO_INVALIDO,
                                     "novaSenha", NOVA_SENHA)))
@@ -193,7 +214,7 @@ class AuthRecoverySecurityIntegrationTest extends AbstractIntegrationTest {
                     .andExpect(jsonPath("$.message").value("Código inválido ou expirado."));
         }
 
-        mockMvc.perform(post("/api/v1/auth/redefinir-senha")
+        perform(post("/api/v1/auth/redefinir-senha")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(json("email", usuario.getEmail(), "codigo", codigo,
                                 "novaSenha", NOVA_SENHA)))
@@ -209,7 +230,7 @@ class AuthRecoverySecurityIntegrationTest extends AbstractIntegrationTest {
         ExecutorService executor = Executors.newFixedThreadPool(5);
         try {
             var tarefas = java.util.stream.IntStream.range(0, 5)
-                    .<java.util.concurrent.Callable<Integer>>mapToObj(indice -> () -> mockMvc.perform(
+                    .<java.util.concurrent.Callable<Integer>>mapToObj(indice -> () -> perform(
                                     post("/api/v1/auth/redefinir-senha")
                                             .with(request -> { request.setRemoteAddr("198.51.100.60"); return request; })
                                             .contentType(MediaType.APPLICATION_JSON)
@@ -224,7 +245,7 @@ class AuthRecoverySecurityIntegrationTest extends AbstractIntegrationTest {
             executor.shutdownNow();
         }
 
-        MvcResult codigoCorretoEsgotado = mockMvc.perform(post("/api/v1/auth/redefinir-senha")
+        MvcResult codigoCorretoEsgotado = perform(post("/api/v1/auth/redefinir-senha")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(json("email", usuario.getEmail(), "codigo", codigoCorreto,
                                 "novaSenha", NOVA_SENHA)))
@@ -237,11 +258,11 @@ class AuthRecoverySecurityIntegrationTest extends AbstractIntegrationTest {
         Usuario usuario = criarUsuario(StatusEnum.ATIVO);
         pedirRecuperacao(usuario.getEmail(), "198.51.100.16");
 
-        MvcResult emailExistente = mockMvc.perform(post("/api/v1/auth/validar-codigo")
+        MvcResult emailExistente = perform(post("/api/v1/auth/validar-codigo")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(json("email", usuario.getEmail(), "codigo", CODIGO_INVALIDO)))
                 .andReturn();
-        MvcResult emailInexistente = mockMvc.perform(post("/api/v1/auth/validar-codigo")
+        MvcResult emailInexistente = perform(post("/api/v1/auth/validar-codigo")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(json("email", emailNovo(), "codigo", CODIGO_INVALIDO)))
                 .andReturn();
@@ -259,12 +280,12 @@ class AuthRecoverySecurityIntegrationTest extends AbstractIntegrationTest {
         String codigo = capturarCodigo(usuario.getEmail());
         jdbcTemplate.update("UPDATE desafio_recuperacao_senha SET expira_em = CURRENT_TIMESTAMP - INTERVAL '1 second' WHERE usuario_id = ?", usuario.getId());
 
-        MvcResult codigoExpirado = mockMvc.perform(post("/api/v1/auth/redefinir-senha")
+        MvcResult codigoExpirado = perform(post("/api/v1/auth/redefinir-senha")
                         .with(request -> { request.setRemoteAddr("198.51.100.41"); return request; })
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(json("email", usuario.getEmail(), "codigo", codigo, "novaSenha", NOVA_SENHA)))
                 .andReturn();
-        MvcResult contaInexistente = mockMvc.perform(post("/api/v1/auth/redefinir-senha")
+        MvcResult contaInexistente = perform(post("/api/v1/auth/redefinir-senha")
                         .with(request -> { request.setRemoteAddr("198.51.100.42"); return request; })
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(json("email", emailNovo(), "codigo", codigo, "novaSenha", NOVA_SENHA)))
@@ -292,31 +313,31 @@ class AuthRecoverySecurityIntegrationTest extends AbstractIntegrationTest {
         Usuario usuario = criarUsuario(StatusEnum.ATIVO);
         String emailComEspacosEMaiusculas = "  " + usuario.getEmail().toUpperCase() + "  ";
 
-        mockMvc.perform(post("/api/v1/auth/login")
+        perform(post("/api/v1/auth/login")
                         .with(request -> { request.setRemoteAddr("198.51.100.21"); return request; })
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(json("email", emailComEspacosEMaiusculas, "senha", SENHA)))
-                .andExpect(status().isOk());
+                .andExpect(status().isNoContent());
     }
 
     @Test
     void loginAplicaRateLimitPorIpComRetryAfterEErroPadrao() throws Exception {
         String emailTentativa = emailNovo();
-        mockMvc.perform(login(emailTentativa, "SenhaErrada123!", "198.51.100.22")
+        perform(login(emailTentativa, "SenhaErrada123!", "198.51.100.22")
                         .header("X-Forwarded-For", "203.0.113.1"))
                 .andExpect(status().isUnauthorized());
-        mockMvc.perform(login(emailNovo(), "SenhaErrada123!", "198.51.100.22")
+        perform(login(emailNovo(), "SenhaErrada123!", "198.51.100.22")
                         .header("X-Forwarded-For", "203.0.113.2"))
                 .andExpect(status().isUnauthorized());
-        mockMvc.perform(login(emailNovo(), "SenhaErrada123!", "198.51.100.22")
+        perform(login(emailNovo(), "SenhaErrada123!", "198.51.100.22")
                         .header("X-Forwarded-For", "203.0.113.3"))
                 .andExpect(status().isTooManyRequests())
                 .andExpect(header().exists("Retry-After"))
                 .andExpect(jsonPath("$.status").value(429));
 
-        mockMvc.perform(login(emailTentativa, "SenhaErrada123!", "198.51.100.23"))
+        perform(login(emailTentativa, "SenhaErrada123!", "198.51.100.23"))
                 .andExpect(status().isUnauthorized());
-        mockMvc.perform(login(emailTentativa, "SenhaErrada123!", "198.51.100.24"))
+        perform(login(emailTentativa, "SenhaErrada123!", "198.51.100.24"))
                 .andExpect(status().isTooManyRequests())
                 .andExpect(header().exists("Retry-After"));
     }
@@ -324,11 +345,11 @@ class AuthRecoverySecurityIntegrationTest extends AbstractIntegrationTest {
     @Test
     void loginAplicaRateLimitPorEmailNormalizadoMesmoComIpsDiferentes() throws Exception {
         String emailTentativa = emailNovo();
-        mockMvc.perform(login(emailTentativa, "SenhaErrada123!", "198.51.100.31"))
+        perform(login(emailTentativa, "SenhaErrada123!", "198.51.100.31"))
                 .andExpect(status().isUnauthorized());
-        mockMvc.perform(login(emailTentativa.toUpperCase(), "SenhaErrada123!", "198.51.100.32"))
+        perform(login(emailTentativa.toUpperCase(), "SenhaErrada123!", "198.51.100.32"))
                 .andExpect(status().isUnauthorized());
-        mockMvc.perform(login(" " + emailTentativa.toUpperCase() + " ", "SenhaErrada123!", "198.51.100.33"))
+        perform(login(" " + emailTentativa.toUpperCase() + " ", "SenhaErrada123!", "198.51.100.33"))
                 .andExpect(status().isTooManyRequests())
                 .andExpect(header().string("Retry-After", org.hamcrest.Matchers.matchesPattern("[0-9]+")))
                 .andExpect(jsonPath("$.status").value(429))
@@ -349,7 +370,7 @@ class AuthRecoverySecurityIntegrationTest extends AbstractIntegrationTest {
         String emailValidacao = emailNovo();
         for (int tentativa = 1; tentativa <= 11; tentativa++) {
             String ip = "198.51.100." + (90 + tentativa);
-            MvcResult resultado = mockMvc.perform(post("/api/v1/auth/validar-codigo")
+            MvcResult resultado = perform(post("/api/v1/auth/validar-codigo")
                             .with(request -> { request.setRemoteAddr(ip); return request; })
                             .contentType(MediaType.APPLICATION_JSON)
                             .content(json("email", emailValidacao, "codigo", CODIGO_INVALIDO)))
@@ -360,7 +381,7 @@ class AuthRecoverySecurityIntegrationTest extends AbstractIntegrationTest {
         String emailReset = emailNovo();
         for (int tentativa = 1; tentativa <= 11; tentativa++) {
             String ip = "198.51.100." + (110 + tentativa);
-            MvcResult resultado = mockMvc.perform(post("/api/v1/auth/redefinir-senha")
+            MvcResult resultado = perform(post("/api/v1/auth/redefinir-senha")
                             .with(request -> { request.setRemoteAddr(ip); return request; })
                             .contentType(MediaType.APPLICATION_JSON)
                             .content(json("email", emailReset, "codigo", CODIGO_INVALIDO, "novaSenha", NOVA_SENHA)))
@@ -387,20 +408,20 @@ class AuthRecoverySecurityIntegrationTest extends AbstractIntegrationTest {
         pedirRecuperacao(usuario.getEmail(), "198.51.100.19");
         String codigoNovo = capturarUltimoCodigo(usuario.getEmail());
 
-        MvcResult codigoAnteriorResposta = mockMvc.perform(post("/api/v1/auth/redefinir-senha")
+        MvcResult codigoAnteriorResposta = perform(post("/api/v1/auth/redefinir-senha")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(json("email", usuario.getEmail(), "codigo", codigoAnterior,
                                 "novaSenha", NOVA_SENHA)))
                 .andReturn();
         assertEquals(400, codigoAnteriorResposta.getResponse().getStatus());
 
-        MvcResult redefinicaoValida = mockMvc.perform(post("/api/v1/auth/redefinir-senha")
+        MvcResult redefinicaoValida = perform(post("/api/v1/auth/redefinir-senha")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(json("email", usuario.getEmail(), "codigo", codigoNovo,
                                 "novaSenha", NOVA_SENHA)))
                 .andReturn();
         assertEquals(204, redefinicaoValida.getResponse().getStatus());
-        MvcResult codigoReutilizado = mockMvc.perform(post("/api/v1/auth/redefinir-senha")
+        MvcResult codigoReutilizado = perform(post("/api/v1/auth/redefinir-senha")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(json("email", usuario.getEmail(), "codigo", codigoNovo,
                                 "novaSenha", "SenhaDeUsoUnico789!")))
@@ -413,8 +434,8 @@ class AuthRecoverySecurityIntegrationTest extends AbstractIntegrationTest {
         String email = emailNovo();
         String emailInformado = " " + email.toUpperCase() + " ";
 
-        mockMvc.perform(post("/api/v1/auth/register")
-                        .header("Authorization", "Bearer " + jwtConfigTokenAdmin())
+        perform(post("/api/v1/auth/register")
+                        .cookie(sessaoAdmin())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(json("nome", "Cadastro normalizado", "email", emailInformado,
                                 "senha", SENHA, "roleName", "USER")))
@@ -428,9 +449,9 @@ class AuthRecoverySecurityIntegrationTest extends AbstractIntegrationTest {
         Usuario alvo = criarUsuario(StatusEnum.ATIVO);
         String novoEmail = emailNovo();
 
-        mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put(
+        perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put(
                                 "/api/v1/usuarios/{id}", alvo.getId())
-                        .header("Authorization", "Bearer " + jwtConfigTokenAdmin())
+                        .cookie(sessaoAdmin())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(json("nome", alvo.getNome(), "email", " " + novoEmail.toUpperCase() + " ")))
                 .andExpect(status().isOk())
@@ -455,7 +476,7 @@ class AuthRecoverySecurityIntegrationTest extends AbstractIntegrationTest {
     }
 
     private MvcResult pedirRecuperacao(String email, String ip) throws Exception {
-        return mockMvc.perform(post("/api/v1/auth/recuperar-senha")
+        return perform(post("/api/v1/auth/recuperar-senha")
                         .with(request -> { request.setRemoteAddr(ip); return request; })
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(json("email", email)))
@@ -499,7 +520,7 @@ class AuthRecoverySecurityIntegrationTest extends AbstractIntegrationTest {
         return UUID.randomUUID() + "@citogenetica.test";
     }
 
-    private String jwtConfigTokenAdmin() {
+    private Cookie sessaoAdmin() throws Exception {
         Role roleAdmin = roleRepository.findByNome(RolesEnum.ADMIN).orElseThrow();
         Usuario admin = usuarioRepository.save(Usuario.builder()
                 .nome("Admin de teste")
@@ -508,7 +529,18 @@ class AuthRecoverySecurityIntegrationTest extends AbstractIntegrationTest {
                 .status(StatusEnum.ATIVO)
                 .role(roleAdmin)
                 .build());
-        return jwtConfig.generateToken(admin);
+        MvcResult resultado = perform(post("/api/v1/auth/login")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(json("email", admin.getEmail(), "senha", SENHA)))
+                .andExpect(status().isNoContent())
+                .andReturn();
+        return resultado.getResponse().getCookie("CITOGENETICA_SESSION");
+    }
+
+    private ResultActions perform(MockHttpServletRequestBuilder request) throws Exception {
+        Cookie csrf = new Cookie("XSRF-TOKEN", "csrf-de-integracao");
+        request.cookie(csrf).header("X-XSRF-TOKEN", csrf.getValue());
+        return mockMvc.perform(request);
     }
 
     private String json(Object... pares) throws Exception {
@@ -521,5 +553,10 @@ class AuthRecoverySecurityIntegrationTest extends AbstractIntegrationTest {
 
     private com.fasterxml.jackson.databind.JsonNode respostaJson(MvcResult result) throws Exception {
         return objectMapper.readTree(new String(result.getResponse().getContentAsByteArray(), StandardCharsets.UTF_8));
+    }
+
+    @AfterEach
+    void limparSessoesDeIntegracao() {
+        jdbcTemplate.update("DELETE FROM SPRING_SESSION");
     }
 }

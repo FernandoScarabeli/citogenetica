@@ -1,6 +1,5 @@
 package br.ufla.citogenetica.service;
 
-import br.ufla.citogenetica.configuration.security.JWTConfig;
 import br.ufla.citogenetica.configuration.security.RecoveryProperties;
 import br.ufla.citogenetica.configuration.security.RecoveryExpirationProperties;
 import br.ufla.citogenetica.exception.BusinessException;
@@ -16,7 +15,6 @@ import br.ufla.citogenetica.model.usuario.dto.request.LoginRequestDTO;
 import br.ufla.citogenetica.model.usuario.dto.request.RedefinirSenhaRequestDTO;
 import br.ufla.citogenetica.model.usuario.dto.request.UsuarioRequestDTO;
 import br.ufla.citogenetica.model.usuario.dto.request.ValidarCodigoRequestDTO;
-import br.ufla.citogenetica.model.usuario.dto.response.LoginResponseDTO;
 import br.ufla.citogenetica.model.usuario.dto.response.UsuarioResponseDTO;
 import br.ufla.citogenetica.repository.RecoveryChallengeRepository;
 import br.ufla.citogenetica.repository.RoleRepository;
@@ -26,6 +24,7 @@ import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.Authentication;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -52,7 +51,6 @@ public class AuthService {
     private final RecoveryChallengeRepository recoveryChallengeRepository;
     private final PasswordEncoder passwordEncoder;
     private final AuthenticationManager authenticationManager;
-    private final JWTConfig tokenService;
     private final UsuarioMapper usuarioMapper;
     private final RecoveryHmacService recoveryHmacService;
     private final RecoveryProperties recoveryProperties;
@@ -61,14 +59,13 @@ public class AuthService {
     private final SecureRandom secureRandom;
     private final Clock applicationClock;
     private final ApplicationEventPublisher eventPublisher;
+    private final SessionRevocationService sessionRevocationService;
 
-    public LoginResponseDTO login(LoginRequestDTO requestDTO) {
+    public Authentication login(LoginRequestDTO requestDTO) {
         String email = EmailNormalizer.normalize(requestDTO.email());
         rateLimitService.enforceEmail(AuthRateLimitRoute.LOGIN, email);
         var usernamePassword = new UsernamePasswordAuthenticationToken(email, requestDTO.senha());
-        var auth = this.authenticationManager.authenticate(usernamePassword);
-        var token = this.tokenService.generateToken((Usuario) auth.getPrincipal());
-        return new LoginResponseDTO(token);
+        return this.authenticationManager.authenticate(usernamePassword);
     }
 
     @Transactional
@@ -133,12 +130,12 @@ public class AuthService {
     }
 
     @Transactional
-    public boolean redefinirSenha(RedefinirSenhaRequestDTO requestDTO) {
+    public Optional<Long> redefinirSenha(RedefinirSenhaRequestDTO requestDTO) {
         String email = EmailNormalizer.normalize(requestDTO.email());
         rateLimitService.enforceEmail(AuthRateLimitRoute.RESET_PASSWORD, email);
         Optional<ValidatedChallenge> desafioEncontrado = validarDesafio(email, requestDTO.codigo());
         if (desafioEncontrado.isEmpty()) {
-            return false;
+            return Optional.empty();
         }
         ValidatedChallenge validated = desafioEncontrado.get();
 
@@ -149,7 +146,8 @@ public class AuthService {
         validated.usuario().setSenha(passwordEncoder.encode(requestDTO.novaSenha()));
         usuarioRepository.save(validated.usuario());
         recoveryChallengeRepository.consume(validated.usuario().getId(), validated.challenge().id(), applicationClock.instant());
-        return true;
+        sessionRevocationService.revogarSessoes(validated.usuario().getId(), null);
+        return Optional.of(validated.usuario().getId());
     }
 
     @Transactional

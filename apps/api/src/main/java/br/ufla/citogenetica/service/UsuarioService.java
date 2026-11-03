@@ -7,6 +7,7 @@ import br.ufla.citogenetica.model.usuario.EmailNormalizer;
 import br.ufla.citogenetica.model.type.RolesEnum;
 import br.ufla.citogenetica.model.type.StatusEnum;
 import br.ufla.citogenetica.model.usuario.Usuario;
+import br.ufla.citogenetica.model.usuario.UsuarioPrincipal;
 import br.ufla.citogenetica.model.usuario.dto.request.AtualizarMeuPerfilRequestDTO;
 import br.ufla.citogenetica.model.usuario.dto.request.AtualizarSenhaRequestDTO;
 import br.ufla.citogenetica.model.usuario.dto.request.AtualizarUsuarioRequestDTO;
@@ -29,6 +30,7 @@ public class UsuarioService {
     private final UsuarioRepository usuarioRepository;
     private final UsuarioMapper usuarioMapper;
     private final PasswordEncoder passwordEncoder;
+    private final SessionRevocationService sessionRevocationService;
 
 
     @Transactional(readOnly = true)
@@ -81,6 +83,13 @@ public class UsuarioService {
         return this.usuarioRepository.save(entidade);
     }
 
+    @Transactional(readOnly = true)
+    public Usuario buscarMeuPerfil() {
+        Usuario usuarioLogado = usuarioAutenticado();
+        return this.usuarioRepository.findById(usuarioLogado.getId())
+                .orElseThrow(() -> new NotFoundException(Usuario.class, usuarioLogado.getId()));
+    }
+
     @Transactional
     public void trocarStatus(Long id) {
         Usuario usuarioLogado = usuarioAutenticado();
@@ -102,10 +111,13 @@ public class UsuarioService {
         entidade.setStatus(novoStatus);
 
         this.usuarioRepository.save(entidade);
+        if (novoStatus == StatusEnum.INATIVO) {
+            sessionRevocationService.revogarSessoes(entidade.getId(), null);
+        }
     }
 
     @Transactional
-    public void atualizarMinhaSenha(AtualizarSenhaRequestDTO dto) {
+    public void atualizarMinhaSenha(AtualizarSenhaRequestDTO dto, String sessionIdAtual) {
         Usuario usuarioLogado = usuarioAutenticado();
         Usuario entidade = this.usuarioRepository.findById(usuarioLogado.getId())
                 .orElseThrow(() -> new NotFoundException(Usuario.class, usuarioLogado.getId()));
@@ -117,13 +129,15 @@ public class UsuarioService {
         String encryptedPassword = this.passwordEncoder.encode(dto.novaSenha());
         entidade.setSenha(encryptedPassword);
         this.usuarioRepository.save(entidade);
+        sessionRevocationService.revogarSessoes(entidade.getId(), sessionIdAtual);
     }
 
     private Usuario usuarioAutenticado() {
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
-        if (authentication == null || !(authentication.getPrincipal() instanceof Usuario usuario)) {
+        if (authentication == null || !(authentication.getPrincipal() instanceof UsuarioPrincipal principal)) {
             throw new AccessDeniedException("É necessário estar autenticado.");
         }
-        return usuario;
+        return this.usuarioRepository.findById(principal.id())
+                .orElseThrow(() -> new AccessDeniedException("É necessário estar autenticado."));
     }
 }

@@ -1,10 +1,24 @@
 server:
   port: ${SERVER_PORT:8080}
   forward-headers-strategy: none
+  servlet:
+    session:
+      timeout: ${API_SECURITY_SESSION_TIMEOUT:30m}
+      cookie:
+        name: CITOGENETICA_SESSION
+        http-only: true
+        secure: true
+        same-site: lax
+        path: /
 
 spring:
   application:
     name: citogenetica-api
+
+  session:
+    timeout: ${API_SECURITY_SESSION_TIMEOUT:30m}
+    jdbc:
+      initialize-schema: never
 
   datasource:
     url: jdbc:postgresql://${SPRING_DATASOURCE_HOST}:${SPRING_DATASOURCE_PORT}/${SPRING_DATASOURCE_DATABASE}
@@ -33,11 +47,11 @@ springdoc:
     path: /swagger-ui.html
 
 api:
+  cors:
+    allowed-origins: ${API_CORS_ALLOWED_ORIGINS}
   security:
     trusted-proxy:
       internal-proxies: ${API_SECURITY_TRUSTED_PROXY_REGEX:}
-    jwt:
-      secret: ${API_SECURITY_JWT_SECRET}
     token:
       recovery-expiration-minutes: ${API_SECURITY_TOKEN_RECOVERY_EXPIRATION_MINUTES:15}
     recovery:

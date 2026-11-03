@@ -1,9 +1,14 @@
 package br.ufla.citogenetica.configuration.security;
 
-import lombok.RequiredArgsConstructor;
+import br.ufla.citogenetica.model.error.dto.response.ErrorResponseDTO;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import jakarta.servlet.http.HttpServletResponse;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpMethod;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.security.access.hierarchicalroles.RoleHierarchy;
 import org.springframework.security.access.hierarchicalroles.RoleHierarchyImpl;
 import org.springframework.security.authentication.AuthenticationManager;
@@ -11,34 +16,44 @@ import org.springframework.security.config.annotation.authentication.configurati
 import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
-import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
 import org.springframework.security.config.http.SessionCreationPolicy;
-import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
-import org.springframework.security.crypto.password.PasswordEncoder;
-import org.springframework.security.web.SecurityFilterChain;
-import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
-import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.AuthenticationEntryPoint;
+import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.security.web.context.SecurityContextHolderFilter;
 import org.springframework.security.web.access.AccessDeniedHandler;
+import org.springframework.security.web.authentication.session.ChangeSessionIdAuthenticationStrategy;
+import org.springframework.security.web.authentication.session.CompositeSessionAuthenticationStrategy;
+import org.springframework.security.web.authentication.session.SessionAuthenticationStrategy;
+import org.springframework.security.web.context.HttpSessionSecurityContextRepository;
+import org.springframework.security.web.context.SecurityContextRepository;
+import org.springframework.security.web.csrf.CookieCsrfTokenRepository;
+import org.springframework.security.web.csrf.CsrfAuthenticationStrategy;
+import org.springframework.security.web.csrf.CsrfException;
+import org.springframework.security.web.csrf.CsrfTokenRepository;
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 
-import jakarta.servlet.http.HttpServletRequest;
-import jakarta.servlet.http.HttpServletResponse;
-import java.io.IOException;
-import java.util.Arrays;
 import java.util.List;
 
 @Configuration
 @EnableWebSecurity
 @EnableMethodSecurity
-@RequiredArgsConstructor
 public class SecurityConfiguration {
 
-    private final SecurityFilter securityFilter;
+    private static final String SESSION_COOKIE_NAME = "CITOGENETICA_SESSION";
+
+    private final CorsProperties corsProperties;
+    private final ObjectMapper objectMapper;
+
+    public SecurityConfiguration(CorsProperties corsProperties, ObjectMapper objectMapper) {
+        this.corsProperties = corsProperties;
+        this.objectMapper = objectMapper;
+    }
 
     @Bean
     public RoleHierarchy roleHierarchy() {
@@ -48,11 +63,10 @@ public class SecurityConfiguration {
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration configuration = new CorsConfiguration();
-        configuration.setAllowedOrigins(Arrays.asList(
-                "http://localhost:4200"
-        ));
-        configuration.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
-        configuration.setAllowedHeaders(List.of("*"));
+        configuration.setAllowedOrigins(corsProperties.allowedOrigins());
+        configuration.setAllowedMethods(List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
+        configuration.setAllowedHeaders(List.of("Accept", "Content-Type", "X-XSRF-TOKEN"));
+        configuration.setExposedHeaders(List.of("Retry-After"));
         configuration.setAllowCredentials(true);
         configuration.setMaxAge(3600L);
 
@@ -62,48 +76,83 @@ public class SecurityConfiguration {
     }
 
     @Bean
-    public SecurityFilterChain securityFilterChain(HttpSecurity http, ApiAuthenticationEntryPoint authenticationEntryPoint) throws Exception {
+    public CsrfTokenRepository csrfTokenRepository(
+            @Value("${server.servlet.session.cookie.secure:true}") boolean secure) {
+        CookieCsrfTokenRepository repository = CookieCsrfTokenRepository.withHttpOnlyFalse();
+        repository.setCookieCustomizer(cookie -> cookie
+                .path("/")
+                .secure(secure)
+                .httpOnly(false)
+                .sameSite("Lax"));
+        return repository;
+    }
+
+    @Bean
+    public SecurityContextRepository securityContextRepository() {
+        return new HttpSessionSecurityContextRepository();
+    }
+
+    @Bean
+    public SessionAuthenticationStrategy sessionAuthenticationStrategy(CsrfTokenRepository csrfTokenRepository) {
+        return new CompositeSessionAuthenticationStrategy(List.of(
+                new ChangeSessionIdAuthenticationStrategy(),
+                new CsrfAuthenticationStrategy(csrfTokenRepository)));
+    }
+
+    @Bean
+    public SecurityFilterChain securityFilterChain(
+            HttpSecurity http,
+            ApiAuthenticationEntryPoint authenticationEntryPoint,
+            CsrfTokenRepository csrfTokenRepository,
+            SecurityContextRepository securityContextRepository,
+            SpaCsrfTokenRequestHandler csrfTokenRequestHandler,
+            SessionUserValidationFilter sessionUserValidationFilter) throws Exception {
         return http
-                .csrf(AbstractHttpConfigurer::disable)
+                .csrf(csrf -> csrf
+                        .csrfTokenRepository(csrfTokenRepository)
+                        .csrfTokenRequestHandler(csrfTokenRequestHandler))
                 .cors(cors -> cors.configurationSource(corsConfigurationSource()))
-                .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+                .securityContext(context -> context
+                        .securityContextRepository(securityContextRepository)
+                        .requireExplicitSave(true))
+                .sessionManagement(session -> session
+                        .sessionCreationPolicy(SessionCreationPolicy.IF_REQUIRED)
+                        .sessionFixation(fixation -> fixation.changeSessionId()))
+                .logout(logout -> logout
+                        .logoutUrl("/api/v1/auth/logout")
+                        .invalidateHttpSession(true)
+                        .clearAuthentication(true)
+                        .deleteCookies(SESSION_COOKIE_NAME)
+                        .logoutSuccessHandler((request, response, authentication) ->
+                                response.setStatus(HttpServletResponse.SC_NO_CONTENT)))
                 .exceptionHandling(exceptions -> exceptions
                         .authenticationEntryPoint(authenticationEntryPoint)
-                        .accessDeniedHandler(customAccessDeniedHandler(authenticationEntryPoint)))
+                        .accessDeniedHandler(apiAccessDeniedHandler(authenticationEntryPoint)))
                 .authorizeHttpRequests(authorize -> authorize
-                        // INFRAESTRUTURA E DOCUMENTAÇÃO (Público)
                         .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
                         .requestMatchers("/actuator/health").permitAll()
                         .requestMatchers("/swagger-ui/**", "/swagger-ui.html", "/v3/api-docs/**", "/swagger-resources/**", "/webjars/**").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/api/v1/auth/csrf").permitAll()
 
-                        // AUTENTICAÇÃO E RECUPERAÇÃO DE SENHA (Público)
+                        // CSRF também protege login e recuperação, inclusive para clientes anônimos.
                         .requestMatchers(HttpMethod.POST,
                                 "/api/v1/auth/login",
                                 "/api/v1/auth/recuperar-senha",
                                 "/api/v1/auth/redefinir-senha",
-                                "/api/v1/auth/validar-codigo"
-                        ).permitAll()
+                                "/api/v1/auth/validar-codigo").permitAll()
 
-                        // NOTIFICAÇÕES E EVENTOS SSE
                         .requestMatchers(HttpMethod.GET, "/api/events/subscribe").authenticated()
                         .requestMatchers(HttpMethod.GET, "/api/events/**").authenticated()
                         .requestMatchers("/api/v1/notificacoes/**").authenticated()
 
-                        // GESTÃO DE USUÁRIOS
                         .requestMatchers(HttpMethod.POST, "/api/v1/auth/register").hasRole("ADMIN")
                         .requestMatchers(HttpMethod.GET, "/api/v1/usuarios/me").authenticated()
                         .requestMatchers(HttpMethod.PUT, "/api/v1/usuarios/me").authenticated()
                         .requestMatchers(HttpMethod.PUT, "/api/v1/usuarios/me/senha").authenticated()
-
-                        // Regras genéricas de ADMIN para usuários (Delete, Update geral, Listar todos)
                         .requestMatchers("/api/v1/usuarios/**").hasRole("ADMIN")
-
-                        // EXEMPLO CRUD (para referência)
                         .requestMatchers("/api/v1/exemplos/**").authenticated()
-
                         .anyRequest().authenticated())
-
-                .addFilterBefore(this.securityFilter, UsernamePasswordAuthenticationFilter.class)
+                .addFilterAfter(sessionUserValidationFilter, SecurityContextHolderFilter.class)
                 .build();
     }
 
@@ -118,19 +167,38 @@ public class SecurityConfiguration {
         return new BCryptPasswordEncoder();
     }
 
-    private AccessDeniedHandler customAccessDeniedHandler(AuthenticationEntryPoint authenticationEntryPoint) {
-        return (request, response, accessDeniedException) -> {
-            Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
-            // Se não há autenticação ou é anônimo, retorna 401 em vez de 403
-            if (authentication == null || !authentication.isAuthenticated() || 
-                "anonymousUser".equals(authentication.getPrincipal())) {
-                authenticationEntryPoint.commence(request, response, null);
-            } else {
-                // Se há autenticação mas sem permissão, retorna 403
-                response.setStatus(HttpServletResponse.SC_FORBIDDEN);
-                response.setContentType("application/json;charset=UTF-8");
-                response.getWriter().write("{\"status\":403,\"error\":\"Forbidden\",\"message\":\"Acesso negado. Você não possui permissão para este recurso.\",\"path\":\"" + request.getRequestURI() + "\"}");
+    private AccessDeniedHandler apiAccessDeniedHandler(AuthenticationEntryPoint authenticationEntryPoint) {
+        return (request, response, exception) -> {
+            if (exception instanceof CsrfException) {
+                escreverErroCsrf(request.getRequestURI(), response);
+                return;
             }
+            Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+            if (authentication == null || !authentication.isAuthenticated()
+                    || "anonymousUser".equals(authentication.getPrincipal())) {
+                authenticationEntryPoint.commence(request, response,
+                        new org.springframework.security.authentication.InsufficientAuthenticationException("Falha na autenticação."));
+                return;
+            }
+            escreverErroForbidden(request.getRequestURI(), response);
         };
+    }
+
+    private void escreverErroForbidden(String path, HttpServletResponse response) throws java.io.IOException {
+        response.setStatus(HttpStatus.FORBIDDEN.value());
+        response.setContentType(MediaType.APPLICATION_JSON_VALUE);
+        response.setCharacterEncoding("UTF-8");
+        objectMapper.writeValue(response.getOutputStream(), new ErrorResponseDTO(
+                HttpStatus.FORBIDDEN.value(), HttpStatus.FORBIDDEN.getReasonPhrase(),
+                "Acesso negado. Você não possui permissão para este recurso.", path));
+    }
+
+    private void escreverErroCsrf(String path, HttpServletResponse response) throws java.io.IOException {
+        response.setStatus(HttpStatus.FORBIDDEN.value());
+        response.setContentType(MediaType.APPLICATION_JSON_VALUE);
+        response.setCharacterEncoding("UTF-8");
+        objectMapper.writeValue(response.getOutputStream(), new ErrorResponseDTO(
+                HttpStatus.FORBIDDEN.value(), HttpStatus.FORBIDDEN.getReasonPhrase(),
+                "Token CSRF ausente ou inválido.", path));
     }
 }

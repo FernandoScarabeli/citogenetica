@@ -1,6 +1,5 @@
 package br.ufla.citogenetica;
 
-import br.ufla.citogenetica.configuration.security.JWTConfig;
 import br.ufla.citogenetica.model.roles.Role;
 import br.ufla.citogenetica.model.type.RolesEnum;
 import br.ufla.citogenetica.model.type.StatusEnum;
@@ -8,6 +7,7 @@ import br.ufla.citogenetica.model.usuario.Usuario;
 import br.ufla.citogenetica.repository.RoleRepository;
 import br.ufla.citogenetica.repository.UsuarioRepository;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import jakarta.servlet.http.Cookie;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -15,7 +15,9 @@ import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMock
 import org.springframework.http.MediaType;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.MvcResult;
 import org.springframework.test.web.servlet.ResultActions;
+import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.UUID;
@@ -23,6 +25,7 @@ import java.util.UUID;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -33,6 +36,9 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 class SecurityUserBoundariesIntegrationTest extends AbstractIntegrationTest {
 
     private static final String SENHA_ATUAL = "SenhaAtualSegura123!";
+    private static final String COOKIE_SESSAO = "CITOGENETICA_SESSION";
+    private static final String COOKIE_CSRF = "XSRF-TOKEN";
+    private static final String TOKEN_CSRF = "csrf-de-integracao";
 
     @Autowired
     private MockMvc mockMvc;
@@ -49,9 +55,6 @@ class SecurityUserBoundariesIntegrationTest extends AbstractIntegrationTest {
     @Autowired
     private PasswordEncoder passwordEncoder;
 
-    @Autowired
-    private JWTConfig jwtConfig;
-
     private Role roleUser;
     private Role roleAdmin;
 
@@ -62,10 +65,13 @@ class SecurityUserBoundariesIntegrationTest extends AbstractIntegrationTest {
     }
 
     @Test
-    void tokenDeUsuarioInativoDeveReceber401NoFormatoDaApi() throws Exception {
-        Usuario usuario = criarUsuario(RolesEnum.USER, StatusEnum.INATIVO);
+    void sessaoDeUsuarioQueFicouInativoDeveReceber401NoFormatoDaApi() throws Exception {
+        Usuario usuario = criarUsuario(RolesEnum.USER, StatusEnum.ATIVO);
+        Cookie sessao = login(usuario);
+        usuario.setStatus(StatusEnum.INATIVO);
+        usuarioRepository.saveAndFlush(usuario);
 
-        mockMvc.perform(requisicaoAutenticada(usuario, put("/api/v1/usuarios/me")))
+        requisicaoAutenticada(sessao, get("/api/v1/usuarios/me"))
                 .andExpect(status().isUnauthorized())
                 .andExpect(jsonPath("$.status").value(401))
                 .andExpect(jsonPath("$.error").value("Unauthorized"))
@@ -74,14 +80,13 @@ class SecurityUserBoundariesIntegrationTest extends AbstractIntegrationTest {
     }
 
     @Test
-    void tokenDeUsuarioRemovidoDeveReceber401SemExporExcecao() throws Exception {
+    void sessaoDeUsuarioRemovidoDeveReceber401SemExporExcecao() throws Exception {
         Usuario usuario = criarUsuario(RolesEnum.USER, StatusEnum.ATIVO);
-        String token = jwtConfig.generateToken(usuario);
+        Cookie sessao = login(usuario);
         usuarioRepository.delete(usuario);
         usuarioRepository.flush();
 
-        mockMvc.perform(put("/api/v1/usuarios/me")
-                        .header("Authorization", "Bearer " + token))
+        requisicaoAutenticada(sessao, get("/api/v1/usuarios/me"))
                 .andExpect(status().isUnauthorized())
                 .andExpect(jsonPath("$.status").value(401))
                 .andExpect(jsonPath("$.message").value("Falha na autenticação."))
@@ -94,11 +99,9 @@ class SecurityUserBoundariesIntegrationTest extends AbstractIntegrationTest {
         Usuario alvo = criarUsuario(RolesEnum.USER, StatusEnum.ATIVO);
         String senhaHashOriginal = alvo.getPassword();
 
-        mockMvc.perform(requisicaoAutenticada(autenticado,
-                put("/api/v1/usuarios/atualizar-senha/{id}", alvo.getId()))
+        requisicaoAutenticada(login(autenticado), put("/api/v1/usuarios/atualizar-senha/{id}", alvo.getId())
                 .contentType(MediaType.APPLICATION_JSON)
-                .content(json("senhaAtual", SENHA_ATUAL,
-                        "novaSenha", "OutraSenhaSegura456!")))
+                .content(json("senhaAtual", SENHA_ATUAL, "novaSenha", "OutraSenhaSegura456!")))
                 .andExpect(status().isForbidden());
 
         Usuario alvoAtualizado = usuarioRepository.findById(alvo.getId()).orElseThrow();
@@ -106,39 +109,40 @@ class SecurityUserBoundariesIntegrationTest extends AbstractIntegrationTest {
     }
 
     @Test
-    void usuarioDeveTrocarSuaSenhaPelaRotaMeExigindoSenhaAtual() throws Exception {
+    void usuarioDeveTrocarSuaSenhaPelaRotaMeExigindoSenhaAtualEMantendoASessaoAtual() throws Exception {
         Usuario usuario = criarUsuario(RolesEnum.USER, StatusEnum.ATIVO);
+        Cookie sessao = login(usuario);
 
-        mockMvc.perform(requisicaoAutenticada(usuario, put("/api/v1/usuarios/me/senha"))
+        requisicaoAutenticada(sessao, put("/api/v1/usuarios/me/senha")
                 .contentType(MediaType.APPLICATION_JSON)
-                .content(json("senhaAtual", SENHA_ATUAL,
-                        "novaSenha", "NovaSenhaSegura456!")))
+                .content(json("senhaAtual", SENHA_ATUAL, "novaSenha", "NovaSenhaSegura456!")))
                 .andExpect(status().isNoContent());
 
         Usuario atualizado = usuarioRepository.findById(usuario.getId()).orElseThrow();
         assertTrue(passwordEncoder.matches("NovaSenhaSegura456!", atualizado.getPassword()));
         assertNotEquals(SENHA_ATUAL, atualizado.getPassword());
+        requisicaoAutenticada(sessao, get("/api/v1/usuarios/me")).andExpect(status().isOk());
     }
 
     @Test
     void senhaAtualIncorretaDeveImpedirTrocaDaSenha() throws Exception {
         Usuario usuario = criarUsuario(RolesEnum.USER, StatusEnum.ATIVO);
+        Cookie sessao = login(usuario);
         String senhaHashOriginal = usuario.getPassword();
 
-        mockMvc.perform(requisicaoAutenticada(usuario, put("/api/v1/usuarios/me/senha"))
+        requisicaoAutenticada(sessao, put("/api/v1/usuarios/me/senha")
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(json("senhaAtual", "SenhaIncorreta123!",
-                                "novaSenha", "NovaSenhaSegura456!")))
+                        .content(json("senhaAtual", "SenhaIncorreta123!", "novaSenha", "NovaSenhaSegura456!")))
                 .andExpect(status().isConflict());
 
         assertEquals(senhaHashOriginal, usuarioRepository.findById(usuario.getId()).orElseThrow().getPassword());
     }
 
     @Test
-    void usuarioDeveEditarSeuProprioPerfilPelaRotaMeSemAlterarCamposPrivilegiados() throws Exception {
+    void usuarioDeveEditarSeuProprioPerfilSemAlterarCamposPrivilegiados() throws Exception {
         Usuario usuario = criarUsuario(RolesEnum.USER, StatusEnum.ATIVO);
 
-        mockMvc.perform(requisicaoAutenticada(usuario, put("/api/v1/usuarios/me"))
+        requisicaoAutenticada(login(usuario), put("/api/v1/usuarios/me")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("""
                         {
@@ -162,7 +166,7 @@ class SecurityUserBoundariesIntegrationTest extends AbstractIntegrationTest {
         Usuario autenticado = criarUsuario(RolesEnum.USER, StatusEnum.ATIVO);
         Usuario alvo = criarUsuario(RolesEnum.USER, StatusEnum.ATIVO);
 
-        mockMvc.perform(requisicaoAutenticada(autenticado, put("/api/v1/usuarios/{id}", alvo.getId()))
+        requisicaoAutenticada(login(autenticado), put("/api/v1/usuarios/{id}", alvo.getId())
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(json("nome", "Nome indevido", "email", alvo.getEmail())))
                 .andExpect(status().isForbidden());
@@ -175,7 +179,7 @@ class SecurityUserBoundariesIntegrationTest extends AbstractIntegrationTest {
         Usuario admin = criarUsuario(RolesEnum.ADMIN, StatusEnum.ATIVO);
         Usuario alvo = criarUsuario(RolesEnum.USER, StatusEnum.ATIVO);
 
-        mockMvc.perform(requisicaoAutenticada(admin, put("/api/v1/usuarios/{id}", alvo.getId()))
+        requisicaoAutenticada(login(admin), put("/api/v1/usuarios/{id}", alvo.getId())
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(json("nome", "Nome alterado pelo admin", "email", alvo.getEmail())))
                 .andExpect(status().isOk())
@@ -187,36 +191,47 @@ class SecurityUserBoundariesIntegrationTest extends AbstractIntegrationTest {
         Usuario usuarioAtivo = criarUsuario(RolesEnum.USER, StatusEnum.ATIVO);
         Usuario usuarioInativo = criarUsuario(RolesEnum.USER, StatusEnum.INATIVO);
 
-        ResultActions credenciaisInvalidas = mockMvc.perform(post("/api/v1/auth/login")
+        requisicaoComCsrf(post("/api/v1/auth/login")
                 .contentType(MediaType.APPLICATION_JSON)
-                .content(json("email", usuarioAtivo.getEmail(), "senha", "SenhaErrada123!")));
-
-        ResultActions contaDesativada = mockMvc.perform(post("/api/v1/auth/login")
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(json("email", usuarioInativo.getEmail(), "senha", SENHA_ATUAL)));
-
-        credenciaisInvalidas.andExpect(status().isUnauthorized())
+                .content(json("email", usuarioAtivo.getEmail(), "senha", "SenhaErrada123!")))
+                .andExpect(status().isUnauthorized())
                 .andExpect(jsonPath("$.message").value("Email ou senha inválidos."));
-        contaDesativada.andExpect(status().isUnauthorized())
+        requisicaoComCsrf(post("/api/v1/auth/login")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(json("email", usuarioInativo.getEmail(), "senha", SENHA_ATUAL)))
+                .andExpect(status().isUnauthorized())
                 .andExpect(jsonPath("$.message").value("Email ou senha inválidos."));
     }
 
     private Usuario criarUsuario(RolesEnum roleNome, StatusEnum status) {
         Role role = roleNome == RolesEnum.ADMIN ? roleAdmin : roleUser;
-        String identificador = UUID.randomUUID().toString();
         return usuarioRepository.save(Usuario.builder()
                 .nome("Usuário de teste")
-                .email(identificador + "@citogenetica.test")
+                .email(UUID.randomUUID() + "@citogenetica.test")
                 .senha(passwordEncoder.encode(SENHA_ATUAL))
                 .status(status)
                 .role(role)
                 .build());
     }
 
-    private org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder requisicaoAutenticada(
-            Usuario usuario,
-            org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder requisicao) {
-        return requisicao.header("Authorization", "Bearer " + jwtConfig.generateToken(usuario));
+    private Cookie login(Usuario usuario) throws Exception {
+        MvcResult resultado = requisicaoComCsrf(post("/api/v1/auth/login")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(json("email", usuario.getEmail(), "senha", SENHA_ATUAL)))
+                .andExpect(status().isNoContent())
+                .andReturn();
+        return resultado.getResponse().getCookie(COOKIE_SESSAO);
+    }
+
+    private ResultActions requisicaoAutenticada(Cookie sessao, MockHttpServletRequestBuilder requisicao)
+            throws Exception {
+        return requisicaoComCsrf(requisicao.cookie(sessao));
+    }
+
+    private ResultActions requisicaoComCsrf(MockHttpServletRequestBuilder requisicao) throws Exception {
+        Cookie csrf = new Cookie(COOKIE_CSRF, TOKEN_CSRF);
+        requisicao.cookie(csrf).header("X-XSRF-TOKEN", csrf.getValue());
+        return mockMvc.perform(requisicao);
     }
 
     private String json(Object... pares) throws Exception {
