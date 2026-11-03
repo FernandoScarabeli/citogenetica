@@ -1,6 +1,6 @@
 package br.ufla.citogenetica.configuration.security;
 
-import br.ufla.citogenetica.model.error.dto.response.ErrorResponseDTO;
+import br.ufla.citogenetica.shared.web.error.ErrorResponseDTO;
 import br.ufla.citogenetica.model.usuario.UsuarioPrincipal;
 import br.ufla.citogenetica.service.EventPublisherService;
 import com.fasterxml.jackson.databind.ObjectMapper;

@@ -1,6 +1,8 @@
 package br.ufla.citogenetica.exception;
 
-import br.ufla.citogenetica.model.error.dto.response.ErrorResponseDTO;
+import br.ufla.citogenetica.shared.error.NotFoundException;
+import br.ufla.citogenetica.shared.filter.FiltroInvalidoException;
+import br.ufla.citogenetica.shared.web.error.ErrorResponseDTO;
 import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;

@@ -1,6 +1,6 @@
 package br.ufla.citogenetica.service;
 
-import br.ufla.citogenetica.exception.NotFoundException;
+import br.ufla.citogenetica.shared.error.NotFoundException;
 import br.ufla.citogenetica.exception.ValidationConflictException;
 import br.ufla.citogenetica.mapper.UsuarioMapper;
 import br.ufla.citogenetica.model.usuario.EmailNormalizer;

@@ -1,7 +1,7 @@
 package br.ufla.citogenetica.controller;
 
-import br.ufla.citogenetica.filter.CamposPermitidos;
-import br.ufla.citogenetica.filter.CriteriaCreator;
+import br.ufla.citogenetica.shared.filter.CamposPermitidos;
+import br.ufla.citogenetica.shared.filter.CriteriaCreator;
 import br.ufla.citogenetica.mapper.UsuarioMapper;
 import br.ufla.citogenetica.model.usuario.dto.request.AtualizarMeuPerfilRequestDTO;
 import br.ufla.citogenetica.model.usuario.Usuario;
@@ -9,9 +9,9 @@ import br.ufla.citogenetica.model.usuario.dto.request.AtualizarSenhaRequestDTO;
 import br.ufla.citogenetica.model.usuario.dto.request.AtualizarUsuarioRequestDTO;
 import br.ufla.citogenetica.model.usuario.dto.request.UsuarioRequestDTO;
 import br.ufla.citogenetica.model.usuario.dto.response.UsuarioResponseDTO;
-import br.ufla.citogenetica.model.genericDto.PageResponseDTO;
-import br.ufla.citogenetica.pagination.PaginationConstants;
-import br.ufla.citogenetica.pagination.PageableFactory;
+import br.ufla.citogenetica.shared.pagination.PageResponseDTO;
+import br.ufla.citogenetica.shared.pagination.PaginationConstants;
+import br.ufla.citogenetica.shared.pagination.PageableFactory;
 import br.ufla.citogenetica.service.UsuarioService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;

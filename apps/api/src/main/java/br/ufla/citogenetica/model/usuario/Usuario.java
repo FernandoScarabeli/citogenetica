@@ -1,6 +1,6 @@
 package br.ufla.citogenetica.model.usuario;
 
-import br.ufla.citogenetica.model.baseEntity.BaseEntity;
+import br.ufla.citogenetica.shared.persistence.BaseEntity;
 import br.ufla.citogenetica.model.roles.Role;
 import br.ufla.citogenetica.model.type.StatusEnum;
 import jakarta.persistence.*;
