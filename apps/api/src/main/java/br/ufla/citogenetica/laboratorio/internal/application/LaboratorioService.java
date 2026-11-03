@@ -3,9 +3,11 @@ package br.ufla.citogenetica.laboratorio.internal.application;
 import java.time.Clock;
 import java.time.Instant;
 import java.util.Collection;
+import java.util.Comparator;
 import java.util.EnumSet;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -30,6 +32,9 @@ import br.ufla.citogenetica.usuario.api.UsuarioRosterQuery;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.PersistenceContext;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionSynchronization;
@@ -95,6 +100,53 @@ public class LaboratorioService {
                 .stream()
                 .map(participacao -> resumo(participacao.getLaboratorio(), participacao))
                 .toList();
+    }
+
+    @Transactional(readOnly = true)
+    public Page<AdminLaboratorioResumo> listarParaAdmin(Specification<Laboratorio> filtros, Pageable pageable) {
+        Page<Laboratorio> laboratorios = laboratorioRepository.findAll(filtros, pageable);
+        if (laboratorios.isEmpty()) {
+            return laboratorios.map(this::resumoAdminVazio);
+        }
+
+        List<UUID> laboratorioIds = laboratorios.getContent().stream().map(Laboratorio::getId).toList();
+        Map<UUID, Long> membrosAtivosPorLaboratorio = new HashMap<>();
+        participacaoRepository.contarAtivasPorLaboratorio(laboratorioIds)
+                .forEach(contagem -> membrosAtivosPorLaboratorio.put(
+                        contagem.getLaboratorioId(), contagem.getQuantidade()));
+
+        Map<UUID, Set<Long>> administradoresPorLaboratorio = new HashMap<>();
+        papelRepository.listarAdministradoresAtivosPorLaboratorio(laboratorioIds)
+                .forEach(administrador -> administradoresPorLaboratorio
+                        .computeIfAbsent(administrador.getLaboratorioId(), ignorado -> new LinkedHashSet<>())
+                        .add(administrador.getUsuarioId()));
+
+        List<Long> usuarioIds = administradoresPorLaboratorio.values().stream()
+                .flatMap(Collection::stream)
+                .distinct()
+                .toList();
+        Map<Long, UsuarioRosterInfo> usuariosPorId = usuarioRosterQuery.buscarPorIds(usuarioIds).stream()
+                .collect(Collectors.toMap(UsuarioRosterInfo::usuarioId, Function.identity()));
+
+        Comparator<AdminLaboratorioResumo.Administrador> ordemAdministradores =
+                Comparator.comparing(AdminLaboratorioResumo.Administrador::nome, String.CASE_INSENSITIVE_ORDER)
+                        .thenComparing(AdminLaboratorioResumo.Administrador::email, String.CASE_INSENSITIVE_ORDER);
+
+        return laboratorios.map(laboratorio -> {
+            List<AdminLaboratorioResumo.Administrador> administradores = administradoresPorLaboratorio
+                    .getOrDefault(laboratorio.getId(), Set.of()).stream()
+                    .map(usuarioId -> {
+                        UsuarioRosterInfo usuario = usuariosPorId.get(usuarioId);
+                        if (usuario == null) {
+                            throw new IllegalStateException("Conta de administrador de laboratório não encontrada.");
+                        }
+                        return new AdminLaboratorioResumo.Administrador(usuario.nome(), usuario.email());
+                    })
+                    .sorted(ordemAdministradores)
+                    .toList();
+            return new AdminLaboratorioResumo(laboratorio.getId(), laboratorio.getNome(), laboratorio.getEstado(),
+                    membrosAtivosPorLaboratorio.getOrDefault(laboratorio.getId(), 0L), administradores);
+        });
     }
 
     @Transactional(readOnly = true)
@@ -255,6 +307,11 @@ public class LaboratorioService {
     private LaboratorioResumo resumo(Laboratorio laboratorio, Participacao participacao) {
         return new LaboratorioResumo(laboratorio.getId(), laboratorio.getNome(), laboratorio.getEstado(),
                 accessPolicy.papeisAtivos(participacao.getId()), laboratorio.getVersion());
+    }
+
+    private AdminLaboratorioResumo resumoAdminVazio(Laboratorio laboratorio) {
+        return new AdminLaboratorioResumo(laboratorio.getId(), laboratorio.getNome(), laboratorio.getEstado(), 0,
+                List.of());
     }
 
     private ParticipacaoResumo resumoParticipacao(Participacao participacao, Set<PapelLaboratorio> papeis,
