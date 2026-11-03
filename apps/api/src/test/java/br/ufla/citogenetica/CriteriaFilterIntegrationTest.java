@@ -1,12 +1,12 @@
 package br.ufla.citogenetica;
 
 import br.ufla.citogenetica.model.roles.Role;
-import br.ufla.citogenetica.model.crudExemplo.Exemplo;
-import br.ufla.citogenetica.model.type.ExemploEnum;
+import br.ufla.citogenetica.exemplo.internal.domain.Exemplo;
+import br.ufla.citogenetica.exemplo.internal.domain.ExemploEnum;
 import br.ufla.citogenetica.model.type.RolesEnum;
 import br.ufla.citogenetica.model.type.StatusEnum;
 import br.ufla.citogenetica.model.usuario.Usuario;
-import br.ufla.citogenetica.repository.ExemploRepository;
+import br.ufla.citogenetica.exemplo.internal.persistence.ExemploRepository;
 import br.ufla.citogenetica.repository.RoleRepository;
 import br.ufla.citogenetica.repository.UsuarioRepository;
 import com.fasterxml.jackson.databind.ObjectMapper;

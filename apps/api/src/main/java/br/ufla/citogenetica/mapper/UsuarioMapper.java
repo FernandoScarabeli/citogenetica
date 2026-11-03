@@ -1,6 +1,6 @@
 package br.ufla.citogenetica.mapper;
 
-import br.ufla.citogenetica.mapper.generic.GenericMapper;
+import br.ufla.citogenetica.shared.mapper.GenericMapper;
 import br.ufla.citogenetica.model.usuario.Usuario;
 import br.ufla.citogenetica.model.usuario.dto.request.AtualizarUsuarioRequestDTO;
 import br.ufla.citogenetica.model.usuario.dto.request.UsuarioRequestDTO;
