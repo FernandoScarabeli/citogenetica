@@ -60,21 +60,21 @@ npx shadcn@latest add https://www.fluidfunctionalism.com/r/typography.json --ove
 
 ## Dados e integração
 
-Os registros da interface atual são armazenados no `localStorage` do navegador, sob uma chave versionada. Use **Backup** para guardar uma cópia e **Importar** para restaurá-la; a aplicação apresenta quantas lâminas serão substituídas antes de confirmar. A importação atual aceita os backups JSON gerados por esta aplicação, não os arquivos das ferramentas anteriores.
+As lâminas e contagens são armazenadas no `localStorage` deste navegador, sob `citogenetica:workspace:v1`. Use **Backup** para guardar uma cópia e **Importar** para restaurá-la; a aplicação apresenta quantas lâminas serão substituídas antes de confirmar. A importação atual aceita os backups JSON gerados por esta aplicação, não os arquivos das ferramentas anteriores.
 
 O front autentica por sessão da API: verifica `/api/v1/usuarios/me` ao abrir, usa `/api/v1/auth/login` e `/api/v1/auth/logout`, e envia o token CSRF pelas rotas protegidas. `/`, `/entrar` e as rotas de pesquisa usam navegação declarativa; laboratórios, perfil e contagem exigem uma sessão válida.
 
-Essa sessão ainda não isola os registros de pesquisa. Lâminas, contagens e laboratórios continuam armazenados localmente no navegador e não são sincronizados nem associados à conta autenticada. O navegador pode apagar esses dados; mantenha backups. Os protocolos e cálculos estão em `src/domain.ts` e o acesso a lâminas em `src/storage.ts`.
+Essa sessão ainda não isola os registros de pesquisa. Lâminas e contagens continuam armazenadas localmente no navegador e não são sincronizadas nem associadas à conta autenticada. O navegador pode apagar esses dados; mantenha backups. Os protocolos e cálculos estão em `src/domain.ts` e o acesso a lâminas em `src/storage.ts`.
 
 O relatório usa a impressão do navegador: na aba **Resumo**, escolha **Imprimir / PDF** e, na janela de impressão, selecione salvar em PDF.
 
-## Fluxo local de laboratórios
+## Laboratórios e participações
 
-Após entrar, `/laboratorios` abre a gestão local (também disponível em `/app`). A conta `pesquisador@exemplo.com` da base local permite explorar criação e alternância de laboratórios, aceite/recusa de convite recebido, membros, atribuição de papéis hierárquicos, criação/revogação de convites, edição do laboratório e saída. A hierarquia local é Administrador → Orientador → Pesquisador: cada nível inclui as capacidades disponíveis dos níveis abaixo. O último administrador não pode sair nem perder seu papel sem outro administrador ativo. Registros antigos com múltiplos papéis são preservados e interpretados pelo nível mais alto. A orientação e o acesso coletivo ainda não estão implementados; as permissões precisam ser garantidas também no backend.
+Após entrar, `/laboratorios` consulta os laboratórios da conta em `/api/v1/laboratorios`. A criação envia somente o nome; a API atribui Membro e Administrador a quem cria. O nome pode ser alterado por Administradores. Participantes ativos veem nome, e-mail e papéis. Os papéis Membro, Administrador e Orientador são combináveis; Membro é obrigatório. A API é a fonte de autorização e de conflitos, incluindo a proteção do último Administrador. Um laboratório desativado fica disponível apenas para consulta, inclusive nas lâminas locais.
 
-Os grupos Citogenética e Genética Vegetal, os membros Marina Alves, Rafael Lima e Clara Costa e seus e-mails são exemplos. Os convites são simulações locais: não enviam e-mail, não autenticam contas e não têm expiração real. Autorização, validade de convites e regras de concessão de administração precisam ser implementadas no backend. Vínculos de orientação continuam pendentes de validação, conforme a documentação.
+A configuração local antiga `citogenetica:laboratories:v1` é removida silenciosamente na inicialização. A limpeza afeta somente essa chave; `citogenetica:workspace:v1` e `citogenetica:preferences:v1` permanecem intactas. Convites (F08) e orientação (F09) ainda não fazem parte da interface; o sino de notificações ficará oculto até a integração prevista na F10.
 
-As lâminas novas recebem `labId`; os registros antigos sem esse campo continuam em **Lâminas avulsas**. Alternar grupos não transfere lâminas. O backup de pesquisa contém somente as lâminas do espaço aberto; a importação pede confirmação e vincula os registros ao espaço escolhido, bloqueando colisões de IDs com outro espaço. A chave `citogenetica:laboratories:v1` mantém laboratórios, participações e convites separadamente dos dados de pesquisa. O backup de lâminas não inclui essa configuração demonstrativa. Sair ou remover um membro preserva os dados locais de pesquisa.
+As lâminas novas em um laboratório real recebem o UUID dele e aparecem somente naquele espaço. Lâminas sem `labId` e lâminas com identificadores locais antigos que não são UUID continuam acessíveis em **Lâminas avulsas**. As lâminas e contagens continuam locais e não são transferidas nem apagadas ao criar ou sair de um laboratório. O backup aberto em um laboratório contém somente as lâminas daquele UUID; em **Lâminas avulsas**, inclui os registros sem vínculo real.
 
 ### Metas e ajustes de contagem
 

@@ -70,7 +70,7 @@ function AuthenticatedApp() {
     user={user}
     onLogout={logout}
     onUserUpdate={updateUser}
-    renderSlides={(laboratory, onBack) => <Slides key={laboratory?.id ?? 'avulsas'} laboratory={laboratory} onBack={onBack}/>}
+    renderSlides={(laboratory, onBack, readOnly) => <Slides key={laboratory?.id ?? 'avulsas'} laboratory={laboratory} onBack={onBack} readOnly={readOnly}/>}
   />;
 }
 

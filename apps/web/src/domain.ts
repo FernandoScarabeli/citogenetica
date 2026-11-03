@@ -2,6 +2,13 @@ export type Protocol = 'meiose' | 'mitose';
 export type Entry = { id: string; phase: string; status: 'normal' | 'anormal'; type: string; createdAt: string; editedAt?: string };
 export type Slide = { labId?: string; id: string; name: string; protocol: Protocol; species: string; treatment: string; notes: string; goal?: number | null; createdAt: string; entries: Entry[] };
 export type State = { version: 1; slides: Slide[]; customTypes: Record<string, string[]> };
+const UUID_PATTERN = /^[\da-f]{8}-[\da-f]{4}-[\da-f]{4}-[\da-f]{4}-[\da-f]{12}$/i;
+
+export function slidesForLaboratory(slides: Slide[], laboratoryId: string | null): Slide[] {
+  if (laboratoryId) return slides.filter(slide => slide.labId === laboratoryId);
+  return slides.filter(slide => !slide.labId || !UUID_PATTERN.test(slide.labId));
+}
+
 export const protocols: Record<Protocol, { name: string; phases: { name: string; types: string[] }[] }> = {
   meiose: { name: 'Meiose', phases: [
     {name:'Leptóteno/Zigóteno', types:[]}, {name:'Paquíteno',types:[]}, {name:'Diplóteno/Diacinese',types:['Univalente','Trivalente','Tetravalente']},

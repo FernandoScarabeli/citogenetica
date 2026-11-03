@@ -54,6 +54,7 @@ function mockApi(options: {
       return response(204);
     }
     if (path === '/api/v1/usuarios/me') return options.me ? options.me() : unauthorized(path);
+    if (path === '/api/v1/laboratorios' && method === 'GET') return response(200, []);
     if (path === '/api/v1/auth/login') return options.login ? options.login() : response(204);
     if (path === '/api/v1/auth/logout') return options.logout ? options.logout() : response(204);
     return options.other ? options.other() : unauthorized(path);
