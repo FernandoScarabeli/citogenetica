@@ -1,5 +1,6 @@
 server:
   port: ${SERVER_PORT:8080}
+  forward-headers-strategy: none
 
 spring:
   application:
@@ -33,10 +34,33 @@ springdoc:
 
 api:
   security:
+    trusted-proxy:
+      internal-proxies: ${API_SECURITY_TRUSTED_PROXY_REGEX:}
     jwt:
       secret: ${API_SECURITY_JWT_SECRET}
     token:
       recovery-expiration-minutes: ${API_SECURITY_TOKEN_RECOVERY_EXPIRATION_MINUTES:15}
+    recovery:
+      hmac-secret: ${API_SECURITY_RECOVERY_HMAC_SECRET}
+      max-attempts: ${API_SECURITY_RECOVERY_MAX_ATTEMPTS:5}
+      email-executor-core-size: ${API_SECURITY_RECOVERY_EMAIL_EXECUTOR_CORE_SIZE:1}
+      email-executor-max-size: ${API_SECURITY_RECOVERY_EMAIL_EXECUTOR_MAX_SIZE:2}
+      email-executor-queue-capacity: ${API_SECURITY_RECOVERY_EMAIL_EXECUTOR_QUEUE_CAPACITY:50}
+    rate-limit:
+      window-minutes: ${API_SECURITY_RATE_LIMIT_WINDOW_MINUTES:15}
+      cleanup-interval-ms: ${API_SECURITY_RATE_LIMIT_CLEANUP_INTERVAL_MS:3600000}
+      login:
+        ip: ${API_SECURITY_RATE_LIMIT_LOGIN_IP:60}
+        email: ${API_SECURITY_RATE_LIMIT_LOGIN_EMAIL:10}
+      recovery-request:
+        ip: ${API_SECURITY_RATE_LIMIT_RECOVERY_REQUEST_IP:30}
+        email: ${API_SECURITY_RATE_LIMIT_RECOVERY_REQUEST_EMAIL:3}
+      validate:
+        ip: ${API_SECURITY_RATE_LIMIT_VALIDATE_IP:30}
+        email: ${API_SECURITY_RATE_LIMIT_VALIDATE_EMAIL:10}
+      reset:
+        ip: ${API_SECURITY_RATE_LIMIT_RESET_IP:30}
+        email: ${API_SECURITY_RATE_LIMIT_RESET_EMAIL:10}
   frontend:
     url: ${API_FRONTEND_URL}
   email:

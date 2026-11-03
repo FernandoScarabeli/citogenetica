@@ -1,5 +1,6 @@
 package br.ufla.citogenetica.model.usuario.dto.request;
 
+import br.ufla.citogenetica.model.usuario.EmailNormalizer;
 import br.ufla.citogenetica.model.type.StatusEnum;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
@@ -21,4 +22,8 @@ public record UsuarioRequestDTO(
 
         @NotBlank(message = "É obrigatório informar o role do usuário")
         String roleName
-) {}
+) {
+    public UsuarioRequestDTO {
+        email = EmailNormalizer.normalize(email);
+    }
+}

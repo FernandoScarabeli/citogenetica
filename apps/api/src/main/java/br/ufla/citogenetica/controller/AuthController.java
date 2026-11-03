@@ -1,6 +1,7 @@
 package br.ufla.citogenetica.controller;
 
 import br.ufla.citogenetica.mapper.UsuarioMapper;
+import br.ufla.citogenetica.exception.RecoveryChallengeException;
 import br.ufla.citogenetica.model.usuario.dto.request.AtualizarSenhaRequestDTO;
 import br.ufla.citogenetica.model.usuario.dto.request.LoginRequestDTO;
 import br.ufla.citogenetica.model.usuario.dto.request.RecuperarSenhaRequestDTO;
@@ -34,7 +35,8 @@ public class AuthController {
     @Operation(summary = "Realizar login", description = "Autentica um usuário e retorna um token JWT")
     @ApiResponses(value = {
             @ApiResponse(responseCode = "200", description = "Login realizado com sucesso"),
-            @ApiResponse(responseCode = "401", description = "Credenciais inválidas")
+            @ApiResponse(responseCode = "401", description = "Credenciais inválidas"),
+            @ApiResponse(responseCode = "429", description = "Limite de tentativas atingido")
     })
     public ResponseEntity<LoginResponseDTO> login(@RequestBody @Valid LoginRequestDTO requestDTO) {
         LoginResponseDTO response = this.authService.login(requestDTO);
@@ -53,36 +55,41 @@ public class AuthController {
     }
 
     @PostMapping("/recuperar-senha")
-    @Operation(summary = "Recuperar senha", description = "Envia email com código numérico para redefinição")
+    @Operation(summary = "Solicitar recuperação de senha", description = "Registra a solicitação de forma uniforme, sem revelar se o e-mail existe")
     @ApiResponses(value = {
-            @ApiResponse(responseCode = "204", description = "Email enviado com sucesso"),
-            @ApiResponse(responseCode = "404", description = "Email não encontrado")
+            @ApiResponse(responseCode = "202", description = "Solicitação aceita"),
+            @ApiResponse(responseCode = "429", description = "Limite de tentativas atingido")
     })
     public ResponseEntity<Void> recuperarSenha(@RequestBody @Valid RecuperarSenhaRequestDTO requestDTO) {
         this.authService.recuperarSenha(requestDTO.email());
-        return ResponseEntity.status(HttpStatus.NO_CONTENT).build();
+        return ResponseEntity.status(HttpStatus.ACCEPTED).build();
     }
 
     @PostMapping("/redefinir-senha")
     @Operation(summary = "Redefinir senha", description = "Redefine a senha usando o código recebido por email")
     @ApiResponses(value = {
             @ApiResponse(responseCode = "204", description = "Senha redefinida com sucesso"),
-            @ApiResponse(responseCode = "400", description = "Código inválido ou expirado")
+            @ApiResponse(responseCode = "400", description = "Código inválido ou expirado"),
+            @ApiResponse(responseCode = "429", description = "Limite de tentativas atingido")
     })
     public ResponseEntity<Void> redefinirSenha(@RequestBody @Valid RedefinirSenhaRequestDTO requestDTO) {
-        this.authService.redefinirSenha(requestDTO);
+        if (!this.authService.redefinirSenha(requestDTO)) {
+            throw new RecoveryChallengeException();
+        }
         return ResponseEntity.status(HttpStatus.NO_CONTENT).build();
     }
 
     @PostMapping("/validar-codigo")
-    @Operation(summary = "Validar código", description = "Verifica se o código de recuperação é válido sem alterar a senha")
+    @Operation(summary = "Validar código", description = "Verifica o código sem revelar se a conta ou solicitação existe")
     @ApiResponses(value = {
             @ApiResponse(responseCode = "204", description = "Código válido"),
-            @ApiResponse(responseCode = "400", description = "Código inválido, expirado ou inexistente"),
-            @ApiResponse(responseCode = "404", description = "Email não encontrado")
+            @ApiResponse(responseCode = "400", description = "Código inválido ou expirado"),
+            @ApiResponse(responseCode = "429", description = "Limite de tentativas atingido")
     })
     public ResponseEntity<Void> validarCodigo(@RequestBody @Valid ValidarCodigoRequestDTO requestDTO) {
-        this.authService.validarCodigo(requestDTO);
+        if (!this.authService.validarCodigo(requestDTO)) {
+            throw new RecoveryChallengeException();
+        }
         return ResponseEntity.status(HttpStatus.NO_CONTENT).build();
     }
 }

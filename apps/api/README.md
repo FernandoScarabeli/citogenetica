@@ -27,7 +27,9 @@ Na raiz do repositório, gere um `.env` local com segredos aleatórios:
 ./scripts/gerar-env.sh
 ```
 
-O script não sobrescreve um `.env` existente; `./scripts/gerar-env.sh --force` permite substituí-lo. O arquivo gerado recebe permissão restrita. Guarde o `.env`: o Postgres grava a senha no volume na primeira inicialização, então trocar `SPRING_DATASOURCE_PASSWORD` depois não altera o banco já criado. Em desenvolvimento, se precisar gerar um `.env` novo, recrie os volumes com `docker compose down -v` (isso apaga os dados locais). O `.env.example` documenta as variáveis e usa marcadores nos segredos; copiar o exemplo diretamente sem gerar ou trocar os segredos faz a API recusar a inicialização.
+O script não sobrescreve um `.env` existente. Se faltarem variáveis novas, `./scripts/gerar-env.sh --add-missing` acrescenta somente as chaves ausentes, gera segredos apenas para as chaves ausentes e preserva o conteúdo existente; os valores não são impressos. `./scripts/gerar-env.sh --force` substitui o arquivo inteiro. O arquivo gerado recebe permissão restrita. O `.env.example` documenta as variáveis e usa marcadores nos segredos; copiar o exemplo diretamente sem gerar ou trocar os segredos faz a API recusar a inicialização.
+
+Por padrão, cabeçalhos de IP encaminhado não são confiáveis. Em produção atrás de proxy, configure `API_SECURITY_TRUSTED_PROXY_REGEX` com uma expressão que corresponda somente aos proxies confiáveis; o Tomcat processa esses cabeçalhos.
 
 As variáveis principais incluem `SERVER_PORT`, as configurações `SPRING_DATASOURCE_*`, as configurações de segurança e e-mail, `API_FRONTEND_URL`, `MAILPIT_WEB_PORT` e as configurações `STORAGE_*`. No Compose local, a API envia e-mails pelo Mailpit; a interface fica em `http://localhost:8025` por padrão. Para outro servidor SMTP, configure `SPRING_MAIL_HOST`, `SPRING_MAIL_PORT`, `SPRING_MAIL_USERNAME`, `SPRING_MAIL_PASSWORD`, `SPRING_MAIL_AUTH` e `SPRING_MAIL_STARTTLS_ENABLE`. Com autenticação SMTP habilitada, STARTTLS também precisa estar habilitado.
 

@@ -2,7 +2,7 @@ package br.ufla.citogenetica.configuration.email;
 
 public class EmailTemplates {
 
-    public static String templateRecuperacaoSenha(String codigo) {
+    public static String templateRecuperacaoSenha(String codigo, long expirationMinutes) {
         return String.format(
                 """
                         <!DOCTYPE html>
@@ -34,7 +34,7 @@ public class EmailTemplates {
                                             </span>
                                         </div>
                                         <p style="color: #555555; text-align: center; font-size: 14px;">
-                                            Este código expira em 15 minutos.
+                                            Este código expira em %d minutos.
                                         </p>
                                     </td>
                                 </tr>
@@ -47,7 +47,8 @@ public class EmailTemplates {
                         </body>
                         </html>
                         """,
-                codigo);
+                codigo,
+                expirationMinutes);
     }
 
 }
