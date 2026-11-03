@@ -13,6 +13,9 @@ import br.ufla.citogenetica.shared.pagination.PageResponseDTO;
 import br.ufla.citogenetica.shared.pagination.PaginationConstants;
 import br.ufla.citogenetica.shared.pagination.PageableFactory;
 import br.ufla.citogenetica.usuario.internal.application.UsuarioService;
+import br.ufla.citogenetica.usuario.internal.application.EmailChangeService;
+import br.ufla.citogenetica.usuario.api.UsuarioPrincipal;
+import br.ufla.citogenetica.usuario.internal.web.dto.request.SolicitarTrocaEmailRequestDTO;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
@@ -25,6 +28,7 @@ import jakarta.validation.constraints.Min;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -48,6 +52,24 @@ public class UsuarioController {
 
     private final UsuarioService usuarioService;
     private final UsuarioMapper usuarioMapper;
+    private final EmailChangeService emailChangeService;
+
+    @PostMapping("/me/email")
+    @SecurityRequirement(name = "csrf-token")
+    @Operation(summary = "Solicitar troca do meu e-mail", description = "Envia link de confirmação ao novo endereço após reautenticação. O endereço atual continua válido até a confirmação.")
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "202", description = "Solicitação aceita"),
+            @ApiResponse(responseCode = "400", description = "Dados inválidos"),
+            @ApiResponse(responseCode = "401", description = "Sessão ausente"),
+            @ApiResponse(responseCode = "409", description = "Senha atual incorreta"),
+            @ApiResponse(responseCode = "429", description = "Limite de solicitações atingido")
+    })
+    public ResponseEntity<Void> solicitarTrocaEmail(
+            @AuthenticationPrincipal UsuarioPrincipal principal,
+            @RequestBody @Valid SolicitarTrocaEmailRequestDTO requestDTO) {
+        emailChangeService.solicitarTrocaEmail(principal.id(), requestDTO);
+        return ResponseEntity.accepted().build();
+    }
 
     @GetMapping
     @Operation(summary = "Listar usuários", description = "Retorna lista paginada de usuários com filtros opcionais")

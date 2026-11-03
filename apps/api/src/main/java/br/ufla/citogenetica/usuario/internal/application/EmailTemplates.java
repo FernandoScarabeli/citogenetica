@@ -3,7 +3,7 @@ package br.ufla.citogenetica.usuario.internal.application;
 public class EmailTemplates {
 
     public static String templateConfirmacaoEmail(String confirmationUrl, long expirationHours) {
-        String safeUrl = confirmationUrl.replace("&", "&amp;").replace("\"", "&quot;");
+        String safeUrl = escapeHtmlAttribute(confirmationUrl);
         return String.format(
                 """
                         <!DOCTYPE html>
@@ -21,6 +21,45 @@ public class EmailTemplates {
                         </body>
                         </html>
                         """, safeUrl, expirationHours);
+    }
+
+    public static String templateConfirmacaoTrocaEmail(String confirmationUrl, long expirationHours) {
+        String safeUrl = escapeHtmlAttribute(confirmationUrl);
+        return String.format(
+                """
+                        <!DOCTYPE html>
+                        <html lang="pt-BR">
+                        <head><meta charset="UTF-8"><title>Confirme a troca de e-mail</title></head>
+                        <body style="font-family: Arial, sans-serif; background-color: #f0eded; padding: 24px;">
+                          <main style="max-width: 600px; margin: auto; background: #fff; padding: 32px;">
+                            <h1 style="color: #00A859;">Citogenética UFLA</h1>
+                            <h2>Confirme a troca de e-mail</h2>
+                            <p>Recebemos uma solicitação para usar este endereço na sua conta.</p>
+                            <p><a href="%s">Confirmar novo e-mail</a></p>
+                            <p>Seu e-mail atual continuará valendo até a confirmação. Este link expira em %d horas e só pode ser usado uma vez.</p>
+                            <p>Se você não solicitou a troca, ignore esta mensagem.</p>
+                          </main>
+                        </body>
+                        </html>
+                        """, safeUrl, expirationHours);
+    }
+
+    public static String templateAvisoTrocaEmail() {
+        return """
+                <!DOCTYPE html>
+                <html lang="pt-BR">
+                <head><meta charset="UTF-8"><title>Aviso de alteração de e-mail</title></head>
+                <body style="font-family: Arial, sans-serif; background-color: #f0eded; padding: 24px;">
+                  <main style="max-width: 600px; margin: auto; background: #fff; padding: 32px;">
+                    <h1 style="color: #00A859;">Citogenética UFLA</h1>
+                    <h2>Aviso de alteração de e-mail</h2>
+                    <p>O endereço de e-mail da sua conta foi alterado.</p>
+                    <p>Se você não solicitou essa alteração, procure o suporte do projeto para proteger sua conta.</p>
+                    <p>Esta mensagem é apenas um aviso e não contém link de ação.</p>
+                  </main>
+                </body>
+                </html>
+                """;
     }
 
     public static String templateRecuperacaoSenha(String codigo, long expirationMinutes) {
@@ -70,6 +109,10 @@ public class EmailTemplates {
                         """,
                 codigo,
                 expirationMinutes);
+    }
+
+    private static String escapeHtmlAttribute(String value) {
+        return value.replace("&", "&amp;").replace("\"", "&quot;");
     }
 
 }

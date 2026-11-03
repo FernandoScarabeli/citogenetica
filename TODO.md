@@ -33,7 +33,7 @@ Nada é commitado até o fim da sequência.
   - [x] `docs/arquitetura.md` (monólito modular, módulos, dependências) + ADR 0001
   - [ ] `docs/modelagem.md` + `docs/modelagem/entidades.mmd` (Mermaid citado no doc)
   - [ ] `docs/glossario.md` (termos da citogenética ↔ entidades)
-  - [ ] `docs/questoes-validacao.md` (com status de cada questão)
+  - [x] `docs/questoes-validacao.md` (com status de cada questão)
 - [ ] Mover os protótipos e manuais para `docs/referencias/legado/`
 - [ ] Registrar as decisões técnicas já tomadas (ADRs curtas): Java 17, Maven, React, e-mail+senha, UUID
 
@@ -62,20 +62,20 @@ Nada é commitado até o fim da sequência.
 - [x] Publicar depois do commit (`@TransactionalEventListener(AFTER_COMMIT)`)
 - [x] Autenticar o SSE sem token na URL (cookie ou ticket curto de uso único)
 - [x] `/subscribers/count` só para admin, ou remover
-- [ ] ⚠️ Definir quais eventos geram notificação (convite, comentário, conflito...)
+- [~] ⚠️ Definir quais eventos geram notificação (comentário, conflito...) — convites de laboratório e de orientação já notificam
 
 ### 1.3 Base do domínio
 - [x] Monólito modular: pacotes por módulo (`usuario`, `notificacao`, `exemplo`) + `shared`, `config`, `infra`, com regras verificadas por ArchUnit
-- [ ] **Primeira tarefa depois do primeiro commit: auto-cadastro com confirmação de e-mail** (sem isso ninguém cria conta, porque o admin padrão foi removido na T04)
+- [x] **Primeira tarefa depois do primeiro commit: auto-cadastro com confirmação de e-mail** (sem isso ninguém cria conta, porque o admin padrão foi removido na T04)
 - [x] `./mvnw test` precisa passar num clone limpo, sem `.env` nem banco rodando: perfil de teste + Postgres via Testcontainers no teste de contexto (hoje ele exige variáveis de e-mail e banco no ar)
-- [ ] IDs UUID nas entidades novas (gerados no cliente quando vierem offline)
-- [ ] Papel por laboratório (Participação), não global no usuário
-- [ ] Admin global da plataforma (acima dos laboratórios): parâmetros do sistema e, depois, um painel (dashboard)
-- [ ] Auto-cadastro + verificação de e-mail
-- [ ] Testes de integração com Testcontainers + OpenAPI atualizado a cada etapa
+- [x] IDs UUID nas entidades novas (gerados no cliente quando vierem offline) — ADR 0003
+- [x] Papel por laboratório (Participação), não global no usuário
+- [~] Admin global da plataforma (acima dos laboratórios): primeiro admin por comando de uso único (ADR 0002) e desativar/reativar laboratório feitos; faltam parâmetros do sistema, listagem global de laboratórios e o painel (dashboard)
+- [x] Auto-cadastro + verificação de e-mail (e troca de e-mail com confirmação no endereço novo)
+- [x] Testes de integração com Testcontainers + OpenAPI atualizado a cada etapa
 
 ### 1.4 Etapas da API (seguindo o planejamento)
-- [ ] **Etapa 1 · Base**: Laboratório, Participação (ATIVA/SAIU/REMOVIDA), Convite (hash do token, expiração, aceite atômico), Vínculo de orientação, regra do último administrador
+- [x] **Etapa 1 · Base**: Laboratório, Participação (ATIVA/SAIU/REMOVIDA), Convite (hash do token, expiração, aceite atômico), Vínculo de orientação, regra do último administrador; `LaboratorioAccessQuery` pronta para as lâminas da Etapa 2
 - [ ] **Etapa 2 · Contagem**: Protocolo, Versão (imutável quando publicada), Fase (`conta_como_divisao`), Tipo de anormalidade (fixo e personalizado, normalização), Lâmina, Registro (`quantidade`, `registrado_em`, `fuso_registro`, exclusão lógica, versão), cálculos oficiais (totais, %, IM), desfazer, edição, histórico; seed de meiose e mitose
 - [ ] **Etapa 3 · Dados**: exportação JSON versionada, importador dos backups legados (sem duplicar), CSV (resumo e uma linha por registro), PDF
 - [ ] **Etapa 4 · Offline/sync**: operações idempotentes (`operacao_id` + hash do payload), revisões, conflitos, consulta incremental com cursor

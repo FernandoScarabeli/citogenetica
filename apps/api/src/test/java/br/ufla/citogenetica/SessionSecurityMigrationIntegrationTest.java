@@ -103,6 +103,9 @@ class SessionSecurityMigrationIntegrationTest extends AbstractIntegrationTest {
                 .andExpect(jsonPath("$.paths['/api/v1/auth/login'].post.security[0]['csrf-token']").exists())
                 .andExpect(jsonPath("$.paths['/api/v1/usuarios/me'].put.security[0]['sessao-cookie']").exists())
                 .andExpect(jsonPath("$.paths['/api/v1/usuarios/me'].put.security[0]['csrf-token']").exists())
+                .andExpect(jsonPath("$.paths['/api/v1/usuarios/me/email'].post.security[0]['sessao-cookie']").exists())
+                .andExpect(jsonPath("$.paths['/api/v1/usuarios/me/email'].post.security[0]['csrf-token']").exists())
+                .andExpect(jsonPath("$.paths['/api/v1/auth/confirmar-troca-email'].post.security[0]['csrf-token']").exists())
                 .andExpect(jsonPath("$.paths['/api/v1/auth/logout'].post.security[0]['sessao-cookie']").exists())
                 .andExpect(jsonPath("$.paths['/api/v1/auth/logout'].post.security[0]['csrf-token']").exists());
     }

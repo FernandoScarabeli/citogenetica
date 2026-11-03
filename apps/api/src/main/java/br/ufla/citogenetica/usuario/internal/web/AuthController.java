@@ -13,6 +13,7 @@ import br.ufla.citogenetica.usuario.internal.web.dto.request.ValidarCodigoReques
 import br.ufla.citogenetica.usuario.internal.domain.Usuario;
 import br.ufla.citogenetica.usuario.api.UsuarioPrincipal;
 import br.ufla.citogenetica.usuario.internal.application.AuthService;
+import br.ufla.citogenetica.usuario.internal.application.EmailChangeService;
 
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
@@ -44,6 +45,7 @@ import org.springframework.web.bind.annotation.*;
 public class AuthController {
 
     private final AuthService authService;
+    private final EmailChangeService emailChangeService;
     private final UsuarioMapper usuarioMapper;
     private final SecurityContextRepository securityContextRepository;
     private final SessionAuthenticationStrategy sessionAuthenticationStrategy;
@@ -129,6 +131,19 @@ public class AuthController {
     })
     public ResponseEntity<Void> confirmarEmail(@RequestBody @Valid EmailConfirmationRequestDTO requestDTO) {
         authService.confirmarEmail(requestDTO);
+        return ResponseEntity.noContent().build();
+    }
+
+    @PostMapping("/confirmar-troca-email")
+    @SecurityRequirement(name = "csrf-token")
+    @Operation(summary = "Confirmar troca de e-mail", description = "Consome o link enviado ao novo endereço. A confirmação encerra as sessões existentes e não cria uma nova sessão.")
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "204", description = "Troca de e-mail confirmada"),
+            @ApiResponse(responseCode = "400", description = "Link inválido, expirado ou indisponível"),
+            @ApiResponse(responseCode = "429", description = "Limite de solicitações atingido")
+    })
+    public ResponseEntity<Void> confirmarTrocaEmail(@RequestBody @Valid EmailConfirmationRequestDTO requestDTO) {
+        emailChangeService.confirmarTrocaEmail(requestDTO.token());
         return ResponseEntity.noContent().build();
     }
 

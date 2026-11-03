@@ -35,12 +35,12 @@ class ModuleArchitectureTest {
     private static final String BASE = "br.ufla.citogenetica";
 
     private static final Set<String> MODULES = Set.of(
-            "shared", "config", "usuario", "notificacao", "exemplo", "infra");
+            "shared", "config", "usuario", "notificacao", "exemplo", "laboratorio", "infra");
 
     private static final Set<String> APPROVED_ROOTS = Set.of(
-            "shared", "config", "usuario", "notificacao", "exemplo", "infra");
+            "shared", "config", "usuario", "notificacao", "exemplo", "laboratorio", "infra");
 
-    private static final List<String> BUSINESS_MODULES = List.of("usuario", "notificacao", "exemplo");
+    private static final List<String> BUSINESS_MODULES = List.of("usuario", "notificacao", "exemplo", "laboratorio");
 
     private static final String[] BUSINESS_MODULE_PACKAGES = BUSINESS_MODULES.stream()
             .map(module -> BASE + "." + module + "..")

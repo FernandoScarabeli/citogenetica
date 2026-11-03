@@ -3,6 +3,7 @@ package br.ufla.citogenetica.usuario.internal.application;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
+import br.ufla.citogenetica.usuario.internal.persistence.EmailChangeConfirmationRepository;
 
 import java.sql.Timestamp;
 import java.time.Clock;
@@ -14,19 +15,22 @@ public class EmailConfirmationCleanupService {
     private final JdbcTemplate jdbcTemplate;
     private final EmailConfirmationProperties properties;
     private final Clock clock;
+    private final EmailChangeConfirmationRepository emailChangeRepository;
 
     public EmailConfirmationCleanupService(JdbcTemplate jdbcTemplate,
                                            EmailConfirmationProperties properties,
-                                           Clock clock) {
+                                           Clock clock,
+                                           EmailChangeConfirmationRepository emailChangeRepository) {
         this.jdbcTemplate = jdbcTemplate;
         this.properties = properties;
         this.clock = clock;
+        this.emailChangeRepository = emailChangeRepository;
     }
 
     @Scheduled(fixedDelayString = "${api.security.email-confirmation.cleanup-interval-ms}")
     public int removeExpiredPendingRegistrations() {
         var cutoff = clock.instant().minus(Duration.ofDays(properties.pendingRetentionDays()));
-        return jdbcTemplate.update("""
+        int removedRegistrations = jdbcTemplate.update("""
                 WITH cadastros_vencidos AS (
                     SELECT id
                     FROM usuario
@@ -39,5 +43,7 @@ public class EmailConfirmationCleanupService {
                 USING cadastros_vencidos vencido
                 WHERE usuario.id = vencido.id
                 """, Timestamp.from(cutoff), properties.cleanupBatchSize());
+        emailChangeRepository.deleteExpired(clock.instant(), properties.cleanupBatchSize());
+        return removedRegistrations;
     }
 }
