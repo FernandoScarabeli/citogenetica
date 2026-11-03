@@ -7,7 +7,7 @@ Aplicação de registro de lâminas de meiose e mitose para o Laboratório de Ci
 Requisitos: Node.js 26 LTS e npm. A versão principal do Node está em `.nvmrc`.
 
 ```sh
-npm install
+npm ci
 npm run dev
 ```
 
@@ -18,6 +18,17 @@ npm test
 npm run build
 npm run preview
 ```
+
+### Docker Compose
+
+Na raiz do repositório, gere o `.env` e inicie os serviços, incluindo a API, o frontend servido pelo Nginx e o Mailpit:
+
+```sh
+./scripts/gerar-env.sh
+docker compose up -d --build
+```
+
+Se o `.env` já existe, use `./scripts/gerar-env.sh --add-missing` para acrescentar somente as variáveis que faltam. O comando preserva os valores existentes; atualize `API_FRONTEND_URL`, as variáveis `API_FRONTEND_*_URL` e `API_CORS_ALLOWED_ORIGINS` para acompanhar `WEB_PORT`. O site fica em <http://localhost:3000> por padrão; a porta pode ser alterada com `WEB_PORT`. Os e-mails enviados no ambiente local aparecem no Mailpit em <http://localhost:8025> (porta configurável por `MAILPIT_WEB_PORT`). As URLs de confirmação e convite do template apontam para o site servido pelo Compose.
 
 ### Desenvolvimento com a API
 

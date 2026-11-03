@@ -67,3 +67,6 @@ jobs:
       - name: Build do web
         run: npm run build
         working-directory: apps/web
+
+      - name: Build da imagem Docker do web
+        run: docker build --tag citogenetica-web:ci ./apps/web
