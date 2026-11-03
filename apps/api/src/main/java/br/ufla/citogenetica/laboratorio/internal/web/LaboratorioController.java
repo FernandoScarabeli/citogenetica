@@ -101,7 +101,7 @@ public class LaboratorioController {
     }
 
     @GetMapping("/{laboratorioId}/participacoes")
-    @Operation(summary = "Listar participantes", description = "Participantes ativos veem nome e papéis; e-mail aparece somente para administradores locais.")
+    @Operation(summary = "Listar participantes", description = "Participantes ativos veem nome, e-mail e papéis dos demais participantes ativos.")
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "Participantes retornados"),
             @ApiResponse(responseCode = "404", description = "Laboratório não encontrado")

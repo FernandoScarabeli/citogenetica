@@ -43,7 +43,6 @@ import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -223,7 +222,7 @@ class LaboratorioIntegrationTest extends AbstractIntegrationTest {
     }
 
     @Test
-    void rosterMostraEmailSomenteParaAdminLocal() throws Exception {
+    void rosterMostraNomeEEmailParaTodosOsParticipantesAtivos() throws Exception {
         Usuario admin = criarUsuario(RolesEnum.USER, StatusEnum.ATIVO, true);
         UUID laboratorioId = criarLaboratorio(admin, "Roster");
         Usuario membro = criarUsuario(RolesEnum.USER, StatusEnum.ATIVO, true);
@@ -237,7 +236,7 @@ class LaboratorioIntegrationTest extends AbstractIntegrationTest {
         String rosterMembro = requisicaoAutenticada(login(membro), get("/api/v1/laboratorios/{id}/participacoes", laboratorioId))
                 .andExpect(status().isOk())
                 .andReturn().getResponse().getContentAsString();
-        assertFalse(rosterMembro.contains(membro.getEmail()));
+        assertTrue(rosterMembro.contains(admin.getEmail()));
         assertTrue(rosterMembro.contains(membro.getNome()));
     }
 

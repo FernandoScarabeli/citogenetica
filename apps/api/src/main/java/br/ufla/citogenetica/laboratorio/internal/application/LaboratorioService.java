@@ -111,9 +111,7 @@ public class LaboratorioService {
     @Transactional(readOnly = true)
     public List<ParticipacaoResumo> listarParticipacoes(UUID laboratorioId, Long usuarioId) {
         accessPolicy.exigirAcesso(laboratorioId, usuarioId);
-        Participacao ator = accessPolicy.exigirParticipacaoAtiva(laboratorioId, usuarioId);
-        boolean administrador = accessPolicy.papeisAtivos(ator.getId()).contains(PapelLaboratorio.ADMIN);
-
+        // Decisão de produto: todo participante ativo vê nome, papéis e e-mail dos colegas.
         List<Participacao> participacoes = participacaoRepository.findAllByLaboratorioIdAndEstadoOrderByCreatedAtAsc(
                 laboratorioId, EstadoParticipacao.ATIVA);
         Map<UUID, Set<PapelLaboratorio>> papeis = papeisPorParticipacao(participacoes);
@@ -128,7 +126,7 @@ public class LaboratorioService {
                         throw new IllegalStateException("Conta de participante não encontrada.");
                     }
                     return new ParticipacaoResumo(participacao.getId(), usuario.nome(),
-                            administrador ? usuario.email() : null,
+                            usuario.email(),
                             papeis.getOrDefault(participacao.getId(), Set.of()), participacao.getVersion());
                 })
                 .toList();
@@ -255,7 +253,7 @@ public class LaboratorioService {
         UsuarioRosterInfo usuario = usuarioRosterQuery.buscarPorIds(List.of(participacao.getUsuarioId())).stream()
                 .findFirst()
                 .orElseThrow(() -> new IllegalStateException("Conta de participante não encontrada."));
-        return new ParticipacaoResumo(participacao.getId(), usuario.nome(), null, papeis, versao);
+        return new ParticipacaoResumo(participacao.getId(), usuario.nome(), usuario.email(), papeis, versao);
     }
 
     private Map<UUID, Set<PapelLaboratorio>> papeisPorParticipacao(List<Participacao> participacoes) {
