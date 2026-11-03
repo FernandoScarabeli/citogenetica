@@ -68,6 +68,7 @@ function mockApi(options: MockResponseOptions = {}) {
       return response(204);
     }
     if (path === '/api/v1/usuarios/me') return options.me ? options.me() : unauthorized(path);
+    if (path === '/api/v1/laboratorios' && method === 'GET') return response(200, []);
     if (path === '/api/v1/auth/register') return options.register ? options.register(body) : response(202);
     if (path === '/api/v1/auth/reenviar-confirmacao') return options.resend ? options.resend(body) : response(202);
     if (path === '/api/v1/auth/confirmar-email') return options.confirm ? options.confirm(body) : response(204);

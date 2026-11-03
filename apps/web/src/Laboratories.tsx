@@ -1,134 +1,589 @@
-import { Fragment, useEffect, useId, useRef, useState, type FormEvent, type KeyboardEvent as ReactKeyboardEvent } from 'react';
-import { ArrowRight, Check, ChevronDown, ChevronRight, LogOut, Mail, Microscope, Plus, Search, Settings, Users, X, Moon, UserRound } from 'lucide-react';
+import { useCallback, useEffect, useRef, useState, type FormEvent, type ReactNode } from 'react';
+import { ArrowRight, Check, ChevronDown, ChevronRight, LogOut, Moon, Microscope, Plus, Search, UserRound, X } from 'lucide-react';
 import { Link, useLocation, useNavigate } from 'react-router';
-import { demoUser, roles, highestRole, hasRole, participation, isLastAdmin, validateInvitationDrafts, loadLaboratories, saveLaboratories, type LaboratoriesState, type Laboratory, type Member, type Role, type Invitation, type InvitationDraft } from './laboratories';
+import { isConflict, isForbidden, isNotFound, isUnauthorized } from './api/errors';
+import type { LaboratorioResponseDTO, PapelLaboratorio, ParticipacaoResponseDTO } from './api/contracts/laboratorio';
+import { PAPEL_LABEL } from './api/contracts/laboratorio';
+import { laboratorioApi } from './api/laboratorio-api';
 import { typeClass } from './lib/type-scale';
-import { Notifications, type NotificationItem } from './Notifications';
 import './laboratories.css';
 import { loadPreferences, savePreferences } from './preferences';
 import type { UsuarioResponseDTO } from './api/contracts/usuario';
 import { ProfileSettings } from './app/ProfileSettings';
 
-const initial = loadLaboratories();
 const initialPreferences = loadPreferences();
-function AccountMenu({name,email,photo,dark,onProfile,onAppearance,onLogout}: {name: string; email: string; photo?: string; dark: boolean; onProfile: ()=>void; onAppearance: ()=>void; onLogout: ()=>void}) {
- const [open,setOpen]=useState(false); const root=useRef<HTMLDivElement>(null); const trigger=useRef<HTMLButtonElement>(null);
- useEffect(()=>{if(!open)return;function outside(event: PointerEvent){if(!root.current?.contains(event.target as Node))setOpen(false);}function key(event: KeyboardEvent){if(event.key==='Escape'){setOpen(false);trigger.current?.focus();}}document.addEventListener('pointerdown',outside);document.addEventListener('keydown',key);return ()=>{document.removeEventListener('pointerdown',outside);document.removeEventListener('keydown',key);};},[open]);
- const initial=name.charAt(0).toLocaleUpperCase('pt-BR');
- return <div className="account-menu" ref={root}>
-  <button ref={trigger} type="button" className="account-trigger" aria-label="Menu do perfil" aria-expanded={open} aria-controls={open?'account-panel':undefined} onClick={()=>setOpen(value=>!value)}><span className="account-initial" aria-hidden="true">{photo?<img src={photo} alt=""/>:initial}</span><span className="account-trigger-identity"><span className="account-trigger-name">{name}</span><span className="account-trigger-email">{email}</span></span><ChevronDown size={16} aria-hidden="true"/></button>
-  {open&&<div className="account-panel" id="account-panel" role="group" aria-label="Menu do perfil"><div className="account-panel-identity"><span className="account-initial" aria-hidden="true">{photo?<img src={photo} alt=""/>:initial}</span><div><strong>{name}</strong><small>{email}</small></div></div><div className="account-panel-actions"><button type="button" onClick={()=>{setOpen(false);onProfile();}}><UserRound size={18} aria-hidden="true"/>Configurações do perfil</button><button type="button" aria-pressed={dark} onClick={onAppearance}><Moon size={18} aria-hidden="true"/><span>Modo escuro</span><span className="account-switch" aria-hidden="true"><span/></span></button></div><div className="account-panel-footer"><button type="button" onClick={()=>{setOpen(false);onLogout();}}><LogOut size={18} aria-hidden="true"/>Sair</button></div></div>}
- </div>;
+type View = 'list' | 'manage' | 'slides' | 'profile';
+type Confirmation = { kind: 'leave' } | { kind: 'remove'; participation: ParticipacaoResponseDTO };
+
+function errorMessage(error: unknown, fallback: string): string {
+  return error instanceof Error && error.message ? error.message : fallback;
 }
-function CreateLaboratoryDialog({name, description, error, onName, onDescription, onClose, onSubmit}: {name: string; description: string; error: string; onName: (value: string)=>void; onDescription: (value: string)=>void; onClose: ()=>void; onSubmit: (event: FormEvent)=>void}) {
- const ref = useRef<HTMLDialogElement>(null);
- useEffect(()=>{const dialog=ref.current; const trigger=document.activeElement instanceof HTMLElement ? document.activeElement : null; if(dialog && !dialog.open){dialog.showModal();dialog.querySelector('input')?.focus();} return ()=>{if(dialog?.open)dialog.close();trigger?.focus();};},[]);
- return <dialog ref={ref} className="create-lab-dialog" aria-labelledby="create-lab-title" aria-describedby="create-lab-description" onCancel={e=>{e.preventDefault();onClose();}} onClick={e=>{if(e.target===e.currentTarget){const rect=e.currentTarget.getBoundingClientRect();if(e.clientX<rect.left||e.clientX>rect.right||e.clientY<rect.top||e.clientY>rect.bottom)onClose();}}}>
-  <div className="create-dialog-header"><div><h2 id="create-lab-title">Criar laboratório</h2><p id="create-lab-description">Reúna seu grupo em um espaço de pesquisa.</p></div><button className="icon-button" type="button" aria-label="Fechar" onClick={onClose}><X size={20}/></button></div>
-  <form onSubmit={onSubmit}>
-   <label>Nome do laboratório<input autoFocus required maxLength={100} value={name} onChange={e=>onName(e.target.value)} placeholder="Ex.: Laboratório de Citogenética"/></label>
-   <label>Descrição <span>(opcional)</span><textarea maxLength={500} rows={3} value={description} onChange={e=>onDescription(e.target.value)} placeholder="Conte brevemente o que seu grupo pesquisa"/></label>
-   {error && <p className="create-dialog-error" role="alert">{error}</p>}
-   <div className="modal-actions"><button type="button" className="button secondary" onClick={onClose}>Cancelar</button><button className="button primary" disabled={!name.trim()||!!initial.error}>Criar laboratório <ArrowRight size={16}/></button></div>
-  </form>
- </dialog>;
+
+function hasRole(papeis: PapelLaboratorio[], papel: PapelLaboratorio): boolean {
+  return papeis.includes(papel);
 }
-function LeaveLaboratoryDialog({blocked,onClose,onConfirm}: {blocked: boolean; onClose: ()=>void; onConfirm: ()=>void}) {
- const ref=useRef<HTMLDialogElement>(null);
- useEffect(()=>{const dialog=ref.current;const trigger=document.activeElement instanceof HTMLElement?document.activeElement:null;if(dialog && !dialog.open)dialog.showModal();return ()=>{if(dialog?.open)dialog.close();trigger?.focus();};},[]);
- return <dialog ref={ref} className="create-lab-dialog leave-lab-dialog" aria-labelledby="leave-lab-title" aria-describedby="leave-lab-description" onCancel={e=>{e.preventDefault();onClose();}} onClick={e=>{if(e.target===e.currentTarget){const rect=e.currentTarget.getBoundingClientRect();if(e.clientX<rect.left||e.clientX>rect.right||e.clientY<rect.top||e.clientY>rect.bottom)onClose();}}}>
-  <div className="create-dialog-header"><h2 id="leave-lab-title">Sair do laboratório?</h2><button className="icon-button" type="button" aria-label="Fechar" onClick={onClose}><X size={20}/></button></div>
-  <p id="leave-lab-description">{blocked?'Você é o último administrador. Atribua esse papel a outro membro antes de sair.':'Seu acesso será encerrado. As lâminas e os registros de pesquisa permanecem no laboratório. Para voltar, você precisará de um novo convite.'}</p>
-  <div className="modal-actions"><button type="button" className="button secondary" autoFocus onClick={onClose}>{blocked?'Entendi':'Cancelar'}</button>{!blocked&&<button type="button" className="button danger" onClick={onConfirm}>Sair do laboratório</button>}</div>
- </dialog>;
+
+function isCurrentUser(participation: ParticipacaoResponseDTO, email: string): boolean {
+  return !!participation.email && participation.email.trim().toLocaleLowerCase('pt-BR') === email.trim().toLocaleLowerCase('pt-BR');
 }
-function InviteRoleSelect({value,onChange,index}: {value: Role; onChange: (role: Role)=>void; index: number}) {
- const [open,setOpen]=useState(false); const [active,setActive]=useState(0); const root=useRef<HTMLDivElement>(null); const trigger=useRef<HTMLButtonElement>(null); const id=useId();
- useEffect(()=>{if(!open)return;function outside(event: PointerEvent){if(!root.current?.contains(event.target as Node))setOpen(false);}document.addEventListener('pointerdown',outside);return ()=>document.removeEventListener('pointerdown',outside);},[open]);
- function show(){setActive(roles.indexOf(value));setOpen(true);}
- function choose(role: Role){onChange(role);setOpen(false);trigger.current?.focus();}
- function onKeyDown(event: ReactKeyboardEvent<HTMLButtonElement>){
-  if(event.key==='Escape'&&open){event.preventDefault();event.stopPropagation();setOpen(false);return;}
-  if(event.key==='Tab'){setOpen(false);return;}
-  if(event.key==='ArrowDown'||event.key==='ArrowUp'){event.preventDefault();if(!open){show();return;}setActive(current=>(current+(event.key==='ArrowDown'?1:-1)+roles.length)%roles.length);return;}
-  if(open&&(event.key==='Home'||event.key==='End')){event.preventDefault();setActive(event.key==='Home'?0:roles.length-1);return;}
-  if(open&&(event.key==='Enter'||event.key===' ')){event.preventDefault();choose(roles[active]);}
- }
- return <div className="invite-role-field"><span className="invite-role-label" id={`${id}-label`}>Papel <span className="sr-only">da pessoa {index+1}</span></span><div className="invite-role-select" ref={root}><button ref={trigger} type="button" className="invite-role-trigger" role="combobox" aria-labelledby={`${id}-label ${id}-value`} aria-expanded={open} aria-controls={`${id}-options`} aria-activedescendant={open?`${id}-option-${active}`:undefined} aria-haspopup="listbox" onClick={()=>open?setOpen(false):show()} onKeyDown={onKeyDown}><span id={`${id}-value`}>{value}</span><ChevronDown size={16} aria-hidden="true"/></button>{open&&<div className="invite-role-options" id={`${id}-options`} role="listbox" aria-labelledby={`${id}-label`}>{roles.map((role,i)=><div id={`${id}-option-${i}`} key={role} role="option" aria-selected={role===value} className={`invite-role-option${active===i?' is-active':''}`} onMouseEnter={()=>setActive(i)} onMouseDown={event=>event.preventDefault()} onClick={()=>choose(role)}><span>{role}</span>{role===value&&<Check size={16} aria-hidden="true"/>}</div>)}</div>}</div></div>;
+
+function AccountMenu({ name, email, photo, dark, onProfile, onAppearance, onLogout }: {
+  name: string;
+  email: string;
+  photo?: string;
+  dark: boolean;
+  onProfile: () => void;
+  onAppearance: () => void;
+  onLogout: () => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const root = useRef<HTMLDivElement>(null);
+  const trigger = useRef<HTMLButtonElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    function outside(event: PointerEvent) {
+      if (!root.current?.contains(event.target as Node)) setOpen(false);
+    }
+    function key(event: KeyboardEvent) {
+      if (event.key === 'Escape') {
+        setOpen(false);
+        trigger.current?.focus();
+      }
+    }
+    document.addEventListener('pointerdown', outside);
+    document.addEventListener('keydown', key);
+    return () => {
+      document.removeEventListener('pointerdown', outside);
+      document.removeEventListener('keydown', key);
+    };
+  }, [open]);
+
+  const initial = name.charAt(0).toLocaleUpperCase('pt-BR');
+  return <div className="account-menu" ref={root}>
+    <button ref={trigger} type="button" className="account-trigger" aria-label="Menu do perfil" aria-expanded={open} aria-controls={open ? 'account-panel' : undefined} onClick={() => setOpen(value => !value)}>
+      <span className="account-initial" aria-hidden="true">{photo ? <img src={photo} alt="" /> : initial}</span>
+      <span className="account-trigger-identity"><span className="account-trigger-name">{name}</span><span className="account-trigger-email">{email}</span></span>
+      <ChevronDown size={16} aria-hidden="true" />
+    </button>
+    {open && <div className="account-panel" id="account-panel" role="group" aria-label="Menu do perfil">
+      <div className="account-panel-identity"><span className="account-initial" aria-hidden="true">{photo ? <img src={photo} alt="" /> : initial}</span><div><strong>{name}</strong><small>{email}</small></div></div>
+      <div className="account-panel-actions">
+        <button type="button" onClick={() => { setOpen(false); onProfile(); }}><UserRound size={18} aria-hidden="true" />Configurações do perfil</button>
+        <button type="button" aria-pressed={dark} onClick={onAppearance}><Moon size={18} aria-hidden="true" /><span>Modo escuro</span><span className="account-switch" aria-hidden="true"><span /></span></button>
+      </div>
+      <div className="account-panel-footer"><button type="button" onClick={() => { setOpen(false); onLogout(); }}><LogOut size={18} aria-hidden="true" />Sair</button></div>
+    </div>}
+  </div>;
 }
-function InviteDialog({invitations,error,onClose,onSubmit,onRevoke}: {invitations: Invitation[]; error: string; onClose: ()=>void; onSubmit: (drafts: InvitationDraft[])=>void; onRevoke: (id: string)=>void}) {
- const ref=useRef<HTMLDialogElement>(null);const [drafts,setDrafts]=useState<InvitationDraft[]>([{email:'',role:'Pesquisador'}]);
- useEffect(()=>{const dialog=ref.current;const trigger=document.activeElement instanceof HTMLElement?document.activeElement:null;if(dialog&&!dialog.open){dialog.showModal();dialog.querySelector('input')?.focus();}return ()=>{if(dialog?.open)dialog.close();trigger?.focus();};},[]);
- function update(index: number, draft: InvitationDraft){setDrafts(current=>current.map((item,i)=>i===index?draft:item));}
- return <dialog ref={ref} className="create-lab-dialog invite-dialog" aria-labelledby="invite-title" onCancel={e=>{e.preventDefault();onClose();}} onClick={e=>{if(e.target===e.currentTarget){const r=e.currentTarget.getBoundingClientRect();if(e.clientX<r.left||e.clientX>r.right||e.clientY<r.top||e.clientY>r.bottom)onClose();}}}>
-  <div className="create-dialog-header"><div><h2 id="invite-title">Convidar pessoas</h2><p>Informe o e-mail e escolha o papel de cada pessoa.</p></div><button type="button" className="icon-button" aria-label="Fechar" onClick={onClose}><X size={20}/></button></div>
-  <form onSubmit={e=>{e.preventDefault();onSubmit(drafts)}}><div className="invite-drafts">{drafts.map((draft,index)=><div className="invite-draft" key={index}><label>E-mail <span className="sr-only">da pessoa {index+1}</span><input type="email" required autoFocus={index===0} maxLength={254} placeholder="nome@instituicao.br" value={draft.email} onChange={e=>update(index,{...draft,email:e.target.value})}/></label><InviteRoleSelect value={draft.role} index={index} onChange={role=>update(index,{...draft,role})}/>{drafts.length>1&&<button type="button" className="icon-button invite-remove-draft" aria-label={`Remover pessoa ${index+1}`} onClick={()=>setDrafts(items=>items.filter((_,i)=>i!==index))}><X size={18}/></button>}</div>)}</div>
-   <button type="button" className="text-button invite-add" onClick={()=>setDrafts(items=>[...items,{email:'',role:'Pesquisador'}])}><Plus size={16}/> Adicionar outra pessoa</button>
-   {error&&<p className="create-dialog-error" role="alert">{error}</p>}
-   <div className="modal-actions"><button type="button" className="button secondary" onClick={onClose}>Cancelar</button><button className="button primary" disabled={!!initial.error}>Registrar {drafts.length===1?'convite':'convites'}</button></div>
-  </form>
-  {invitations.length>0&&<details className="invite-history"><summary>Convites registrados ({invitations.length})</summary><div>{invitations.map(i=><div className="invite-history-row" key={i.id}><div><strong>{i.email}</strong><small>{highestRole(i.roles)} · {i.status}</small></div>{i.status==='Pendente'&&<button type="button" className="text-button" onClick={()=>onRevoke(i.id)}>Revogar<span className="sr-only"> convite de {i.email}</span></button>}</div>)}</div></details>}
- </dialog>;
+
+function CreateLaboratoryDialog({ name, error, busy, onName, onClose, onSubmit }: {
+  name: string;
+  error: string;
+  busy: boolean;
+  onName: (value: string) => void;
+  onClose: () => void;
+  onSubmit: (event: FormEvent<HTMLFormElement>) => void;
+}) {
+  const dialog = useRef<HTMLDialogElement>(null);
+  useEffect(() => {
+    const element = dialog.current;
+    const previousFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    if (element && !element.open) element.showModal();
+    element?.querySelector('input')?.focus();
+    return () => {
+      if (element?.open) element.close();
+      previousFocus?.focus();
+    };
+  }, []);
+
+  return <dialog ref={dialog} className="laboratory-dialog" aria-labelledby="create-lab-title" onCancel={event => { event.preventDefault(); onClose(); }}>
+    <div className="dialog-heading"><div><h2 id="create-lab-title">Criar laboratório</h2><p>Quem cria o laboratório recebe o papel de administrador.</p></div><button className="icon-button" type="button" aria-label="Fechar" onClick={onClose}><X size={19} aria-hidden="true" /></button></div>
+    <form onSubmit={onSubmit}>
+      <label htmlFor="new-lab-name">Nome do laboratório</label>
+      <input id="new-lab-name" required maxLength={120} value={name} onChange={event => onName(event.target.value)} placeholder="Ex.: Laboratório de Citogenética" />
+      {error && <p className="dialog-error" role="alert">{error}</p>}
+      <div className="dialog-actions"><button className="button secondary" type="button" onClick={onClose}>Cancelar</button><button className="button primary" type="submit" disabled={!name.trim() || busy}>{busy ? 'Criando…' : 'Criar laboratório'}</button></div>
+    </form>
+  </dialog>;
 }
-function MemberActions({member,onEdit,onRemove}: {member: Member; onEdit: ()=>void; onRemove: ()=>void}) {
- const [open,setOpen]=useState(false);const container=useRef<HTMLDivElement>(null);const trigger=useRef<HTMLButtonElement>(null);
- useEffect(()=>{if(!open)return;function outside(e: PointerEvent){if(!container.current?.contains(e.target as Node))setOpen(false);}function key(e: KeyboardEvent){if(e.key==='Escape'){setOpen(false);trigger.current?.focus();}}document.addEventListener('pointerdown',outside);document.addEventListener('keydown',key);return ()=>{document.removeEventListener('pointerdown',outside);document.removeEventListener('keydown',key);};},[open]);
- const label=member.id===demoUser.id?'seu perfil':member.name;
- return <div className="member-actions-menu" ref={container}><button ref={trigger} type="button" className="icon-button member-menu-trigger" aria-label={`Gerenciar ${label}`} aria-expanded={open} onClick={()=>setOpen(value=>!value)}><Settings size={18}/></button>{open&&<div className="member-menu" role="group" aria-label={`Ações para ${label}`}><button type="button" onClick={()=>{setOpen(false);onEdit();}}>Alterar papel</button>{member.id!==demoUser.id&&<button type="button" className="member-menu-remove" onClick={()=>{setOpen(false);onRemove();}}>Remover do laboratório</button>}</div>}</div>;
+
+function ConfirmationDialog({ confirmation, busy, error, onClose, onConfirm }: {
+  confirmation: Confirmation;
+  busy: boolean;
+  error: string;
+  onClose: () => void;
+  onConfirm: () => void;
+}) {
+  const dialog = useRef<HTMLDialogElement>(null);
+  useEffect(() => {
+    const element = dialog.current;
+    const previousFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    if (element && !element.open) element.showModal();
+    element?.querySelector<HTMLButtonElement>('[data-cancel]')?.focus();
+    return () => {
+      if (element?.open) element.close();
+      previousFocus?.focus();
+    };
+  }, []);
+
+  const removing = confirmation.kind === 'remove';
+  const heading = removing ? `Remover ${confirmation.participation.nome}?` : 'Sair do laboratório?';
+  const description = removing
+    ? `A participação de ${confirmation.participation.nome} será encerrada.`
+    : 'Sua participação será encerrada e este laboratório deixará de aparecer na sua lista.';
+
+  return <dialog ref={dialog} className="laboratory-dialog" aria-labelledby="confirm-lab-title" aria-describedby="confirm-lab-description" onCancel={event => { event.preventDefault(); onClose(); }}>
+    <div className="dialog-heading"><h2 id="confirm-lab-title">{heading}</h2><button className="icon-button" type="button" aria-label="Fechar" onClick={onClose}><X size={19} aria-hidden="true" /></button></div>
+    <p id="confirm-lab-description">{description}</p>
+    {error && <p className="dialog-error" role="alert">{error}</p>}
+    <div className="dialog-actions"><button data-cancel className="button secondary" type="button" onClick={onClose}>Cancelar</button><button className="button danger" type="button" disabled={busy} onClick={onConfirm}>{busy ? 'Aguarde…' : removing ? 'Remover participação' : 'Sair do laboratório'}</button></div>
+  </dialog>;
 }
-function RoleFields({value, onChange}: {value: Role[]; onChange: (v: Role[])=>void}) {
- return <fieldset className="role-fields"><legend>Papel no laboratório</legend>{roles.map(role=><label key={role}><input type="radio" name="laboratory-role" checked={highestRole(value)===role} onChange={()=>onChange([role])}/><span>{role}<small>{role==='Administrador'?'Gerencia o laboratório e inclui os acessos dos demais papéis.':role==='Orientador'?'Inclui o acesso de pesquisador; a orientação ainda está em validação.':'Cria e edita as próprias lâminas.'}</small></span></label>)}</fieldset>;
+
+function RoleFields({ value, onChange }: { value: PapelLaboratorio[]; onChange: (value: PapelLaboratorio[]) => void }) {
+  const roles: PapelLaboratorio[] = ['MEMBRO', 'ADMIN', 'ORIENTADOR'];
+  return <fieldset className="role-fields"><legend>Papéis no laboratório</legend>
+    {roles.map(role => <label className="role-field" key={role}>
+      <input type="checkbox" checked={hasRole(value, role)} disabled={role === 'MEMBRO'} onChange={event => {
+        if (role === 'MEMBRO') return;
+        onChange(event.target.checked
+          ? [...new Set<PapelLaboratorio>([...value, role, 'MEMBRO'])]
+          : value.filter(item => item !== role));
+      }} />
+      <span><strong>{PAPEL_LABEL[role]}</strong>{role === 'MEMBRO' && <small>Obrigatório para toda participação.</small>}</span>
+    </label>)}
+  </fieldset>;
 }
-export function Laboratories({user,onLogout,onUserUpdate,renderSlides}: {user: UsuarioResponseDTO; onLogout: ()=>void; onUserUpdate: (user: UsuarioResponseDTO)=>void; renderSlides: (lab: Laboratory|null, onBack: ()=>void)=>React.ReactNode}) {
- const [state,setState]=useState(initial.state);
- const [preferences,setPreferences]=useState(initialPreferences.value);
- useEffect(()=>{document.documentElement.dataset.appearance=preferences.dark?'dark':'light';return ()=>{delete document.documentElement.dataset.appearance;};},[preferences.dark]);
- function updatePreferences(next: typeof preferences){if(initialPreferences.error){setError(initialPreferences.error);return false;}try{savePreferences(next);setPreferences(next);return true;}catch{setError('Não foi possível salvar a preferência neste navegador.');return false;}}
- const location=useLocation(); const navigate=useNavigate();
- const [view,setView]=useState<'list'|'manage'|'slides'|'profile'>(()=>location.pathname==='/perfil'?'profile':'list');
- useEffect(()=>{setView(location.pathname==='/perfil'?'profile':'list');},[location.pathname]);
- const [selected,setSelected]=useState<string|null>(null);
- const [section,setSection]=useState<'members'|'settings'>('members');
- const [query,setQuery]=useState(''); const [memberQuery,setMemberQuery]=useState(''); const [error,setError]=useState(initial.error); const [notice,setNotice]=useState('');
- const [name,setName]=useState(''); const [description,setDescription]=useState(''); const [createOpen,setCreateOpen]=useState(false);
- const [inviteOpen,setInviteOpen]=useState(false); const [pickedRoles,setPickedRoles]=useState<Role[]>(['Pesquisador']);
- const [editing,setEditing]=useState<string|null>(null); const [confirm,setConfirm]=useState<Member|null>(null);
- const lab=state.laboratories.find(l=>l.id===selected); const me=lab&&participation(lab); const admin=!!me && hasRole(me.roles,'Administrador');
- const myLabs=state.laboratories.filter(participation);
- const received=state.invitations.filter(i=>i.email===demoUser.email&&i.status==='Pendente');
- const memberEmail=(member: Member)=>member.id===demoUser.id?user.email:member.email;
- function commit(next: LaboratoriesState, message: string) {
-  if(initial.error) return false;
-  try { saveLaboratories(next); setState(next);setError('');setNotice(message);return true; }
-  catch {setError('Não foi possível salvar. Verifique o espaço e as permissões de armazenamento do navegador e tente novamente.');return false;}
- }
- function updateLab(next: Laboratory, message: string) { return commit({...state,laboratories:state.laboratories.map(l=>l.id===next.id?next:l)},message); }
- function goList(){if(location.pathname==='/perfil')navigate('/laboratorios');setView('list');setSelected(null);setConfirm(null);setEditing(null);setInviteOpen(false);setQuery('');}
- function manage(l: Laboratory){setMemberQuery('');setSelected(l.id);setView('manage');setSection('members');setName(l.name);setDescription(l.description||'');setNotice('');}
- function create(e: FormEvent){e.preventDefault();if(!name.trim())return;const l: Laboratory={id:crypto.randomUUID(),name:name.trim(),institution:'',description:description.trim(),members:[{...demoUser,roles:['Administrador'],active:true}]};if(commit({...state,laboratories:[l,...state.laboratories]},'Laboratório criado. Você é administrador.')){setCreateOpen(false);setQuery('');}}
- function invite(drafts: InvitationDraft[]){if(!lab||!admin)return;const validation=validateInvitationDrafts(drafts,lab,state.invitations);if(validation){setError(validation);return;}const added=drafts.map(d=>({id:crypto.randomUUID(),labId:lab.id,email:d.email.trim().toLowerCase(),roles:[d.role],status:'Pendente' as const}));if(commit({...state,invitations:[...added,...state.invitations]},`${added.length===1?'Convite registrado':'Convites registrados'}. Nenhum e-mail foi enviado.`))setInviteOpen(false);}
- function saveRoles(member: Member){if(!lab||!admin)return;if(!pickedRoles.length){setError('Selecione um papel para o membro.');return;}if(isLastAdmin(lab,member)&&!pickedRoles.includes('Administrador')){setError('Este é o último administrador. Atribua o papel a outro membro antes de continuar.');return;}if(updateLab({...lab,members:lab.members.map(m=>m.id===member.id?{...m,roles:pickedRoles}:m)},'Papel atualizado.'))setEditing(null);}
- function remove(){if(!lab||!confirm||(!admin&&confirm.id!==demoUser.id))return;if(isLastAdmin(lab,confirm)){setError('Transfira a administração para outro membro antes de sair.');return;}if(updateLab({...lab,members:lab.members.map(m=>m.id===confirm.id?{...m,active:false}:m)},'Participação encerrada. Os dados de pesquisa foram preservados.')){setConfirm(null);if(confirm.id===demoUser.id)goList();}}
- const notifications: NotificationItem[] = received.map(i=>{const destination=state.laboratories.find(l=>l.id===i.labId);return {id: `invitation:${i.id}`, content: <article className="received-invite"><div className="invite-heading"><Mail size={18} aria-hidden="true"/><div><h3>Convite para {destination?.name || 'laboratório indisponível'}</h3>{destination?.institution && !['Grupo de pesquisa', 'Grupo de pesquisa · demonstração'].includes(destination.institution) && <p>{destination.institution}</p>}</div></div><p className="invite-role">Papel no laboratório: <strong>{highestRole(i.roles)}</strong></p><div className="invite-actions"><button className="button primary" aria-label={`Aceitar convite para ${destination?.name || "laboratório indisponível"}`} disabled={!destination || !!initial.error} onClick={()=>{if(!destination)return;const member={...demoUser,roles:i.roles,active:true};commit({...state,laboratories:state.laboratories.map(l=>l.id===i.labId?{...l,members:[...l.members.filter(m=>m.id!==demoUser.id),member]}:l),invitations:state.invitations.map(inv=>inv.id===i.id?{...inv,status:'Aceito'}:inv)},'Convite aceito. O laboratório está disponível na sua lista.')}}>Aceitar convite</button><button className="text-button" aria-label={`Recusar convite para ${destination?.name || "laboratório indisponível"}`} disabled={!!initial.error} onClick={()=>commit({...state,invitations:state.invitations.map(inv=>inv.id===i.id?{...inv,status:'Recusado'}:inv)},'Convite recusado.')}>Recusar</button></div></article>};});
- return <div className="labs-app"><header className="topbar"><div className="topbar-inner"><Link className="brand" to="/laboratorios"><span className="brand-mark"><Microscope size={21}/></span><span>citogenética<small>Laboratório de Citogenética · UFLA</small></span></Link><div className="lab-account"><Notifications items={notifications}/><AccountMenu name={user.nome} email={user.email} photo={preferences.photo} dark={preferences.dark} onProfile={()=>{if(location.pathname!=='/perfil')navigate('/perfil');setView('profile');setError('');setNotice('');}} onAppearance={()=>updatePreferences({...preferences,dark:!preferences.dark})} onLogout={onLogout}/></div></div></header>
- {view==='slides'&&(!selected||me)?<>{error&&<div className="container lab-alert error" role="alert">{error}<button aria-label="Dispensar erro" onClick={()=>setError('')}><X size={16}/></button></div>}{notice&&<div className="container lab-alert" role="status"><span><Check size={16}/>{notice}</span><button aria-label="Dispensar aviso" onClick={()=>setNotice('')}><X size={16}/></button></div>}{renderSlides(lab||null,goList)}</>:<main className="container labs-main"><div className="labs-content">
- {error&&!inviteOpen&&<div className="lab-alert error" role="alert">{error}<button aria-label="Dispensar erro" onClick={()=>setError('')}><X size={16}/></button></div>}
- {notice&&<div className="lab-alert" role="status"><span><Check size={16}/>{notice}</span><button aria-label="Dispensar aviso" onClick={()=>setNotice('')}><X size={16}/></button></div>}
-   {view==='profile'?<ProfileSettings user={user} photo={preferences.photo} onBack={goList} onUserUpdate={onUserUpdate} onPhotoChange={photo=>updatePreferences({...preferences,photo})}/>:view==='list'?<><div className="page-heading"><div><h1 className={typeClass('display')}>Meus laboratórios</h1><p>Escolha onde você vai continuar sua pesquisa.</p></div><button className="button primary create-lab-action" onClick={()=>{setName('');setDescription('');setCreateOpen(true);setNotice('')}}><Plus size={17}/> Criar laboratório</button></div>
- <div className="labs-grid"><section aria-labelledby="your-labs"><div className="section-heading"><h2 id="your-labs">Seus espaços de pesquisa</h2><label className="search"><Search size={16}/><span className="sr-only">Buscar laboratório</span><input value={query} onChange={e=>setQuery(e.target.value)} placeholder="Buscar laboratório"/></label></div>
- <div className="lab-list">{myLabs.filter(l=>`${l.name} ${l.institution}`.toLocaleLowerCase('pt-BR').includes(query.toLocaleLowerCase('pt-BR'))).map(l=>{const memberCount=l.members.filter(m=>m.active).length; return <article className="lab-row" key={l.id}><div className="lab-row-heading"><h3>{l.name}</h3><button className="icon-button" aria-label={`Gerenciar ${l.name}`} onClick={()=>manage(l)}><Settings size={18}/></button></div><p>{l.description||l.institution||'Espaço de pesquisa'}</p><div className="lab-row-meta"><span><Users size={15}/>{memberCount} {memberCount===1?'membro':'membros'}</span><span>Seu papel: {highestRole(participation(l)!.roles)}</span></div><div className="lab-row-bottom"><button className="button secondary" onClick={()=>{setSelected(l.id);setView('slides')}}>Acessar laboratório <ArrowRight size={16}/></button></div></article>})}
- {!myLabs.some(l=>`${l.name} ${l.institution}`.toLocaleLowerCase('pt-BR').includes(query.toLocaleLowerCase('pt-BR')))&&<div className="lab-empty"><h3>{query?'Nenhum laboratório encontrado':'Seu próximo espaço de pesquisa'}</h3><p>{query?'Tente outro nome ou instituição.':'Crie um laboratório ou aceite um convite para começar.'}</p>{query&&<button className="button secondary" onClick={()=>setQuery('')}>Limpar busca</button>}</div>}</div>
- <div className="loose-slides"><div><h3>Lâminas avulsas</h3><p>Acesse suas lâminas sem laboratório.</p></div><button className="text-button" onClick={()=>{setSelected(null);setView('slides')}}>Abrir lâminas <ArrowRight size={16}/></button></div></section>
- </div></>:
- lab&&me?<><div className="breadcrumb"><button onClick={goList}>Meus laboratórios</button><ChevronRight size={14}/><strong>Gerenciar laboratório</strong></div><div className="page-heading"><div><h1>{lab.name}</h1>{lab.description&&<p>{lab.description}</p>}</div><button className="button primary" onClick={()=>setView('slides')}>Acessar lâminas <ArrowRight size={16}/></button></div><nav className="tabs" aria-label="Gestão do laboratório">{(['members','settings'] as const).map((key,index)=><button key={key} className={section===key?'selected':''} aria-current={section===key?'page':undefined} onClick={()=>{setSection(key);setEditing(null);setInviteOpen(false);setError('')}}>{['Membros','Configurações'][index]}</button>)}</nav>
- {section==='members'?<section className="members-section" aria-labelledby="members-title">
-  <div className="members-toolbar"><div><h2 id="members-title">Membros do laboratório</h2><p>{lab.members.filter(m=>m.active).length} {lab.members.filter(m=>m.active).length===1?'pessoa':'pessoas'} no laboratório</p></div><div className="members-tools"><label className="members-search"><Search size={17} aria-hidden="true"/><span className="sr-only">Buscar membro</span><input type="search" value={memberQuery} onChange={e=>setMemberQuery(e.target.value)} placeholder="Buscar membro"/></label>{admin&&<button className="button primary" onClick={()=>{setError('');setInviteOpen(true)}}><Plus size={16}/> Convidar pessoa</button>}</div></div>
-  <div className="members-table-wrap"><table className="members-table"><thead><tr><th scope="col">Nome</th><th scope="col">E-mail</th><th scope="col">Papel</th><th scope="col">Última atividade</th>{admin&&<th scope="col"><span className="sr-only">Ações</span></th>}</tr></thead><tbody>
-   {lab.members.filter(m=>m.active && `${m.id===demoUser.id?'Você':m.name} ${memberEmail(m)}`.toLocaleLowerCase('pt-BR').includes(memberQuery.trim().toLocaleLowerCase('pt-BR'))).map(m=><Fragment key={m.id}><tr className="members-table-row"><td data-label="Nome"><div className="members-person"><span className="member-initial" aria-hidden="true">{m.name[0]}</span><strong>{m.id===demoUser.id?'Você':m.name}</strong></div></td><td data-label="E-mail" className="members-email">{memberEmail(m)}</td><td data-label="Papel"><span className="members-role">{highestRole(m.roles)}</span></td><td data-label="Última atividade" className="members-activity"><span className="members-activity-label">Última atividade: </span>Sem dados</td>{admin&&<td className="members-actions-cell"><MemberActions member={m} onEdit={()=>{setEditing(m.id);setPickedRoles([highestRole(m.roles)!]);setError('')}} onRemove={()=>setConfirm(m)}/></td>}</tr>{editing===m.id&&<tr className="members-edit-row"><td colSpan={admin?5:4}><form className="inline-role-editor" onSubmit={e=>{e.preventDefault();saveRoles(m)}}><RoleFields value={pickedRoles} onChange={setPickedRoles}/>{isLastAdmin(lab,m)&&<p className="lab-muted">É necessário manter ao menos um administrador ativo.</p>}<div className="modal-actions"><button type="button" className="button secondary" onClick={()=>setEditing(null)}>Cancelar</button><button className="button primary">Salvar papel</button></div></form></td></tr>}</Fragment>)}
-  </tbody></table>{!lab.members.some(m=>m.active && `${m.id===demoUser.id?'Você':m.name} ${memberEmail(m)}`.toLocaleLowerCase('pt-BR').includes(memberQuery.trim().toLocaleLowerCase('pt-BR')))&&<div className="members-empty"><p>Nenhum membro encontrado.</p><button className="text-button" onClick={()=>setMemberQuery('')}>Limpar busca</button></div>}</div>
- </section>:
- <div className="lab-settings-grid"><section><h2>Dados do laboratório</h2><p>Atualize o nome e a descrição do grupo.</p></section><form className="lab-form-panel" onSubmit={e=>{e.preventDefault();if(name.trim()&&admin)updateLab({...lab,name:name.trim(),description:description.trim()},'Dados do laboratório atualizados.')}}><label>Nome do laboratório<input required maxLength={100} disabled={!admin} value={name} onChange={e=>setName(e.target.value)}/></label><label>Descrição <span>(opcional)</span><textarea className="lab-description-input" maxLength={500} rows={3} disabled={!admin} value={description} onChange={e=>setDescription(e.target.value)}/></label>{admin&&<button className="button primary" disabled={!name.trim()}>Salvar alterações</button>}</form><div className="lab-leave-action"><button className="button secondary" type="button" onClick={()=>setConfirm(me)}><LogOut size={16}/> Sair do laboratório</button></div></div>}
- {confirm&&(confirm.id===demoUser.id?<LeaveLaboratoryDialog blocked={isLastAdmin(lab,confirm)} onClose={()=>setConfirm(null)} onConfirm={remove}/>:<div className="lab-confirm" role="alert"><h3>Remover {confirm.name}?</h3><p>O acesso será encerrado, mas as lâminas e os registros de pesquisa serão preservados.{isLastAdmin(lab,confirm)?' Este é o último administrador; transfira o papel antes de continuar.':''}</p><div className="invite-actions"><button className="button secondary" onClick={()=>setConfirm(null)}>Cancelar</button><button className="button danger" disabled={isLastAdmin(lab,confirm)} onClick={remove}>Confirmar remoção</button></div></div>)}</>:null}
- {inviteOpen&&lab&&admin&&<InviteDialog invitations={state.invitations.filter(i=>i.labId===lab.id)} error={error} onClose={()=>{setInviteOpen(false);setError('')}} onSubmit={invite} onRevoke={id=>commit({...state,invitations:state.invitations.map(i=>i.id===id&&i.labId===lab.id&&i.status==='Pendente'?{...i,status:'Revogado'}:i)},'Convite revogado.')}/>}
- {createOpen&&<CreateLaboratoryDialog name={name} description={description} error={error} onName={setName} onDescription={setDescription} onClose={()=>setCreateOpen(false)} onSubmit={create}/>}</div><footer className="labs-footer"><span>Laboratório de Citogenética · UFLA</span></footer></main>}</div>;
+
+export function Laboratories({ user, onLogout, onUserUpdate, renderSlides }: {
+  user: UsuarioResponseDTO;
+  onLogout: () => void;
+  onUserUpdate: (user: UsuarioResponseDTO) => void;
+  renderSlides: (lab: LaboratorioResponseDTO | null, onBack: () => void, readOnly: boolean) => React.ReactNode;
+}) {
+  const [preferences, setPreferences] = useState(initialPreferences.value);
+  const [labs, setLabs] = useState<LaboratorioResponseDTO[]>([]);
+  const [listStatus, setListStatus] = useState<'loading' | 'ready' | 'error'>('loading');
+  const [listError, setListError] = useState('');
+  const [view, setView] = useState<View>(() => window.location.pathname === '/perfil' ? 'profile' : 'list');
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [currentLab, setCurrentLab] = useState<LaboratorioResponseDTO | null>(null);
+  const [members, setMembers] = useState<ParticipacaoResponseDTO[]>([]);
+  const [detailStatus, setDetailStatus] = useState<'loading' | 'ready' | 'error'>('loading');
+  const [detailRetry, setDetailRetry] = useState(0);
+  const [slidesLab, setSlidesLab] = useState<LaboratorioResponseDTO | null>(null);
+  const [slidesStatus, setSlidesStatus] = useState<'loading' | 'ready' | 'error'>('loading');
+  const [slidesRetry, setSlidesRetry] = useState(0);
+  const [section, setSection] = useState<'members' | 'settings'>('members');
+  const [query, setQuery] = useState('');
+  const [memberQuery, setMemberQuery] = useState('');
+  const [pageError, setPageError] = useState('');
+  const [notice, setNotice] = useState('');
+  const [nameDraft, setNameDraft] = useState('');
+  const [createName, setCreateName] = useState('');
+  const [createOpen, setCreateOpen] = useState(false);
+  const [creating, setCreating] = useState(false);
+  const [savingName, setSavingName] = useState(false);
+  const [editingParticipation, setEditingParticipation] = useState<string | null>(null);
+  const [rolesDraft, setRolesDraft] = useState<PapelLaboratorio[]>(['MEMBRO']);
+  const [savingRoles, setSavingRoles] = useState(false);
+  const [confirmation, setConfirmation] = useState<Confirmation | null>(null);
+  const [confirming, setConfirming] = useState(false);
+  const location = useLocation();
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    document.documentElement.dataset.appearance = preferences.dark ? 'dark' : 'light';
+    return () => { delete document.documentElement.dataset.appearance; };
+  }, [preferences.dark]);
+
+  useEffect(() => {
+    setView(location.pathname === '/perfil' ? 'profile' : 'list');
+    setPageError('');
+    setNotice('');
+  }, [location.pathname]);
+
+  const loadLabs = useCallback(async (signal?: AbortSignal) => {
+    setListStatus('loading');
+    setListError('');
+    try {
+      const result = await laboratorioApi.listarMeus(signal);
+      if (signal?.aborted) return;
+      setLabs(result);
+      setListStatus('ready');
+    } catch (error) {
+      if (signal?.aborted) return;
+      if (isUnauthorized(error)) return;
+      setListError(errorMessage(error, 'Não foi possível carregar seus laboratórios.'));
+      setListStatus('error');
+    }
+  }, []);
+
+  useEffect(() => {
+    const controller = new AbortController();
+    void loadLabs(controller.signal);
+    return () => controller.abort();
+  }, [loadLabs]);
+
+  const returnToListForMissingLab = useCallback((message = 'Este laboratório não está mais disponível para sua participação.') => {
+    setSelectedId(null);
+    setCurrentLab(null);
+    setSlidesLab(null);
+    setView('list');
+    setPageError('');
+    setNotice(message);
+    void loadLabs();
+  }, [loadLabs]);
+
+  useEffect(() => {
+    if (view !== 'manage' || !selectedId) return;
+    let active = true;
+    setDetailStatus('loading');
+    setPageError('');
+    const controller = new AbortController();
+    Promise.all([laboratorioApi.buscar(selectedId, controller.signal), laboratorioApi.listarParticipacoes(selectedId, controller.signal)])
+      .then(([lab, participations]) => {
+        if (!active) return;
+        setCurrentLab(lab);
+        setLabs(current => current.map(item => item.id === lab.id ? lab : item));
+        setNameDraft(lab.nome);
+        setMembers(participations);
+        setDetailStatus('ready');
+      })
+      .catch(error => {
+        if (!active || isUnauthorized(error)) return;
+        if (isNotFound(error)) {
+          returnToListForMissingLab();
+          return;
+        }
+        setPageError(errorMessage(error, 'Não foi possível carregar os dados do laboratório.'));
+        setDetailStatus('error');
+      });
+    return () => { active = false; controller.abort(); };
+  }, [view, selectedId, detailRetry, returnToListForMissingLab]);
+
+  useEffect(() => {
+    if (view !== 'slides') return;
+    if (!selectedId) {
+      setSlidesLab(null);
+      setSlidesStatus('ready');
+      return;
+    }
+    let active = true;
+    setSlidesStatus('loading');
+    setPageError('');
+    const controller = new AbortController();
+    laboratorioApi.buscar(selectedId, controller.signal)
+      .then(lab => {
+        if (!active) return;
+        setSlidesLab(lab);
+        setLabs(current => current.map(item => item.id === lab.id ? lab : item));
+        setSlidesStatus('ready');
+      })
+      .catch(error => {
+        if (!active || isUnauthorized(error)) return;
+        if (isNotFound(error)) {
+          returnToListForMissingLab();
+          return;
+        }
+        setPageError(errorMessage(error, 'Não foi possível abrir este laboratório.'));
+        setSlidesStatus('error');
+      });
+    return () => { active = false; controller.abort(); };
+  }, [view, selectedId, slidesRetry, returnToListForMissingLab]);
+
+  function goList() {
+    if (location.pathname === '/perfil') navigate('/laboratorios');
+    setView('list');
+    setSelectedId(null);
+    setCurrentLab(null);
+    setSlidesLab(null);
+    setConfirmation(null);
+    setEditingParticipation(null);
+    setQuery('');
+    setPageError('');
+  }
+
+  function openManage(lab: LaboratorioResponseDTO) {
+    setSelectedId(lab.id);
+    setCurrentLab(null);
+    setMembers([]);
+    setSection('members');
+    setMemberQuery('');
+    setPageError('');
+    setNotice('');
+    setView('manage');
+  }
+
+  function openSlides(lab: LaboratorioResponseDTO | null) {
+    setSelectedId(lab?.id ?? null);
+    setSlidesLab(null);
+    setPageError('');
+    setNotice('');
+    setView('slides');
+  }
+
+  function updatePreferences(next: typeof preferences): boolean {
+    if (initialPreferences.error) {
+      setPageError(initialPreferences.error);
+      return false;
+    }
+    try {
+      savePreferences(next);
+      setPreferences(next);
+      return true;
+    } catch {
+      setPageError('Não foi possível salvar a preferência neste navegador.');
+      return false;
+    }
+  }
+
+  async function createLaboratory(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const nome = createName.trim();
+    if (!nome || creating) return;
+    setCreating(true);
+    setPageError('');
+    try {
+      const lab = await laboratorioApi.criar(nome);
+      setLabs(current => [lab, ...current.filter(item => item.id !== lab.id)]);
+      setCreateOpen(false);
+      setCreateName('');
+      openManage(lab);
+      setNotice('Laboratório criado. Você recebeu os papéis Membro e Administrador.');
+    } catch (error) {
+      if (!isUnauthorized(error)) setPageError(errorMessage(error, 'Não foi possível criar o laboratório.'));
+    } finally {
+      setCreating(false);
+    }
+  }
+
+  async function saveLaboratoryName(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!currentLab || currentLab.estado !== 'ATIVO' || !hasRole(currentLab.papeis, 'ADMIN') || savingName) return;
+    const nome = nameDraft.trim();
+    if (!nome) return;
+    setSavingName(true);
+    setPageError('');
+    try {
+      const updated = await laboratorioApi.atualizarNome(currentLab.id, nome);
+      setCurrentLab(updated);
+      setLabs(current => current.map(item => item.id === updated.id ? updated : item));
+      setNameDraft(updated.nome);
+      setNotice('Nome do laboratório atualizado.');
+    } catch (error) {
+      if (isNotFound(error)) returnToListForMissingLab();
+      else if (isForbidden(error)) setPageError(`Somente administradores podem alterar o nome deste laboratório. ${errorMessage(error, '')}`.trim());
+      else if (!isUnauthorized(error)) setPageError(errorMessage(error, 'Não foi possível alterar o nome do laboratório.'));
+    } finally {
+      setSavingName(false);
+    }
+  }
+
+  function beginRoleEdit(participation: ParticipacaoResponseDTO) {
+    setEditingParticipation(participation.id);
+    setRolesDraft([...participation.papeis]);
+    setPageError('');
+  }
+
+  async function reloadMembersAfterRoleConflict(
+    participation: ParticipacaoResponseDTO,
+    selectedRoles: PapelLaboratorio[],
+    conflict: unknown,
+  ) {
+    if (!currentLab) return;
+    try {
+      const latest = await laboratorioApi.listarParticipacoes(currentLab.id);
+      setMembers(latest);
+      const updatedParticipation = latest.find(item => item.id === participation.id);
+      if (!updatedParticipation) {
+        setEditingParticipation(null);
+        setPageError('A participação não está mais ativa. A lista de membros foi atualizada.');
+        return;
+      }
+      if (updatedParticipation.versao !== participation.versao) {
+        setEditingParticipation(null);
+        setPageError('Os papéis foram alterados por outra pessoa. A lista foi atualizada; confira os valores antes de tentar novamente.');
+        return;
+      }
+      if (hasRole(participation.papeis, 'ADMIN') && !hasRole(selectedRoles, 'ADMIN')
+        && latest.filter(item => hasRole(item.papeis, 'ADMIN')).length <= 1) {
+        setPageError(`${errorMessage(conflict, 'A operação não pode ser concluída.')} É necessário manter ao menos um Administrador ativo.`);
+        return;
+      }
+      if (hasRole(participation.papeis, 'ORIENTADOR') && !hasRole(selectedRoles, 'ORIENTADOR')) {
+        setPageError(`${errorMessage(conflict, 'A operação não pode ser concluída.')} Não é possível remover o papel de Orientador enquanto houver vínculo de orientação ativo.`);
+        return;
+      }
+      setPageError(errorMessage(conflict, 'A operação não pode ser concluída.'));
+    } catch (error) {
+      if (isNotFound(error)) returnToListForMissingLab();
+      else if (!isUnauthorized(error)) setPageError(errorMessage(error, 'Não foi possível atualizar a lista de membros.'));
+    }
+  }
+
+  async function saveRoles(event: FormEvent<HTMLFormElement>, participation: ParticipacaoResponseDTO) {
+    event.preventDefault();
+    if (!currentLab || currentLab.estado !== 'ATIVO' || !hasRole(currentLab.papeis, 'ADMIN') || savingRoles) return;
+    const papeis = [...new Set([...rolesDraft, 'MEMBRO' as const])];
+    setSavingRoles(true);
+    setPageError('');
+    try {
+      const updated = await laboratorioApi.alterarPapeis(currentLab.id, participation.id, participation.versao, papeis);
+      setMembers(current => current.map(item => item.id === updated.id ? updated : item));
+      setEditingParticipation(null);
+      setNotice(`Papéis de ${updated.nome} atualizados.`);
+    } catch (error) {
+      if (isNotFound(error)) returnToListForMissingLab();
+      else if (isForbidden(error)) setPageError(`Somente administradores podem alterar papéis. ${errorMessage(error, '')}`.trim());
+      else if (isConflict(error)) await reloadMembersAfterRoleConflict(participation, papeis, error);
+      else if (!isUnauthorized(error)) setPageError(errorMessage(error, 'Não foi possível alterar os papéis.'));
+    } finally {
+      setSavingRoles(false);
+    }
+  }
+
+  async function confirmMembershipChange() {
+    if (!currentLab || currentLab.estado !== 'ATIVO' || !confirmation || confirming) return;
+    const target = confirmation;
+    setConfirming(true);
+    setPageError('');
+    try {
+      if (target.kind === 'leave') {
+        await laboratorioApi.sair(currentLab.id);
+        setLabs(current => current.filter(item => item.id !== currentLab.id));
+        setConfirmation(null);
+        goList();
+        setNotice(`Você saiu de ${currentLab.nome}.`);
+        return;
+      }
+      await laboratorioApi.removerParticipacao(currentLab.id, target.participation.id);
+      setMembers(current => current.filter(item => item.id !== target.participation.id));
+      setConfirmation(null);
+      setNotice(`${target.participation.nome} foi removido do laboratório.`);
+    } catch (error) {
+      if (isNotFound(error)) {
+        setConfirmation(null);
+        returnToListForMissingLab();
+      } else if (isForbidden(error)) {
+        setConfirmation(null);
+        setPageError(`Somente administradores podem remover participantes. ${errorMessage(error, '')}`.trim());
+      } else if (isConflict(error)) {
+        setConfirmation(null);
+        if (target.kind === 'leave') {
+          const latest = await laboratorioApi.listarParticipacoes(currentLab.id).catch(() => members);
+          setMembers(latest);
+          const self = latest.find(item => isCurrentUser(item, user.email));
+          if (self && hasRole(self.papeis, 'ADMIN') && latest.filter(item => hasRole(item.papeis, 'ADMIN')).length <= 1) {
+            setPageError(`${errorMessage(error, 'A operação não pode ser concluída.')} Você é o último Administrador ativo. Atribua esse papel a outra pessoa antes de sair.`);
+          } else setPageError(errorMessage(error, 'A operação não pode ser concluída.'));
+        } else {
+          const latest = await laboratorioApi.listarParticipacoes(currentLab.id).catch(() => members);
+          setMembers(latest);
+          const removed = latest.find(item => item.id === target.participation.id);
+          if (removed && hasRole(removed.papeis, 'ADMIN') && latest.filter(item => hasRole(item.papeis, 'ADMIN')).length <= 1) {
+            setPageError(`${errorMessage(error, 'A operação não pode ser concluída.')} É necessário manter ao menos um Administrador ativo.`);
+          } else setPageError(errorMessage(error, 'A operação não pode ser concluída.'));
+        }
+      } else if (!isUnauthorized(error)) {
+        setConfirmation(null);
+        setPageError(errorMessage(error, 'Não foi possível encerrar a participação.'));
+      }
+    } finally {
+      setConfirming(false);
+    }
+  }
+
+  const admin = currentLab?.estado === 'ATIVO' && hasRole(currentLab.papeis, 'ADMIN');
+  const visibleLabs = labs.filter(lab => lab.nome.toLocaleLowerCase('pt-BR').includes(query.trim().toLocaleLowerCase('pt-BR')));
+  const visibleMembers = members.filter(participation => `${participation.nome} ${participation.email ?? ''}`
+    .toLocaleLowerCase('pt-BR').includes(memberQuery.trim().toLocaleLowerCase('pt-BR')));
+
+  return <div className="labs-app">
+    <header className="topbar"><div className="topbar-inner">
+      <Link className="brand" to="/laboratorios"><span className="brand-mark"><Microscope size={21} aria-hidden="true" /></span><span>citogenética<small>Laboratório de Citogenética · UFLA</small></span></Link>
+      <div className="lab-account"><AccountMenu name={user.nome} email={user.email} photo={preferences.photo} dark={preferences.dark}
+        onProfile={() => { if (location.pathname !== '/perfil') navigate('/perfil'); setView('profile'); setPageError(''); setNotice(''); }}
+        onAppearance={() => updatePreferences({ ...preferences, dark: !preferences.dark })}
+        onLogout={onLogout} /></div>
+    </div></header>
+
+    {view === 'slides' ? <>
+      {pageError && <div className="container lab-alert error" role="alert">{pageError}<button type="button" aria-label="Dispensar erro" onClick={() => setPageError('')}><X size={16} aria-hidden="true" /></button></div>}
+      {notice && <div className="container lab-alert" role="status"><span><Check size={16} aria-hidden="true" />{notice}</span><button type="button" aria-label="Dispensar aviso" onClick={() => setNotice('')}><X size={16} aria-hidden="true" /></button></div>}
+      {slidesStatus === 'loading' ? <main className="container slide-access-state" aria-live="polite"><p>Carregando laboratório…</p></main>
+        : slidesStatus === 'error' ? <main className="container slide-access-state"><h1>Não foi possível abrir as lâminas</h1><p>{pageError}</p><button className="button secondary" type="button" onClick={() => setSlidesRetry(value => value + 1)}>Tentar de novo</button><button className="text-button" type="button" onClick={goList}>Meus laboratórios</button></main>
+          : renderSlides(slidesLab, goList, slidesLab?.estado === 'DESATIVADO')}
+    </> : <main className="container labs-main"><div className="labs-content">
+      {(pageError || (listStatus === 'error' && view === 'list')) && !createOpen && !confirmation && <div className="lab-alert error" role="alert"><span>{pageError || listError}</span><button type="button" aria-label="Dispensar erro" onClick={() => { setPageError(''); setListError(''); }}><X size={16} aria-hidden="true" /></button></div>}
+      {notice && <div className="lab-alert" role="status"><span><Check size={16} aria-hidden="true" />{notice}</span><button type="button" aria-label="Dispensar aviso" onClick={() => setNotice('')}><X size={16} aria-hidden="true" /></button></div>}
+      {view === 'profile' ? <ProfileSettings user={user} photo={preferences.photo} onBack={goList} onUserUpdate={onUserUpdate} onPhotoChange={photo => updatePreferences({ ...preferences, photo })} />
+        : view === 'list' ? <>
+          <div className="page-heading"><div><h1 className={typeClass('display')}>Meus laboratórios</h1><p>Escolha onde você vai continuar sua pesquisa.</p></div><button className="button primary" type="button" onClick={() => { setCreateName(''); setPageError(''); setCreateOpen(true); }}><Plus size={17} aria-hidden="true" />Criar laboratório</button></div>
+          <section className="laboratory-list-section" aria-labelledby="laboratory-list-title">
+            <div className="section-heading"><h2 id="laboratory-list-title">Laboratórios</h2><label className="laboratory-search"><Search size={16} aria-hidden="true" /><span className="sr-only">Buscar laboratório</span><input type="search" value={query} onChange={event => setQuery(event.target.value)} placeholder="Buscar laboratório" /></label></div>
+            {listStatus === 'loading' ? <div className="laboratory-loading" aria-live="polite"><p>Carregando laboratórios…</p><span /><span /><span /></div>
+              : listStatus === 'error' ? <div className="laboratory-empty"><p>{listError}</p><button className="button secondary" type="button" onClick={() => void loadLabs()}>Tentar novamente</button></div>
+                : visibleLabs.length ? <div className="laboratory-grid">{visibleLabs.map(lab => <article className="laboratory-card" key={lab.id}>
+                  <div className="laboratory-card-heading"><h3>{lab.nome}</h3><span className={`laboratory-state ${lab.estado === 'ATIVO' ? 'is-active' : 'is-disabled'}`}>{lab.estado === 'ATIVO' ? 'Ativo' : 'Desativado'}</span></div>
+                  <div className="laboratory-card-meta"><span>Seus papéis</span><div className="role-chips">{lab.papeis.map(role => <span className="role-chip" key={role}>{PAPEL_LABEL[role]}</span>)}</div></div>
+                  <div className="laboratory-card-actions"><button className="button secondary" type="button" onClick={() => openManage(lab)}>Gerenciar</button><button className="text-button" type="button" onClick={() => openSlides(lab)}>Abrir lâminas <ArrowRight size={15} aria-hidden="true" /></button></div>
+                </article>)}</div>
+                  : <div className="laboratory-empty"><h3>{query ? 'Nenhum laboratório encontrado' : 'Nenhum laboratório ainda'}</h3><p>{query ? 'Tente outro nome.' : 'Crie um laboratório para organizar sua pesquisa.'}</p>{query && <button className="text-button" type="button" onClick={() => setQuery('')}>Limpar busca</button>}</div>}
+          </section>
+          <section className="loose-slides"><div><h2>Lâminas avulsas</h2><p>Acesse suas lâminas sem vínculo a laboratório.</p></div><button className="text-button" type="button" onClick={() => openSlides(null)}>Abrir lâminas <ArrowRight size={16} aria-hidden="true" /></button></section>
+        </> : <>
+          <div className="breadcrumb"><button type="button" onClick={goList}>Meus laboratórios</button><ChevronRight size={14} aria-hidden="true" /><span>Gerenciar laboratório</span></div>
+          {detailStatus === 'loading' ? <div className="laboratory-loading" aria-live="polite"><p>Carregando laboratório e membros…</p><span /><span /></div>
+              : detailStatus === 'error' ? <div className="laboratory-empty"><p>{pageError || 'Não foi possível carregar os dados do laboratório.'}</p><button className="button secondary" type="button" onClick={() => setDetailRetry(value => value + 1)}>Tentar novamente</button></div>
+              : currentLab && <>
+                <div className="page-heading laboratory-detail-heading"><div><h1>{currentLab.nome}</h1><div className="laboratory-detail-meta"><span className={`laboratory-state ${currentLab.estado === 'ATIVO' ? 'is-active' : 'is-disabled'}`}>{currentLab.estado === 'ATIVO' ? 'Ativo' : 'Desativado'}</span>{currentLab.estado === 'DESATIVADO' && <span>Somente leitura</span>}</div></div><button className="button primary" type="button" onClick={() => openSlides(currentLab)}>Acessar lâminas <ArrowRight size={16} aria-hidden="true" /></button></div>
+                <nav className="tabs laboratory-tabs" aria-label="Gestão do laboratório"><button type="button" className={section === 'members' ? 'selected' : ''} aria-current={section === 'members' ? 'page' : undefined} onClick={() => { setSection('members'); setEditingParticipation(null); }}>Membros <span>{members.length}</span></button><button type="button" className={section === 'settings' ? 'selected' : ''} aria-current={section === 'settings' ? 'page' : undefined} onClick={() => { setSection('settings'); setEditingParticipation(null); }}>Configurações</button></nav>
+                {section === 'members' ? <section className="members-section" aria-labelledby="members-title">
+                  <div className="members-toolbar"><div><h2 id="members-title">Membros do laboratório</h2><p>{members.length} {members.length === 1 ? 'participante ativo' : 'participantes ativos'}</p></div><label className="members-search"><Search size={16} aria-hidden="true" /><span className="sr-only">Buscar membro por nome ou e-mail</span><input type="search" value={memberQuery} onChange={event => setMemberQuery(event.target.value)} placeholder="Buscar membro" /></label></div>
+                  <div className="members-table-wrap"><table className="members-table"><thead><tr><th scope="col">Nome</th><th scope="col">E-mail</th><th scope="col">Papéis</th>{admin && <th scope="col"><span className="sr-only">Ações</span></th>}</tr></thead><tbody>
+                    {visibleMembers.map(participation => <MemberRows key={participation.id} participation={participation} isMe={isCurrentUser(participation, user.email)} admin={!!admin} readOnly={currentLab.estado === 'DESATIVADO'} editing={editingParticipation === participation.id} roles={rolesDraft} saving={savingRoles} onEdit={() => beginRoleEdit(participation)} onRoles={setRolesDraft} onSave={event => void saveRoles(event, participation)} onCancel={() => setEditingParticipation(null)} onRemove={() => setConfirmation({ kind: 'remove', participation })} />)}
+                  </tbody></table>
+                    {!visibleMembers.length && <div className="members-empty"><p>{memberQuery ? 'Nenhum membro encontrado.' : 'Não há membros ativos neste laboratório.'}</p>{memberQuery && <button className="text-button" type="button" onClick={() => setMemberQuery('')}>Limpar busca</button>}</div>}
+                  </div>
+                </section> : <section className="laboratory-settings" aria-labelledby="laboratory-settings-title">
+                  <div><h2 id="laboratory-settings-title">Dados do laboratório</h2><p>O laboratório faz parte da UFLA.</p></div>
+                  {admin ? <form className="laboratory-name-form" onSubmit={event => void saveLaboratoryName(event)}><label htmlFor="laboratory-name">Nome do laboratório</label><input id="laboratory-name" required maxLength={120} value={nameDraft} onChange={event => setNameDraft(event.target.value)} /><button className="button primary" type="submit" disabled={!nameDraft.trim() || savingName}>{savingName ? 'Salvando…' : 'Salvar nome'}</button></form>
+                    : <div className="laboratory-read-only-name"><span>Nome do laboratório</span><strong>{currentLab.nome}</strong>{currentLab.estado === 'DESATIVADO' && <p>Este laboratório está desativado e disponível somente para consulta.</p>}</div>}
+                </section>}
+                {currentLab.estado === 'ATIVO' && <section className="leave-laboratory" aria-labelledby="leave-title"><div><h2 id="leave-title">Sair do laboratório</h2><p>Sua participação será encerrada.</p></div><button className="button secondary" type="button" onClick={() => setConfirmation({ kind: 'leave' })}><LogOut size={16} aria-hidden="true" />Sair do laboratório</button></section>}
+              </>}
+        </>}
+    </div><footer className="labs-footer"><span>Laboratório de Citogenética · UFLA</span></footer></main>}
+
+    {createOpen && <CreateLaboratoryDialog name={createName} error={pageError} busy={creating} onName={setCreateName} onClose={() => { setCreateOpen(false); setPageError(''); }} onSubmit={event => void createLaboratory(event)} />}
+    {confirmation && <ConfirmationDialog confirmation={confirmation} busy={confirming} error={pageError} onClose={() => { setConfirmation(null); setPageError(''); }} onConfirm={() => void confirmMembershipChange()} />}
+  </div>;
+}
+
+function MemberRows({ participation, isMe, admin, readOnly, editing, roles, saving, onEdit, onRoles, onSave, onCancel, onRemove }: {
+  participation: ParticipacaoResponseDTO;
+  isMe: boolean;
+  admin: boolean;
+  readOnly: boolean;
+  editing: boolean;
+  roles: PapelLaboratorio[];
+  saving: boolean;
+  onEdit: () => void;
+  onRoles: (roles: PapelLaboratorio[]) => void;
+  onSave: (event: FormEvent<HTMLFormElement>) => void;
+  onCancel: () => void;
+  onRemove: () => void;
+}) {
+  const canManage = admin && !readOnly;
+  return <>
+    <tr className="members-table-row">
+      <td data-label="Nome"><div className="members-person"><span className="member-initial" aria-hidden="true">{participation.nome.charAt(0).toLocaleUpperCase('pt-BR')}</span><span><strong>{participation.nome}</strong>{isMe && <small>Você</small>}</span></div></td>
+      <td data-label="E-mail" className="members-email">{participation.email || 'E-mail indisponível'}</td>
+      <td data-label="Papéis"><div className="role-chips">{participation.papeis.map(role => <span className="role-chip" key={role}>{PAPEL_LABEL[role]}</span>)}</div></td>
+      {admin && <td data-label="Ações" className="members-actions-cell">{canManage && <div className="members-actions"><button className="text-button" type="button" aria-label={`Alterar papéis de ${participation.nome}`} onClick={onEdit}>Alterar papéis</button>{!isMe && <button className="text-button danger-text" type="button" aria-label={`Remover ${participation.nome} do laboratório`} onClick={onRemove}>Remover</button>}</div>}</td>}
+    </tr>
+    {editing && canManage && <tr className="members-edit-row"><td colSpan={admin ? 4 : 3}><form className="inline-role-editor" onSubmit={onSave}><RoleFields value={roles} onChange={onRoles} /><div className="dialog-actions"><button className="button secondary" type="button" onClick={onCancel}>Cancelar</button><button className="button primary" type="submit" disabled={saving}>{saving ? 'Salvando…' : 'Salvar papéis'}</button></div></form></td></tr>}
+  </>;
 }
