@@ -105,6 +105,46 @@
     text-underline-offset: 3px;
   }
 
+  .auth-secondary-button {
+    display: inline-flex;
+    align-items: center;
+    min-height: 44px;
+    width: fit-content;
+    padding: 0;
+    border: 0;
+    background: transparent;
+    color: var(--access-green);
+    font: inherit;
+    font-size: var(--fs-body);
+    font-weight: 600;
+    text-decoration: underline;
+    text-underline-offset: 3px;
+    cursor: pointer;
+  }
+
+  .auth-secondary-button:disabled { cursor: wait; opacity: .7; }
+
+  .recovery-code-input {
+    text-align: center;
+    font-size: 24px !important;
+    font-variant-numeric: tabular-nums;
+    letter-spacing: .32em;
+  }
+
+  .recovery-actions {
+    display: grid;
+    justify-items: start;
+    gap: 4px;
+    margin-top: 12px;
+  }
+
+  .recovery-step {
+    margin: 0 0 16px;
+    color: var(--access-muted);
+    font-size: var(--fs-caption);
+    line-height: var(--lh-caption);
+  }
+
   .auth-secondary-link {
     display: inline-flex;
     align-items: center;

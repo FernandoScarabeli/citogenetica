@@ -136,6 +136,7 @@ export function LoginPage() {
         {!submitting && !countdown && <ArrowRight size={17} aria-hidden="true"/>}
       </button>
     </form>
+    <p className="auth-switch"><Link to="/recuperar-senha">Esqueci a senha</Link></p>
     <p className="auth-switch">Ainda não tem uma conta? <Link to="/criar-conta">Criar conta</Link></p>
   </AuthLayout>;
 }

@@ -12,6 +12,7 @@ import { Slides } from '../Slides';
 import { LoginPage } from './LoginPage';
 import { CreateAccountPage } from './CreateAccountPage';
 import { ConfirmEmailPage } from './ConfirmEmailPage';
+import { RecoverPasswordPage } from './RecoverPasswordPage';
 import { prepareInitialConfirmationToken } from './confirmation-token';
 import { SessionProvider, isSessionNetworkError, useSession } from './SessionProvider';
 import { currentInternalPath } from './return-path';
@@ -77,6 +78,7 @@ function RouteTable() {
     <Route path="/entrar" element={<LoginPage/>}/>
     <Route path="/criar-conta" element={<CreateAccountPage/>}/>
     <Route path="/confirmar-email" element={<ConfirmEmailPage/>}/>
+    <Route path="/recuperar-senha" element={<RecoverPasswordPage/>}/>
     <Route element={<ProtectedRoutes/>}>
       <Route path="/app" element={<AuthenticatedApp/>}/>
       <Route path="/laboratorios" element={<AuthenticatedApp/>}/>
