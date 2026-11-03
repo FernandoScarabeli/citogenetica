@@ -1,5 +1,7 @@
 package br.ufla.citogenetica.service;
 
+import br.ufla.citogenetica.model.event.SessoesRevogadasEvent;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.session.FindByIndexNameSessionRepository;
 import org.springframework.session.Session;
 import org.springframework.stereotype.Service;
@@ -12,9 +14,12 @@ import java.util.Map;
 public class SessionRevocationService {
 
     private final FindByIndexNameSessionRepository<? extends Session> sessionRepository;
+    private final ApplicationEventPublisher eventPublisher;
 
-    public SessionRevocationService(FindByIndexNameSessionRepository<? extends Session> sessionRepository) {
+    public SessionRevocationService(FindByIndexNameSessionRepository<? extends Session> sessionRepository,
+                                    ApplicationEventPublisher eventPublisher) {
         this.sessionRepository = sessionRepository;
+        this.eventPublisher = eventPublisher;
     }
 
     @Transactional(propagation = Propagation.MANDATORY)
@@ -23,5 +28,7 @@ public class SessionRevocationService {
         sessoes.keySet().stream()
                 .filter(sessionId -> sessionIdMantido == null || !sessionIdMantido.equals(sessionId))
                 .forEach(sessionRepository::deleteById);
+        // Conexões abertas (SSE) dessas sessões são encerradas depois do commit.
+        eventPublisher.publishEvent(new SessoesRevogadasEvent(usuarioId, sessionIdMantido));
     }
 }

@@ -27,6 +27,9 @@ spring:
     driver-class-name: org.postgresql.Driver
 
   jpa:
+    # Sem Open Session In View: a conexão JDBC volta ao pool ao fim da transação, e não ao fim
+    # da requisição. Com ele ligado, cada stream SSE aberto prendia uma conexão até fechar.
+    open-in-view: false
     show-sql: true
     properties:
       hibernate:
@@ -75,6 +78,9 @@ api:
       reset:
         ip: ${API_SECURITY_RATE_LIMIT_RESET_IP:30}
         email: ${API_SECURITY_RATE_LIMIT_RESET_EMAIL:10}
+  sse:
+    max-connections-per-user: ${API_SSE_MAX_CONNECTIONS_PER_USER:5}
+    timeout: ${API_SSE_TIMEOUT:30m}
   frontend:
     url: ${API_FRONTEND_URL}
   email:

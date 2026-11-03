@@ -2,7 +2,7 @@ package br.ufla.citogenetica.service;
 
 import br.ufla.citogenetica.exception.NotFoundException;
 import br.ufla.citogenetica.mapper.NotificacaoMapper;
-import br.ufla.citogenetica.model.event.ServerEvent;
+import br.ufla.citogenetica.model.event.NotificacaoCriadaEvent;
 import br.ufla.citogenetica.model.notificacao.Notificacao;
 import br.ufla.citogenetica.model.notificacao.dto.NotificacaoResponseDTO;
 import br.ufla.citogenetica.model.type.TipoNotificacao;
@@ -11,6 +11,7 @@ import br.ufla.citogenetica.repository.NotificacaoRepository;
 import br.ufla.citogenetica.repository.UsuarioRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
@@ -33,7 +34,7 @@ public class NotificacaoService {
     private final NotificacaoRepository notificacaoRepository;
     private final UsuarioRepository usuarioRepository;
     private final NotificacaoMapper notificacaoMapper;
-    private final EventPublisherService eventPublisherService;
+    private final ApplicationEventPublisher eventPublisher;
 
     @Transactional
     public NotificacaoResponseDTO criar(Long destinatarioId, TipoNotificacao tipo, String titulo,
@@ -53,7 +54,8 @@ public class NotificacaoService {
         notificacao = notificacaoRepository.save(notificacao);
         NotificacaoResponseDTO responseDTO = notificacaoMapper.toResponseDTO(notificacao);
 
-        eventPublisherService.publish(new ServerEvent(responseDTO));
+        // O envio por SSE só acontece depois do commit (ver EventPublisherService).
+        eventPublisher.publishEvent(new NotificacaoCriadaEvent(destinatarioId, responseDTO));
 
         log.info("Notificação {} criada para o usuário {}", notificacao.getId(), destinatarioId);
         return responseDTO;
