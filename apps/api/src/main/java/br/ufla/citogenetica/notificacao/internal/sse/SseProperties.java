@@ -1,4 +1,4 @@
-package br.ufla.citogenetica.config.sse;
+package br.ufla.citogenetica.notificacao.internal.sse;
 
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;

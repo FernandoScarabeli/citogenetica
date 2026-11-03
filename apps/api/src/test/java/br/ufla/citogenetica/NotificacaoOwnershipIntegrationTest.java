@@ -1,15 +1,16 @@
 package br.ufla.citogenetica;
 
-import br.ufla.citogenetica.model.notificacao.dto.NotificacaoResponseDTO;
+import br.ufla.citogenetica.notificacao.internal.web.dto.response.NotificacaoResponseDTO;
 import br.ufla.citogenetica.usuario.internal.domain.Role;
 import br.ufla.citogenetica.usuario.api.RolesEnum;
 import br.ufla.citogenetica.usuario.internal.domain.StatusEnum;
-import br.ufla.citogenetica.model.type.TipoNotificacao;
+import br.ufla.citogenetica.notificacao.internal.domain.TipoNotificacao;
 import br.ufla.citogenetica.usuario.internal.domain.Usuario;
-import br.ufla.citogenetica.repository.NotificacaoRepository;
+import br.ufla.citogenetica.notificacao.internal.persistence.NotificacaoRepository;
 import br.ufla.citogenetica.usuario.internal.persistence.RoleRepository;
 import br.ufla.citogenetica.usuario.internal.persistence.UsuarioRepository;
-import br.ufla.citogenetica.service.NotificacaoService;
+import br.ufla.citogenetica.shared.web.error.NotFoundException;
+import br.ufla.citogenetica.notificacao.internal.application.NotificacaoService;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.persistence.EntityManager;
@@ -225,6 +226,14 @@ class NotificacaoOwnershipIntegrationTest extends AbstractIntegrationTest {
                 "SELECT usuario_id FROM notificacao WHERE id = ?", Long.class, criada.id()));
         requisicaoAutenticada(sessaoAlice, get("/api/v1/notificacoes"))
                 .andExpect(jsonPath("$.content", hasSize(0)));
+    }
+
+    @Test
+    void criarParaUsuarioInexistenteDeveManterARespostaAnterior() {
+        NotFoundException excecao = assertThrows(NotFoundException.class, () -> notificacaoService.criar(
+                Long.MAX_VALUE, TipoNotificacao.INFO, "sem destinatário", null, null));
+
+        assertEquals("Usuario não encontrado com o id: " + Long.MAX_VALUE, excecao.getMessage());
     }
 
     @Test

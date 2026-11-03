@@ -1,7 +1,7 @@
-package br.ufla.citogenetica.mapper;
+package br.ufla.citogenetica.notificacao.internal.mapper;
 
-import br.ufla.citogenetica.model.notificacao.Notificacao;
-import br.ufla.citogenetica.model.notificacao.dto.NotificacaoResponseDTO;
+import br.ufla.citogenetica.notificacao.internal.domain.Notificacao;
+import br.ufla.citogenetica.notificacao.internal.web.dto.response.NotificacaoResponseDTO;
 import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
 

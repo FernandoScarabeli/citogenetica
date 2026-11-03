@@ -1,6 +1,6 @@
-package br.ufla.citogenetica.model.notificacao.dto;
+package br.ufla.citogenetica.notificacao.internal.web.dto.response;
 
-import br.ufla.citogenetica.model.type.TipoNotificacao;
+import br.ufla.citogenetica.notificacao.internal.domain.TipoNotificacao;
 
 import java.time.LocalDateTime;
 import java.util.Map;

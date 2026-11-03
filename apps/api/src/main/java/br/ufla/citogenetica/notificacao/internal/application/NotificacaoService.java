@@ -1,14 +1,13 @@
-package br.ufla.citogenetica.service;
+package br.ufla.citogenetica.notificacao.internal.application;
 
 import br.ufla.citogenetica.shared.web.error.NotFoundException;
-import br.ufla.citogenetica.mapper.NotificacaoMapper;
-import br.ufla.citogenetica.model.event.NotificacaoCriadaEvent;
-import br.ufla.citogenetica.model.notificacao.Notificacao;
-import br.ufla.citogenetica.model.notificacao.dto.NotificacaoResponseDTO;
-import br.ufla.citogenetica.model.type.TipoNotificacao;
-import br.ufla.citogenetica.usuario.internal.domain.Usuario;
-import br.ufla.citogenetica.repository.NotificacaoRepository;
-import br.ufla.citogenetica.usuario.internal.persistence.UsuarioRepository;
+import br.ufla.citogenetica.notificacao.internal.mapper.NotificacaoMapper;
+import br.ufla.citogenetica.notificacao.internal.domain.event.NotificacaoCriadaEvent;
+import br.ufla.citogenetica.notificacao.internal.domain.Notificacao;
+import br.ufla.citogenetica.notificacao.internal.web.dto.response.NotificacaoResponseDTO;
+import br.ufla.citogenetica.notificacao.internal.domain.TipoNotificacao;
+import br.ufla.citogenetica.notificacao.internal.persistence.NotificacaoRepository;
+import br.ufla.citogenetica.usuario.api.UsuarioExistenceQuery;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.ApplicationEventPublisher;
@@ -30,20 +29,22 @@ public class NotificacaoService {
 
     // Mesma mensagem para "não existe" e "é de outro usuário", para não revelar ids alheios.
     private static final String NOTIFICACAO_NAO_ENCONTRADA = "Notificação não encontrada.";
+    private static final String USUARIO_NAO_ENCONTRADO = "Usuario não encontrado com o id: ";
 
     private final NotificacaoRepository notificacaoRepository;
-    private final UsuarioRepository usuarioRepository;
+    private final UsuarioExistenceQuery usuarioExistenceQuery;
     private final NotificacaoMapper notificacaoMapper;
     private final ApplicationEventPublisher eventPublisher;
 
     @Transactional
     public NotificacaoResponseDTO criar(Long destinatarioId, TipoNotificacao tipo, String titulo,
                                         String mensagem, Map<String, Object> dados) {
-        Usuario destinatario = usuarioRepository.findById(destinatarioId)
-                .orElseThrow(() -> new NotFoundException(Usuario.class, destinatarioId));
+        if (!usuarioExistenceQuery.existsById(destinatarioId)) {
+            throw new NotFoundException(USUARIO_NAO_ENCONTRADO + destinatarioId);
+        }
 
         Notificacao notificacao = Notificacao.builder()
-                .destinatario(destinatario)
+                .destinatarioId(destinatarioId)
                 .tipo(tipo)
                 .titulo(titulo)
                 .mensagem(mensagem)

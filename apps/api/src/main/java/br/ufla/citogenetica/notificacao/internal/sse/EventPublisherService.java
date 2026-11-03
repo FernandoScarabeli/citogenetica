@@ -1,8 +1,7 @@
-package br.ufla.citogenetica.service;
+package br.ufla.citogenetica.notificacao.internal.sse;
 
-import br.ufla.citogenetica.config.sse.SseProperties;
-import br.ufla.citogenetica.model.event.NotificacaoCriadaEvent;
-import br.ufla.citogenetica.model.event.ServerEvent;
+import br.ufla.citogenetica.notificacao.internal.domain.event.NotificacaoCriadaEvent;
+import br.ufla.citogenetica.usuario.api.event.SessaoEncerradaEvent;
 import br.ufla.citogenetica.usuario.api.event.SessoesRevogadasEvent;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.scheduling.annotation.Scheduled;
@@ -83,9 +82,13 @@ public class EventPublisherService {
         encerrar(evento.usuarioId(), conexao -> !conexao.sessionId().equals(evento.sessionIdMantido()));
     }
 
-    /** Encerra as conexões abertas pela sessão informada (logout). */
-    public void encerrarSessao(Long usuarioId, String sessionId) {
-        encerrar(usuarioId, conexao -> conexao.sessionId().equals(sessionId));
+    /**
+     * Fecha somente os streams da sessão encerrada. No logout HTTP não há transação; nesse caso,
+     * o fallback síncrono fecha os streams antes de o SecurityContextLogoutHandler invalidar a sessão.
+     */
+    @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT, fallbackExecution = true)
+    public void aoEncerrarSessao(SessaoEncerradaEvent evento) {
+        encerrar(evento.usuarioId(), conexao -> conexao.sessionId().equals(evento.sessionId()));
     }
 
     /**

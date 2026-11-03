@@ -1,4 +1,4 @@
-package br.ufla.citogenetica.model.type;
+package br.ufla.citogenetica.notificacao.internal.domain;
 
 import lombok.Getter;
 import lombok.RequiredArgsConstructor;
