@@ -1,8 +1,11 @@
 package br.ufla.citogenetica.configuration.security;
 
 import br.ufla.citogenetica.model.error.dto.response.ErrorResponseDTO;
+import br.ufla.citogenetica.model.usuario.UsuarioPrincipal;
+import br.ufla.citogenetica.service.EventPublisherService;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.servlet.http.HttpServletResponse;
+import jakarta.servlet.http.HttpSession;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -106,7 +109,8 @@ public class SecurityConfiguration {
             CsrfTokenRepository csrfTokenRepository,
             SecurityContextRepository securityContextRepository,
             SpaCsrfTokenRequestHandler csrfTokenRequestHandler,
-            SessionUserValidationFilter sessionUserValidationFilter) throws Exception {
+            SessionUserValidationFilter sessionUserValidationFilter,
+            EventPublisherService eventPublisherService) throws Exception {
         return http
                 .csrf(csrf -> csrf
                         .csrfTokenRepository(csrfTokenRepository)
@@ -123,6 +127,14 @@ public class SecurityConfiguration {
                         .invalidateHttpSession(true)
                         .clearAuthentication(true)
                         .deleteCookies(SESSION_COOKIE_NAME)
+                        // Roda antes da invalidação da sessão: fecha os streams SSE abertos por ela.
+                        .addLogoutHandler((request, response, authentication) -> {
+                            HttpSession sessao = request.getSession(false);
+                            if (sessao != null && authentication != null
+                                    && authentication.getPrincipal() instanceof UsuarioPrincipal principal) {
+                                eventPublisherService.encerrarSessao(principal.id(), sessao.getId());
+                            }
+                        })
                         .logoutSuccessHandler((request, response, authentication) ->
                                 response.setStatus(HttpServletResponse.SC_NO_CONTENT)))
                 .exceptionHandling(exceptions -> exceptions
