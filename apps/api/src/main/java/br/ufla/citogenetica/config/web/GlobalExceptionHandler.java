@@ -2,6 +2,7 @@ package br.ufla.citogenetica.config.web;
 
 import br.ufla.citogenetica.shared.web.error.NotFoundException;
 import br.ufla.citogenetica.shared.filter.FiltroInvalidoException;
+import br.ufla.citogenetica.shared.web.error.BadRequestException;
 import br.ufla.citogenetica.shared.web.error.BusinessException;
 import br.ufla.citogenetica.shared.web.error.ConflictException;
 import br.ufla.citogenetica.shared.web.error.ErrorResponseDTO;
@@ -142,6 +143,14 @@ public class GlobalExceptionHandler {
                 request.getRequestURI()
         );
         return new ResponseEntity<>(errorResponse, HttpStatus.CONFLICT);
+    }
+
+    @ExceptionHandler(BadRequestException.class)
+    public ResponseEntity<ErrorResponseDTO> handleBadRequestException(BadRequestException ex, HttpServletRequest request) {
+        ErrorResponseDTO errorResponse = new ErrorResponseDTO(
+                HttpStatus.BAD_REQUEST.value(), HttpStatus.BAD_REQUEST.getReasonPhrase(),
+                ex.getMessage(), request.getRequestURI());
+        return new ResponseEntity<>(errorResponse, HttpStatus.BAD_REQUEST);
     }
 
     @ExceptionHandler(ConflictException.class)

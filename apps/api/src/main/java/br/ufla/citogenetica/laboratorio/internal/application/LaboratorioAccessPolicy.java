@@ -49,16 +49,7 @@ public class LaboratorioAccessPolicy {
         return laboratorio;
     }
 
-    /** Bloqueia o laboratório para operações de aceite em que o destinatário ainda não é membro. */
-    public Laboratorio bloquearLaboratorioAtivo(UUID laboratorioId) {
-        Laboratorio laboratorio = bloquearLaboratorio(laboratorioId);
-        if (laboratorio.getEstado() != EstadoLaboratorio.ATIVO) {
-            throw new ConflictException(CONFLITO_GENERICO);
-        }
-        return laboratorio;
-    }
-
-    /** Obtém o lock do laboratório sem exigir que ele esteja ativo, para recusa ou revogação. */
+    /** Obtém o lock do laboratório sem exigir que ele esteja ativo; o chamador decide como tratar o estado. */
     public Laboratorio bloquearLaboratorio(UUID laboratorioId) {
         return laboratorioRepository.findByIdForUpdate(laboratorioId)
                 .orElseThrow(() -> new NotFoundException(NAO_ENCONTRADO));

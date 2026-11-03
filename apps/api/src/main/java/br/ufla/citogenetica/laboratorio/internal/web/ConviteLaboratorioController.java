@@ -35,7 +35,7 @@ public class ConviteLaboratorioController {
     @ApiResponses({
             @ApiResponse(responseCode = "204", description = "Convite aceito e participação criada ou reaproveitada"),
             @ApiResponse(responseCode = "401", description = "Sessão ausente ou conta não habilitada"),
-            @ApiResponse(responseCode = "409", description = "Convite inválido, expirado ou indisponível"),
+            @ApiResponse(responseCode = "400", description = "Convite inválido, expirado ou indisponível (resposta genérica)"),
             @ApiResponse(responseCode = "429", description = "Limite de tentativas atingido")
     })
     public ResponseEntity<Void> aceitar(@RequestBody @Valid ConsumirConviteRequestDTO request,
@@ -51,7 +51,7 @@ public class ConviteLaboratorioController {
     @ApiResponses({
             @ApiResponse(responseCode = "204", description = "Convite recusado"),
             @ApiResponse(responseCode = "401", description = "Sessão ausente ou conta não habilitada"),
-            @ApiResponse(responseCode = "409", description = "Convite inválido, expirado ou indisponível"),
+            @ApiResponse(responseCode = "400", description = "Convite inválido, expirado ou indisponível (resposta genérica)"),
             @ApiResponse(responseCode = "429", description = "Limite de tentativas atingido")
     })
     public ResponseEntity<Void> recusar(@RequestBody @Valid ConsumirConviteRequestDTO request,

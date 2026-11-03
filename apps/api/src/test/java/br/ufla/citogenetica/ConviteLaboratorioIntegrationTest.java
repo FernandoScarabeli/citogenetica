@@ -185,7 +185,7 @@ class ConviteLaboratorioIntegrationTest extends AbstractIntegrationTest {
         String token = tokenDoEmail(destinatario.getEmail(), "Convite para participar de um laboratório — Citogenética UFLA");
 
         consumir(login(outraPessoa), "/aceitar", token, novoIp())
-                .andExpect(status().isConflict())
+                .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.message").value("Convite inválido ou indisponível."));
         assertTrue(participacaoRepository
                 .findByLaboratorioIdAndUsuarioIdAndEstado(laboratorioId, outraPessoa.getId(), EstadoParticipacao.ATIVA)
@@ -223,17 +223,17 @@ class ConviteLaboratorioIntegrationTest extends AbstractIntegrationTest {
         UUID conviteId = conviteId(laboratorioId);
         jdbcTemplate.update("UPDATE convite_laboratorio SET expires_at = ? WHERE id = ?",
                 java.sql.Timestamp.from(Instant.now().minusSeconds(5)), conviteId);
-        consumir(sessaoDestinatario, "/aceitar", tokenExpirado, novoIp()).andExpect(status().isConflict());
+        consumir(sessaoDestinatario, "/aceitar", tokenExpirado, novoIp()).andExpect(status().isBadRequest());
 
         requisicaoAutenticada(sessaoAdmin, post("/api/v1/laboratorios/{id}/convites/{convite}/reenviar", laboratorioId, conviteId))
                 .andExpect(status().isOk());
         String tokenSubstituido = tokenExpirado;
         String tokenAtual = tokenDoEmail(destinatario.getEmail(), "Convite para participar de um laboratório — Citogenética UFLA", 2);
-        consumir(sessaoDestinatario, "/aceitar", tokenSubstituido, novoIp()).andExpect(status().isConflict());
+        consumir(sessaoDestinatario, "/aceitar", tokenSubstituido, novoIp()).andExpect(status().isBadRequest());
 
         requisicaoAutenticada(sessaoAdmin, delete("/api/v1/laboratorios/{id}/convites/{convite}", laboratorioId, conviteId))
                 .andExpect(status().isNoContent());
-        consumir(sessaoDestinatario, "/aceitar", tokenAtual, novoIp()).andExpect(status().isConflict());
+        consumir(sessaoDestinatario, "/aceitar", tokenAtual, novoIp()).andExpect(status().isBadRequest());
         assertTrue(participacaoRepository
                 .findByLaboratorioIdAndUsuarioIdAndEstado(laboratorioId, destinatario.getId(), EstadoParticipacao.ATIVA)
                 .isEmpty());
@@ -249,7 +249,7 @@ class ConviteLaboratorioIntegrationTest extends AbstractIntegrationTest {
         Cookie sessaoDestinatario = login(destinatario);
 
         consumir(sessaoDestinatario, "/aceitar", tokenAceito, novoIp()).andExpect(status().isNoContent());
-        consumir(sessaoDestinatario, "/aceitar", tokenAceito, novoIp()).andExpect(status().isConflict());
+        consumir(sessaoDestinatario, "/aceitar", tokenAceito, novoIp()).andExpect(status().isBadRequest());
 
         Usuario outroAdmin = criarUsuario("outro-admin");
         UUID segundoLab = criarLaboratorio(outroAdmin, "Recusa");
@@ -346,7 +346,9 @@ class ConviteLaboratorioIntegrationTest extends AbstractIntegrationTest {
         requisicaoAutenticada(login(adminGlobal), patch("/api/v1/admin/laboratorios/{id}/desativar", laboratorioId))
                 .andExpect(status().isNoContent());
 
-        consumir(login(destinatario), "/aceitar", token, novoIp()).andExpect(status().isConflict());
+        consumir(login(destinatario), "/aceitar", token, novoIp())
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message").value("Convite inválido ou indisponível."));
         UUID conviteId = conviteId(laboratorioId);
         requisicaoAutenticada(sessaoAdmin, post("/api/v1/laboratorios/{id}/convites/{convite}/reenviar",
                         laboratorioId, conviteId))
@@ -408,9 +410,9 @@ class ConviteLaboratorioIntegrationTest extends AbstractIntegrationTest {
                 .andExpect(header().exists("Retry-After"));
 
         consumir(login(destinatario), "/aceitar", "token-invalido-a", "203.0.113.40")
-                .andExpect(status().isConflict());
+                .andExpect(status().isBadRequest());
         consumir(login(destinatario), "/aceitar", "token-invalido-b", "203.0.113.40")
-                .andExpect(status().isConflict());
+                .andExpect(status().isBadRequest());
         consumir(login(destinatario), "/aceitar", "token-invalido-c", "203.0.113.40")
                 .andExpect(status().isTooManyRequests())
                 .andExpect(header().exists("Retry-After"));

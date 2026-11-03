@@ -8,10 +8,12 @@ import java.util.EnumSet;
 import java.util.List;
 import java.util.Set;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 import br.ufla.citogenetica.laboratorio.api.event.ConviteLaboratorioCriadoEvent;
 import br.ufla.citogenetica.laboratorio.internal.domain.ConviteLaboratorio;
 import br.ufla.citogenetica.laboratorio.internal.domain.EstadoConviteLaboratorio;
+import br.ufla.citogenetica.laboratorio.internal.domain.EstadoLaboratorio;
 import br.ufla.citogenetica.laboratorio.internal.domain.EstadoParticipacao;
 import br.ufla.citogenetica.laboratorio.internal.domain.Laboratorio;
 import br.ufla.citogenetica.laboratorio.internal.domain.PapelLaboratorio;
@@ -19,6 +21,7 @@ import br.ufla.citogenetica.laboratorio.internal.domain.Participacao;
 import br.ufla.citogenetica.laboratorio.internal.persistence.ConviteLaboratorioRepository;
 import br.ufla.citogenetica.laboratorio.internal.persistence.ParticipacaoRepository;
 import br.ufla.citogenetica.shared.persistence.UuidFactory;
+import br.ufla.citogenetica.shared.web.error.BadRequestException;
 import br.ufla.citogenetica.shared.web.error.ConflictException;
 import br.ufla.citogenetica.shared.web.error.NotFoundException;
 import br.ufla.citogenetica.usuario.api.UsuarioConviteInfo;
@@ -162,10 +165,14 @@ public class ConviteLaboratorioService {
         limitarConsumo(usuarioId, enderecoIp);
         byte[] hash = tokenService.hash(token);
         ConviteLaboratorio referencia = buscarPorToken(hash);
-        Laboratorio laboratorio = accessPolicy.bloquearLaboratorioAtivo(referencia.getLaboratorio().getId());
+        Laboratorio laboratorio = accessPolicy.bloquearLaboratorio(referencia.getLaboratorio().getId());
         ConviteLaboratorio convite = buscarConviteBloqueado(referencia.getLaboratorio().getId(), referencia.getId());
         validarTokenPendente(convite, hash);
         validarDestinatario(convite.getEmailDestino(), usuarioId, emailSessao);
+        // Verificado só depois do token e do destinatário: a resposta genérica não revela o estado do laboratório.
+        if (laboratorio.getEstado() != EstadoLaboratorio.ATIVO) {
+            throw new BadRequestException(CONVITE_INDISPONIVEL);
+        }
 
         EnumSet<PapelLaboratorio> papeis = papeisConcedidos(convite);
         Participacao participacao = participacaoConviteService.garantirParticipacaoAtiva(
@@ -194,10 +201,10 @@ public class ConviteLaboratorioService {
 
     private ConviteLaboratorio buscarPorToken(byte[] hash) {
         if (hash == null) {
-            throw new ConflictException(CONVITE_INDISPONIVEL);
+            throw new BadRequestException(CONVITE_INDISPONIVEL);
         }
         return conviteRepository.findByTokenHash(hash)
-                .orElseThrow(() -> new ConflictException(CONVITE_INDISPONIVEL));
+                .orElseThrow(() -> new BadRequestException(CONVITE_INDISPONIVEL));
     }
 
     private ConviteLaboratorio buscarConviteBloqueado(UUID laboratorioId, UUID conviteId) {
@@ -214,19 +221,19 @@ public class ConviteLaboratorioService {
         if (convite.getEstado() != EstadoConviteLaboratorio.PENDENTE
                 || !tokenService.iguais(convite.getTokenHash(), hashRecebido)
                 || !convite.getExpiraEm().isAfter(clock.instant())) {
-            throw new ConflictException(CONVITE_INDISPONIVEL);
+            throw new BadRequestException(CONVITE_INDISPONIVEL);
         }
     }
 
     private void validarDestinatario(String emailDestino, Long usuarioId, String emailSessao) {
         String emailNormalizadoSessao = usuarioConviteQuery.normalizarEmail(emailSessao);
         if (!emailDestino.equals(emailNormalizadoSessao)) {
-            throw new ConflictException(CONVITE_INDISPONIVEL);
+            throw new BadRequestException(CONVITE_INDISPONIVEL);
         }
         UsuarioConviteInfo destinatario = usuarioConviteQuery.bloquearPorEmailNormalizado(emailDestino)
-                .orElseThrow(() -> new ConflictException(CONVITE_INDISPONIVEL));
+                .orElseThrow(() -> new BadRequestException(CONVITE_INDISPONIVEL));
         if (!destinatario.usuarioId().equals(usuarioId) || !destinatario.ativo() || !destinatario.emailConfirmado()) {
-            throw new ConflictException(CONVITE_INDISPONIVEL);
+            throw new BadRequestException(CONVITE_INDISPONIVEL);
         }
     }
 
@@ -245,7 +252,7 @@ public class ConviteLaboratorioService {
         Set<String> papeis = papeisConcedidos(convite).stream()
                 .sorted(Comparator.comparing(PapelLaboratorio::name))
                 .map(Enum::name)
-                .collect(java.util.stream.Collectors.toUnmodifiableSet());
+                .collect(Collectors.toUnmodifiableSet());
         eventPublisher.publishEvent(new ConviteLaboratorioCriadoEvent(convite.getId(), laboratorio.getId(),
                 convite.getConvidadoPorUsuarioId(), laboratorio.getNome(), convite.getEmailDestino(), papeis));
 
