@@ -1,6 +1,6 @@
 let preparedToken: string | null | undefined;
 let preparedUrl: string | undefined;
-const tokenPaths = new Set(['/confirmar-email', '/confirmar-troca-email', '/convites/aceitar']);
+const tokenPaths = new Set(['/confirmar-email', '/confirmar-troca-email', '/convites/aceitar', '/orientacoes/convites/aceitar']);
 
 function readAndRemoveToken(): string | null {
   const token = new URLSearchParams(window.location.hash.slice(1)).get('token');

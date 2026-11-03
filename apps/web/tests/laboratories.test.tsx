@@ -17,9 +17,14 @@ const api = vi.hoisted(() => ({
   sair: vi.fn(),
 }));
 const invitationsApi = vi.hoisted(() => ({ criar: vi.fn(), listar: vi.fn(), reenviar: vi.fn(), revogar: vi.fn(), aceitar: vi.fn(), recusar: vi.fn() }));
+const orientationApi = vi.hoisted(() => ({
+  listarVinculos: vi.fn(), encerrarVinculo: vi.fn(), criarConvite: vi.fn(), listarConvites: vi.fn(),
+  reenviarConvite: vi.fn(), cancelarConvite: vi.fn(), aceitarConvite: vi.fn(), recusarConvite: vi.fn(),
+}));
 
 vi.mock('../src/api/laboratorio-api', () => ({ laboratorioApi: api }));
 vi.mock('../src/api/convite-api', () => ({ conviteApi: invitationsApi }));
+vi.mock('../src/api/orientacao-api', () => ({ orientacaoApi: orientationApi }));
 
 import { Laboratories } from '../src/Laboratories';
 import { Slides } from '../src/Slides';
@@ -121,6 +126,15 @@ beforeEach(() => {
   invitationsApi.listar.mockResolvedValue([PENDING_INVITATION]);
   invitationsApi.reenviar.mockResolvedValue({ ...PENDING_INVITATION, expiraEm: '2026-11-17T18:30:00Z' });
   invitationsApi.revogar.mockResolvedValue(undefined);
+  orientationApi.listarVinculos.mockResolvedValue([{
+    id: 'vinculo-1', laboratorioId: ACTIVE_LAB.id, orientadorUsuarioId: 44, nomeOrientador: 'Bruna Almeida',
+    pesquisadorUsuarioId: USER.id, nomePesquisador: USER.nome, criadoEm: '2026-10-20T12:00:00Z',
+  }]);
+  orientationApi.listarConvites.mockResolvedValue([]);
+  orientationApi.encerrarVinculo.mockResolvedValue(undefined);
+  orientationApi.criarConvite.mockResolvedValue(undefined);
+  orientationApi.reenviarConvite.mockResolvedValue(undefined);
+  orientationApi.cancelarConvite.mockResolvedValue(undefined);
   window.history.replaceState(null, '', '/laboratorios');
 });
 
@@ -224,6 +238,21 @@ describe('gestão de laboratórios reais', () => {
     expect(invitationsApi.listar).not.toHaveBeenCalled();
   });
 
+  it('abre a seção de orientação usando os vínculos visíveis que a API retorna', async () => {
+    const memberOnlyLab = { ...ACTIVE_LAB, papeis: ['MEMBRO'] as const };
+    api.listarMeus.mockResolvedValue([memberOnlyLab]);
+    api.buscar.mockResolvedValue(memberOnlyLab);
+    const user = userEvent.setup();
+    renderPage();
+    await openLaboratoryManagement(user);
+    await user.click(screen.getByRole('button', { name: 'Orientação' }));
+
+    expect(await screen.findByRole('heading', { name: 'Vínculos ativos' })).toBeTruthy();
+    expect(screen.getByText('Bruna Almeida')).toBeTruthy();
+    expect(orientationApi.listarVinculos).toHaveBeenCalledWith(ACTIVE_LAB.id, expect.any(AbortSignal));
+    expect(orientationApi.listarConvites).not.toHaveBeenCalled();
+  });
+
   it('trata respostas 403 e 404 ao consultar convites', async () => {
     const user = userEvent.setup();
     invitationsApi.listar.mockRejectedValueOnce(apiError(403, 'Acesso negado.'));
@@ -315,7 +344,7 @@ describe('gestão de laboratórios reais', () => {
     await user.click(screen.getByRole('checkbox', { name: /Orientador/ }));
     await user.click(screen.getByRole('button', { name: 'Salvar papéis' }));
 
-    expect(await screen.findByText(/Não é possível remover o papel de Orientador enquanto houver vínculo de orientação ativo/)).toBeTruthy();
+    expect(await screen.findByText(/Não foi possível remover o papel Orientador. Encerre todos os vínculos ativos dessa pessoa/)).toBeTruthy();
   });
 
   it('explica o conflito do último administrador ao alterar papéis e ao sair', async () => {
