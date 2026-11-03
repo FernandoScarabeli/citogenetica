@@ -3,6 +3,7 @@ package br.ufla.citogenetica.notificacao.internal.application;
 import java.util.Map;
 
 import br.ufla.citogenetica.laboratorio.api.event.ConviteLaboratorioCriadoEvent;
+import br.ufla.citogenetica.laboratorio.api.event.ConviteOrientacaoCriadoEvent;
 import br.ufla.citogenetica.notificacao.internal.domain.TipoNotificacao;
 import br.ufla.citogenetica.usuario.api.UsuarioConviteInfo;
 import br.ufla.citogenetica.usuario.api.UsuarioConviteQuery;
@@ -25,21 +26,34 @@ public class ConviteLaboratorioNotificationListener {
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void aoCriarConvite(ConviteLaboratorioCriadoEvent evento) {
+        notificar(evento.emailDestino(), evento.conviteId(), "Convite para laboratório",
+                "Você recebeu um convite para o laboratório “" + evento.laboratorioNome() + "”.",
+                Map.of("conviteId", evento.conviteId().toString(),
+                        "laboratorioId", evento.laboratorioId().toString(),
+                        "papeis", evento.papeis()));
+    }
+
+    @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    public void aoCriarConviteOrientacao(ConviteOrientacaoCriadoEvent evento) {
+        notificar(evento.emailDestino(), evento.conviteId(), "Convite de orientação",
+                "Você recebeu um convite de orientação no laboratório “" + evento.laboratorioNome() + "”.",
+                Map.of("conviteId", evento.conviteId().toString(),
+                        "laboratorioId", evento.laboratorioId().toString()));
+    }
+
+    private void notificar(String emailDestino, java.util.UUID conviteId, String titulo,
+                           String descricao, Map<String, Object> dados) {
         UsuarioConviteInfo destinatario = usuarioConviteQuery
-                .buscarPorEmailNormalizado(evento.emailDestino()).orElse(null);
+                .buscarPorEmailNormalizado(emailDestino).orElse(null);
         if (destinatario == null) {
             return;
         }
 
         try {
-            notificacaoService.criar(destinatario.usuarioId(), TipoNotificacao.INFO,
-                    "Convite para laboratório",
-                    "Você recebeu um convite para o laboratório “" + evento.laboratorioNome() + "”.",
-                    Map.of("conviteId", evento.conviteId().toString(),
-                            "laboratorioId", evento.laboratorioId().toString(),
-                            "papeis", evento.papeis()));
+            notificacaoService.criar(destinatario.usuarioId(), TipoNotificacao.INFO, titulo, descricao, dados);
         } catch (RuntimeException exception) {
-            log.warn("Não foi possível criar a notificação do convite {}.", evento.conviteId());
+            log.warn("Não foi possível criar a notificação do convite {}.", conviteId);
         }
     }
 }

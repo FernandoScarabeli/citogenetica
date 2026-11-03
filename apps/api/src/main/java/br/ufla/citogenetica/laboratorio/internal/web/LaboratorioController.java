@@ -124,7 +124,7 @@ public class LaboratorioController {
             @ApiResponse(responseCode = "400", description = "UUID ou papéis inválidos"),
             @ApiResponse(responseCode = "403", description = "Participante sem papel de administrador"),
             @ApiResponse(responseCode = "404", description = "Laboratório ou participação não encontrado"),
-            @ApiResponse(responseCode = "409", description = "Versão obsoleta ou último administrador")
+            @ApiResponse(responseCode = "409", description = "Versão obsoleta, último administrador ou ORIENTADOR com vínculo ativo")
     })
     public ResponseEntity<ParticipacaoResponseDTO> alterarPapeis(
             @PathVariable @CanonicalUuidV4 String laboratorioId,

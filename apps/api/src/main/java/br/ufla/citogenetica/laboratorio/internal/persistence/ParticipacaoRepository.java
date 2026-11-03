@@ -17,6 +17,8 @@ public interface ParticipacaoRepository extends JpaRepository<Participacao, UUID
     Optional<Participacao> findByLaboratorioIdAndUsuarioIdAndEstado(
             UUID laboratorioId, Long usuarioId, EstadoParticipacao estado);
 
+    boolean existsByLaboratorioIdAndUsuarioId(UUID laboratorioId, Long usuarioId);
+
     boolean existsByLaboratorioIdAndUsuarioIdAndEstado(
             UUID laboratorioId, Long usuarioId, EstadoParticipacao estado);
 

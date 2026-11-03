@@ -43,4 +43,25 @@ public class ConviteLaboratorioCleanupService {
                  WHERE convite.id = vencidos.id
                 """, agora, properties.cleanupBatchSize(), agora);
     }
+
+    @Scheduled(fixedDelayString = "${api.security.laboratory-invitations.cleanup-interval-ms}")
+    @Transactional
+    public int expirarConvitesOrientacaoVencidos() {
+        Timestamp agora = Timestamp.from(clock.instant());
+        return jdbcTemplate.update("""
+                WITH vencidos AS (
+                    SELECT id
+                      FROM convite_orientacao
+                     WHERE estado = 'PENDENTE' AND expires_at <= ?
+                     ORDER BY expires_at, id
+                     LIMIT ?
+                     FOR UPDATE SKIP LOCKED
+                )
+                UPDATE convite_orientacao convite
+                   SET estado = 'EXPIRADO', token_hash = NULL,
+                       version = version + 1, last_modified_at = ?
+                  FROM vencidos
+                 WHERE convite.id = vencidos.id
+                """, agora, properties.cleanupBatchSize(), agora);
+    }
 }
