@@ -310,6 +310,44 @@ test('401 aciona o assinante e os helpers identificam os status HTTP', async () 
   }
 });
 
+test('cadastro e confirmação usam os endpoints e payloads definidos pelo backend', async () => {
+  setCookie('XSRF-TOKEN=csrf-token');
+  const calls = [];
+  const client = createHttpClient({
+    fetch: async (path, init) => {
+      calls.push({ path, method: init.method, body: init.body ? JSON.parse(init.body) : undefined });
+      return response(path.endsWith('/register') || path.endsWith('/reenviar-confirmacao') ? 202 : 204);
+    },
+  });
+
+  try {
+    const auth = createAuthApi(client);
+    await auth.register({ nome: 'Ana', email: 'ana@ufla.br', senha: 'AmostraSegura-783!' });
+    await auth.resendEmailConfirmation('ana@ufla.br');
+    await auth.confirmEmail('token-de-confirmacao');
+
+    assert.deepEqual(calls, [
+      {
+        path: '/api/v1/auth/register',
+        method: 'POST',
+        body: { nome: 'Ana', email: 'ana@ufla.br', senha: 'AmostraSegura-783!' },
+      },
+      {
+        path: '/api/v1/auth/reenviar-confirmacao',
+        method: 'POST',
+        body: { email: 'ana@ufla.br' },
+      },
+      {
+        path: '/api/v1/auth/confirmar-email',
+        method: 'POST',
+        body: { token: 'token-de-confirmacao' },
+      },
+    ]);
+  } finally {
+    clearCookie();
+  }
+});
+
 test('separa falha de rede de abort solicitado pelo chamador', async () => {
   setCookie('XSRF-TOKEN=token');
   const networkClient = createHttpClient({ fetch: async () => { throw new TypeError('offline'); } });
