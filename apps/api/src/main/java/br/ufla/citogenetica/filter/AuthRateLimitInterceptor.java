@@ -1,0 +1,44 @@
+package br.ufla.citogenetica.filter;
+
+import br.ufla.citogenetica.service.AuthRateLimitRoute;
+import br.ufla.citogenetica.service.RateLimitService;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
+import org.springframework.http.HttpMethod;
+import org.springframework.stereotype.Component;
+import org.springframework.web.servlet.HandlerInterceptor;
+
+@Component
+public class AuthRateLimitInterceptor implements HandlerInterceptor {
+
+    private final RateLimitService rateLimitService;
+
+    public AuthRateLimitInterceptor(RateLimitService rateLimitService) {
+        this.rateLimitService = rateLimitService;
+    }
+
+    @Override
+    public boolean preHandle(HttpServletRequest request, HttpServletResponse response, Object handler) {
+        if (!HttpMethod.POST.matches(request.getMethod())) {
+            return true;
+        }
+
+        AuthRateLimitRoute route = routeFor(request.getRequestURI());
+        if (route == null) {
+            return true;
+        }
+
+        rateLimitService.enforceIp(route, request.getRemoteAddr());
+        return true;
+    }
+
+    private AuthRateLimitRoute routeFor(String path) {
+        return switch (path) {
+            case "/api/v1/auth/login" -> AuthRateLimitRoute.LOGIN;
+            case "/api/v1/auth/recuperar-senha" -> AuthRateLimitRoute.RECOVERY_REQUEST;
+            case "/api/v1/auth/validar-codigo" -> AuthRateLimitRoute.VALIDATE_RECOVERY;
+            case "/api/v1/auth/redefinir-senha" -> AuthRateLimitRoute.RESET_PASSWORD;
+            default -> null;
+        };
+    }
+}

@@ -33,7 +33,9 @@ Na raiz do repositório, gere as configurações locais e inicie os serviços:
 docker compose up -d --build
 ```
 
-O script gera um `.env` com segredos aleatórios e não sobrescreve um arquivo existente. As portas padrão abaixo vêm do `.env.example`; elas podem ser alteradas no `.env`.
+O script gera um `.env` com segredos aleatórios e não sobrescreve um arquivo existente. Se o `.env` já existe e faltam variáveis novas, use `./scripts/gerar-env.sh --add-missing`: o script acrescenta apenas chaves ausentes, gera somente os segredos ausentes e preserva o conteúdo existente. `./scripts/gerar-env.sh --force` substitui o arquivo inteiro. O script não imprime valores de configuração. As portas padrão abaixo vêm do `.env.example`; elas podem ser alteradas no `.env`.
+
+Por padrão, a API ignora cabeçalhos de IP encaminhado. Configure `API_SECURITY_TRUSTED_PROXY_REGEX` apenas com uma expressão regular que corresponda aos endereços dos proxies confiáveis; o Tomcat então aplica seu `RemoteIpValve`.
 
 | Serviço | Endereço local |
 | --- | --- |

@@ -3,6 +3,7 @@ package br.ufla.citogenetica.service;
 import br.ufla.citogenetica.exception.NotFoundException;
 import br.ufla.citogenetica.exception.ValidationConflictException;
 import br.ufla.citogenetica.mapper.UsuarioMapper;
+import br.ufla.citogenetica.model.usuario.EmailNormalizer;
 import br.ufla.citogenetica.model.type.RolesEnum;
 import br.ufla.citogenetica.model.type.StatusEnum;
 import br.ufla.citogenetica.model.usuario.Usuario;
@@ -58,12 +59,13 @@ public class UsuarioService {
 
         entidade.setNome(dto.nome());
 
-        if (!entidade.getEmail().equals(dto.email())) {
-            if (this.usuarioRepository.existsByEmail(dto.email())) {
+        String emailNormalizado = EmailNormalizer.normalize(dto.email());
+        if (!entidade.getEmail().equals(emailNormalizado)) {
+            if (this.usuarioRepository.existsByEmailIgnoreCaseAndIdNot(emailNormalizado, entidade.getId())) {
                 throw new ValidationConflictException("Já existe um usuário cadastrado com este e-mail.");
             }
 
-            entidade.setEmail(dto.email());
+            entidade.setEmail(emailNormalizado);
         }
 
         return this.usuarioRepository.save(entidade);

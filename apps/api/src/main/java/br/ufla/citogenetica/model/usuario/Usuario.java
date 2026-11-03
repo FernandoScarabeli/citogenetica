@@ -10,7 +10,6 @@ import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.userdetails.UserDetails;
 
-import java.time.LocalDateTime;
 import java.util.Collection;
 import java.util.Collections;
 
@@ -26,7 +25,7 @@ public class Usuario extends BaseEntity<Long> implements UserDetails {
     @Column(name = "nome", nullable = false, length = 100)
     private String nome;
 
-    @Column(name = "email", nullable = false, unique = true)
+    @Column(name = "email", nullable = false)
     private String email;
 
     @Column(name = "senha", nullable = false)
@@ -39,12 +38,6 @@ public class Usuario extends BaseEntity<Long> implements UserDetails {
     @ManyToOne(fetch = FetchType.EAGER)
     @JoinColumn(name = "role_id", nullable = false)
     private Role role;
-
-    @Column(length = 10)
-    private String tokenRecuperacaoSenha;
-
-    @Column(name = "data_expiracao_codigo")
-    private LocalDateTime dataExpiracaoCodigo;
 
     @Override
     public Collection<GrantedAuthority> getAuthorities() {
