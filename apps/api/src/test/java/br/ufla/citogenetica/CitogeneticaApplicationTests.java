@@ -60,6 +60,7 @@ class CitogeneticaApplicationTests extends AbstractIntegrationTest {
                 "/api/v1/auth/logout",
                 "/api/v1/auth/register",
                 "/api/v1/auth/confirmar-email",
+                "/api/v1/auth/confirmar-troca-email",
                 "/api/v1/auth/reenviar-confirmacao",
                 "/api/v1/auth/recuperar-senha",
                 "/api/v1/auth/redefinir-senha",
@@ -74,6 +75,7 @@ class CitogeneticaApplicationTests extends AbstractIntegrationTest {
                 "/api/v1/usuarios",
                 "/api/v1/usuarios/{id}",
                 "/api/v1/usuarios/me",
+                "/api/v1/usuarios/me/email",
                 "/api/v1/usuarios/me/senha");
     }
 }

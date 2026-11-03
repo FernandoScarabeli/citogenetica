@@ -67,6 +67,9 @@ api:
       cleanup-interval-ms: ${API_SECURITY_EMAIL_CONFIRMATION_CLEANUP_INTERVAL_MS:3600000}
       cleanup-batch-size: ${API_SECURITY_EMAIL_CONFIRMATION_CLEANUP_BATCH_SIZE:100}
       frontend-url: ${API_FRONTEND_EMAIL_CONFIRMATION_URL}
+    email-change-confirmation:
+      expiration-hours: ${API_SECURITY_EMAIL_CHANGE_CONFIRMATION_EXPIRATION_HOURS:24}
+      frontend-url: ${API_FRONTEND_EMAIL_CHANGE_CONFIRMATION_URL}
     rate-limit:
       window-minutes: ${API_SECURITY_RATE_LIMIT_WINDOW_MINUTES:15}
       cleanup-interval-ms: ${API_SECURITY_RATE_LIMIT_CLEANUP_INTERVAL_MS:3600000}
@@ -91,6 +94,12 @@ api:
       email-confirmation:
         ip: ${API_SECURITY_RATE_LIMIT_EMAIL_CONFIRMATION_IP:30}
         email: ${API_SECURITY_RATE_LIMIT_EMAIL_CONFIRMATION_EMAIL:10}
+      change-email:
+        ip: ${API_SECURITY_RATE_LIMIT_CHANGE_EMAIL_IP:10}
+        user: ${API_SECURITY_RATE_LIMIT_CHANGE_EMAIL_USER:5}
+      confirm-email-change:
+        ip: ${API_SECURITY_RATE_LIMIT_CONFIRM_EMAIL_CHANGE_IP:30}
+        user: ${API_SECURITY_RATE_LIMIT_CONFIRM_EMAIL_CHANGE_USER:10}
   sse:
     max-connections-per-user: ${API_SSE_MAX_CONNECTIONS_PER_USER:5}
     timeout: ${API_SSE_TIMEOUT:30m}

@@ -155,6 +155,7 @@ public class SecurityConfiguration {
                                 "/api/v1/auth/register",
                                 "/api/v1/auth/reenviar-confirmacao",
                                 "/api/v1/auth/confirmar-email",
+                                "/api/v1/auth/confirmar-troca-email",
                                 "/api/v1/auth/recuperar-senha",
                                 "/api/v1/auth/redefinir-senha",
                                 "/api/v1/auth/validar-codigo").permitAll()
@@ -166,6 +167,7 @@ public class SecurityConfiguration {
                         .requestMatchers(HttpMethod.GET, "/api/v1/usuarios/me").authenticated()
                         .requestMatchers(HttpMethod.PUT, "/api/v1/usuarios/me").authenticated()
                         .requestMatchers(HttpMethod.PUT, "/api/v1/usuarios/me/senha").authenticated()
+                        .requestMatchers(HttpMethod.POST, "/api/v1/usuarios/me/email").authenticated()
                         .requestMatchers("/api/v1/usuarios/**").hasRole("ADMIN")
                         .requestMatchers("/api/v1/exemplos/**").hasRole("ADMIN")
                         .anyRequest().authenticated())

@@ -18,8 +18,13 @@ public record RateLimitProperties(
         @NotNull @Valid Limits reset,
         @NotNull @Valid Limits register,
         @NotNull @Valid Limits resendConfirmation,
-        @NotNull @Valid Limits emailConfirmation) {
+        @NotNull @Valid Limits emailConfirmation,
+        @NotNull @Valid UserLimits changeEmail,
+        @NotNull @Valid UserLimits confirmEmailChange) {
 
     public record Limits(@Min(1) int ip, @Min(1) int email) {
+    }
+
+    public record UserLimits(@Min(1) int ip, @Min(1) int user) {
     }
 }

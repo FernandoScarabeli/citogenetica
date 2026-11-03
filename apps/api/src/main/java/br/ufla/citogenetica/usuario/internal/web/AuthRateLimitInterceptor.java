@@ -41,6 +41,8 @@ public class AuthRateLimitInterceptor implements HandlerInterceptor {
             case "/api/v1/auth/register" -> AuthRateLimitRoute.REGISTER;
             case "/api/v1/auth/reenviar-confirmacao" -> AuthRateLimitRoute.RESEND_CONFIRMATION;
             case "/api/v1/auth/confirmar-email" -> AuthRateLimitRoute.EMAIL_CONFIRMATION;
+            case "/api/v1/usuarios/me/email" -> AuthRateLimitRoute.CHANGE_EMAIL;
+            case "/api/v1/auth/confirmar-troca-email" -> AuthRateLimitRoute.CONFIRM_EMAIL_CHANGE;
             default -> null;
         };
     }

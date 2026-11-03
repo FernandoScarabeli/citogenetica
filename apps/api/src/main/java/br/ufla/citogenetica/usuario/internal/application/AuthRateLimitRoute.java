@@ -7,7 +7,9 @@ public enum AuthRateLimitRoute {
     RESET_PASSWORD("redefinir-senha"),
     REGISTER("register"),
     RESEND_CONFIRMATION("reenviar-confirmacao"),
-    EMAIL_CONFIRMATION("confirmar-email");
+    EMAIL_CONFIRMATION("confirmar-email"),
+    CHANGE_EMAIL("trocar-email"),
+    CONFIRM_EMAIL_CHANGE("confirmar-troca-email");
 
     private final String key;
 

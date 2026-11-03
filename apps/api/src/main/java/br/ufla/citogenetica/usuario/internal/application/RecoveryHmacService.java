@@ -14,6 +14,7 @@ public class RecoveryHmacService {
     private static final String RECOVERY_CODE_DOMAIN = "citogenetica:recuperacao-senha:v1";
     private static final String EMAIL_RATE_DOMAIN = "citogenetica:rate-limit:email:v1";
     private static final String IP_RATE_DOMAIN = "citogenetica:rate-limit:ip:v1";
+    private static final String USER_RATE_DOMAIN = "citogenetica:rate-limit:user:v1";
 
     private final byte[] secret;
 
@@ -31,6 +32,10 @@ public class RecoveryHmacService {
 
     public byte[] ipRateKey(String ipAddress) {
         return digest(IP_RATE_DOMAIN + ":" + ipAddress);
+    }
+
+    public byte[] userRateKey(String userId) {
+        return digest(USER_RATE_DOMAIN + ":" + userId);
     }
 
     private byte[] digest(String value) {
