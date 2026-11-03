@@ -12,7 +12,7 @@ Legenda: `[ ]` a fazer · `[~]` em andamento · `[x]` feito · ⚠️ depende de
 Nada é commitado até o fim da sequência.
 - [x] **T01 · Segurança + .gitignore**: remover `backend/local.yaml`; `.gitignore` com `node_modules/`, `dist/`, `.impeccable/`, `.taste-skill/` e os PDFs de `docs/` (ficam só locais)
 - [x] **T02 · Monorepo**: `backend/` → `apps/api/`, `frontend/` → `apps/web/`; `docker-compose.yml` e `.env.example` na **raiz** (fluxo: clonar → `cp .env.example .env` → `docker compose up -d --build`); restaurar o Maven Wrapper (`.mvn/`) e conferir se o Dockerfile builda. `infra/` só quando houver deploy real.
-- [ ] **T02b · Front no compose**: serviço `web` no `docker-compose.yml`, pra um único `up` subir tudo; healthcheck também no serviço `api`
+- [x] **T02b · Front no compose**: serviço `web` no `docker-compose.yml`, pra um único `up` subir tudo; healthcheck também no serviço `api`
 - [x] **T02c · Trocar o MinIO por RustFS**: `rustfs/rustfs:1.0.3` (só dev por enquanto; reavaliar versão e backup antes de produção); SDK `io.minio` → AWS SDK v2; bucket **privado** com URLs temporárias assinadas (endpoint público para assinar). O fluxo de domínio das fotos (entidade, status, checksum, permissões) fica para a etapa 6
 - [x] **T02d · Dockerfile padrão de mercado**: compilar com a imagem oficial `maven` (tag fixa, Java 17) e rodar com JRE 17; `mvnw` fica intocado para uso local/IDE
 - [x] **T03 · Renomear para citogenetica**: pacote `br.ufla.citogenetica`, Maven `citogenetica-api`, `CitogeneticaApplication`, banco/bucket/projeto compose `citogenetica`, containers sem nome fixo, OpenAPI e e-mails sem textos do template, contato removido até haver um oficial, comentário da migration V1 limpo (antes do primeiro commit)
@@ -88,7 +88,7 @@ Nada é commitado até o fim da sequência.
 ## 2. Frontend
 
 ### 2.1 Correções no que já existe
-- [ ] Papéis sem hierarquia: admin não herda permissão de editar contagens (o planejamento é explícito)
+- [~] Papéis sem hierarquia: admin não herda permissão de editar contagens (o planejamento é explícito) — papéis de laboratório já vêm da API e são combináveis; falta aplicar às contagens (Etapa 2)
 - [ ] Histórico por dia + edição de registro (o modal existe, mas nada abre ele)
 - [ ] "Desfazer" sem apagar registros em sequência depois de recarregar (limite e/ou confirmação)
 - [ ] Lote como **1 registro com `quantidade`**, e não N registros
@@ -99,11 +99,12 @@ Nada é commitado até o fim da sequência.
 - [ ] "Criada por" com dado real
 
 ### 2.2 Integração com a API
-- [ ] Camada `api/` substituindo `storage.ts`, `laboratories.ts` e `demoUser`
-- [ ] Telas de cadastro, login, recuperação de senha e verificação de e-mail
-- [ ] Laboratórios, convites e membros reais
+- [~] Camada `api/` substituindo `storage.ts`, `laboratories.ts` e `demoUser` — `laboratories.ts` e `demoUser` removidos; `storage.ts` (lâminas) segue local até a Etapa 2
+- [x] Telas de cadastro, login, recuperação de senha e verificação de e-mail (e Minha conta: nome, senha, troca de e-mail)
+- [x] Laboratórios, convites e membros reais (e orientação)
 - [ ] Contagem, lâminas, resumo e IM vindos da API
-- [ ] Notificações via SSE no sino
+- [x] Notificações via SSE no sino
+- [ ] Painel do admin da plataforma (desativar/reativar laboratório) — depende de rota de listagem global na API
 - [ ] Importador dos backups dos HTMLs antigos (meiose e mitose)
 
 ### 2.3 PWA e offline (Etapa 4)
