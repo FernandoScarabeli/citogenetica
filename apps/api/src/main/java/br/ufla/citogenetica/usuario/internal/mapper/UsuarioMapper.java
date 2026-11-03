@@ -15,10 +15,12 @@ public interface UsuarioMapper extends GenericMapper<Usuario, UsuarioRequestDTO,
     @Override
     @Mapping(target = "role", ignore = true)
     @Mapping(target = "status", ignore = true)
+    @Mapping(target = "emailConfirmadoEm", ignore = true)
     Usuario requestToEntity(UsuarioRequestDTO DTO);
 
     @Override
     @Mapping(target = "id", ignore = true)
+    @Mapping(target = "email", ignore = true)
     @Mapping(target = "version", ignore = true)
     @Mapping(target = "createdDate", ignore = true)
     @Mapping(target = "lastModifiedDate", ignore = true)
@@ -26,9 +28,11 @@ public interface UsuarioMapper extends GenericMapper<Usuario, UsuarioRequestDTO,
     @Mapping(target = "status", ignore = true)
     @Mapping(target = "role", ignore = true)
     @Mapping(target = "authorities", ignore = true)
+    @Mapping(target = "emailConfirmadoEm", ignore = true)
     Usuario copyProperties(Usuario newEntity, @MappingTarget Usuario entity);
 
     @Mapping(target = "id", ignore = true)
+    @Mapping(target = "email", ignore = true)
     @Mapping(target = "version", ignore = true)
     @Mapping(target = "createdDate", ignore = true)
     @Mapping(target = "lastModifiedDate", ignore = true)
@@ -36,5 +40,6 @@ public interface UsuarioMapper extends GenericMapper<Usuario, UsuarioRequestDTO,
     @Mapping(target = "status", ignore = true)
     @Mapping(target = "role", ignore = true)
     @Mapping(target = "authorities", ignore = true)
+    @Mapping(target = "emailConfirmadoEm", ignore = true)
     void copyProperties(AtualizarUsuarioRequestDTO dto, @MappingTarget Usuario entity);
 }

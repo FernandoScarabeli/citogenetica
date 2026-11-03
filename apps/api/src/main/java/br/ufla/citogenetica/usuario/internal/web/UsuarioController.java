@@ -83,7 +83,7 @@ public class UsuarioController {
 
     @PutMapping("/{id}")
     @SecurityRequirement(name = "csrf-token")
-    @Operation(summary = "Atualizar usuário", description = "Atualiza os dados de um usuário existente. Disponível para administradores.")
+    @Operation(summary = "Atualizar usuário", description = "Atualiza o nome de um usuário existente. A alteração de e-mail depende de um fluxo de confirmação próprio.")
     @ApiResponses(value = {
             @ApiResponse(responseCode = "200", description = "Usuário alterado com sucesso"),
             @ApiResponse(responseCode = "403", description = "Acesso negado")
@@ -124,7 +124,7 @@ public class UsuarioController {
 
     @PutMapping("/me")
     @SecurityRequirement(name = "csrf-token")
-    @Operation(summary = "Atualizar meu perfil", description = "Atualiza o nome do usuário autenticado. A alteração de e-mail é exclusiva de administradores.")
+    @Operation(summary = "Atualizar meu perfil", description = "Atualiza o nome do usuário autenticado. O e-mail não pode ser alterado sem confirmação.")
     @ApiResponses(value = {
             @ApiResponse(responseCode = "200", description = "Perfil atualizado com sucesso"),
             @ApiResponse(responseCode = "401", description = "Usuário não autenticado"),

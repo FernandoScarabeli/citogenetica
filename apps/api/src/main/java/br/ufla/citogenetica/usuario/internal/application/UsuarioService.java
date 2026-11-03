@@ -3,7 +3,6 @@ package br.ufla.citogenetica.usuario.internal.application;
 import br.ufla.citogenetica.shared.web.error.NotFoundException;
 import br.ufla.citogenetica.usuario.api.error.ValidationConflictException;
 import br.ufla.citogenetica.usuario.internal.mapper.UsuarioMapper;
-import br.ufla.citogenetica.usuario.internal.domain.EmailNormalizer;
 import br.ufla.citogenetica.usuario.api.RolesEnum;
 import br.ufla.citogenetica.usuario.internal.domain.StatusEnum;
 import br.ufla.citogenetica.usuario.internal.domain.Usuario;
@@ -31,6 +30,7 @@ public class UsuarioService {
     private final UsuarioMapper usuarioMapper;
     private final PasswordEncoder passwordEncoder;
     private final SessionRevocationService sessionRevocationService;
+    private final PasswordPolicy passwordPolicy;
 
 
     @Transactional(readOnly = true)
@@ -60,16 +60,6 @@ public class UsuarioService {
         }
 
         entidade.setNome(dto.nome());
-
-        String emailNormalizado = EmailNormalizer.normalize(dto.email());
-        if (!entidade.getEmail().equals(emailNormalizado)) {
-            if (this.usuarioRepository.existsByEmailIgnoreCaseAndIdNot(emailNormalizado, entidade.getId())) {
-                throw new ValidationConflictException("Já existe um usuário cadastrado com este e-mail.");
-            }
-
-            entidade.setEmail(emailNormalizado);
-        }
-
         return this.usuarioRepository.save(entidade);
     }
 
@@ -126,6 +116,10 @@ public class UsuarioService {
             throw new ValidationConflictException("A senha atual está incorreta.");
         }
 
+        passwordPolicy.validate(dto.novaSenha());
+        if (passwordEncoder.matches(dto.novaSenha(), entidade.getPassword())) {
+            throw new ValidationConflictException("A nova senha deve ser diferente da atual.");
+        }
         String encryptedPassword = this.passwordEncoder.encode(dto.novaSenha());
         entidade.setSenha(encryptedPassword);
         this.usuarioRepository.save(entidade);

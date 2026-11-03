@@ -12,6 +12,7 @@ import org.springframework.security.core.userdetails.UserDetails;
 
 import java.util.Collection;
 import java.util.Collections;
+import java.time.Instant;
 
 @Getter
 @Setter
@@ -30,6 +31,9 @@ public class Usuario extends BaseEntity<Long> implements UserDetails {
 
     @Column(name = "senha", nullable = false)
     private String senha;
+
+    @Column(name = "email_confirmado_em")
+    private Instant emailConfirmadoEm;
 
     @Enumerated(EnumType.STRING)
     @Column(name = "status", nullable = false)
@@ -72,6 +76,6 @@ public class Usuario extends BaseEntity<Long> implements UserDetails {
 
     @Override
     public boolean isEnabled() {
-        return this.status == StatusEnum.ATIVO;
+        return this.status == StatusEnum.ATIVO && this.emailConfirmadoEm != null;
     }
 }

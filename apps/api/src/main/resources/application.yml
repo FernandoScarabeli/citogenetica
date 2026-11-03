@@ -61,6 +61,12 @@ api:
       email-executor-core-size: ${API_SECURITY_RECOVERY_EMAIL_EXECUTOR_CORE_SIZE:1}
       email-executor-max-size: ${API_SECURITY_RECOVERY_EMAIL_EXECUTOR_MAX_SIZE:2}
       email-executor-queue-capacity: ${API_SECURITY_RECOVERY_EMAIL_EXECUTOR_QUEUE_CAPACITY:50}
+    email-confirmation:
+      expiration-hours: ${API_SECURITY_EMAIL_CONFIRMATION_EXPIRATION_HOURS:24}
+      pending-retention-days: ${API_SECURITY_EMAIL_CONFIRMATION_PENDING_RETENTION_DAYS:30}
+      cleanup-interval-ms: ${API_SECURITY_EMAIL_CONFIRMATION_CLEANUP_INTERVAL_MS:3600000}
+      cleanup-batch-size: ${API_SECURITY_EMAIL_CONFIRMATION_CLEANUP_BATCH_SIZE:100}
+      frontend-url: ${API_FRONTEND_EMAIL_CONFIRMATION_URL}
     rate-limit:
       window-minutes: ${API_SECURITY_RATE_LIMIT_WINDOW_MINUTES:15}
       cleanup-interval-ms: ${API_SECURITY_RATE_LIMIT_CLEANUP_INTERVAL_MS:3600000}
@@ -76,6 +82,15 @@ api:
       reset:
         ip: ${API_SECURITY_RATE_LIMIT_RESET_IP:30}
         email: ${API_SECURITY_RATE_LIMIT_RESET_EMAIL:10}
+      register:
+        ip: ${API_SECURITY_RATE_LIMIT_REGISTER_IP:10}
+        email: ${API_SECURITY_RATE_LIMIT_REGISTER_EMAIL:5}
+      resend-confirmation:
+        ip: ${API_SECURITY_RATE_LIMIT_RESEND_CONFIRMATION_IP:10}
+        email: ${API_SECURITY_RATE_LIMIT_RESEND_CONFIRMATION_EMAIL:3}
+      email-confirmation:
+        ip: ${API_SECURITY_RATE_LIMIT_EMAIL_CONFIRMATION_IP:30}
+        email: ${API_SECURITY_RATE_LIMIT_EMAIL_CONFIRMATION_EMAIL:10}
   sse:
     max-connections-per-user: ${API_SSE_MAX_CONNECTIONS_PER_USER:5}
     timeout: ${API_SSE_TIMEOUT:30m}

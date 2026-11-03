@@ -436,17 +436,16 @@ class AuthRecoverySecurityIntegrationTest extends AbstractIntegrationTest {
         String emailInformado = " " + email.toUpperCase() + " ";
 
         perform(post("/api/v1/auth/register")
-                        .cookie(sessaoAdmin())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(json("nome", "Cadastro normalizado", "email", emailInformado,
-                                "senha", SENHA, "roleName", "USER")))
-                .andExpect(status().isCreated());
+                                "senha", SENHA)))
+                .andExpect(status().isAccepted());
 
         assertTrue(usuarioRepository.findByEmail(email).isPresent());
     }
 
     @Test
-    void adminEditaEmailComEspacosEMaiusculasEValorFicaNormalizado() throws Exception {
+    void adminNaoPodeAlterarEmailSemFluxoDeConfirmacao() throws Exception {
         Usuario alvo = criarUsuario(StatusEnum.ATIVO);
         String novoEmail = emailNovo();
 
@@ -456,9 +455,9 @@ class AuthRecoverySecurityIntegrationTest extends AbstractIntegrationTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(json("nome", alvo.getNome(), "email", " " + novoEmail.toUpperCase() + " ")))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.email").value(novoEmail));
+                .andExpect(jsonPath("$.email").value(alvo.getEmail()));
 
-        assertEquals(novoEmail, usuarioRepository.findById(alvo.getId()).orElseThrow().getEmail());
+        assertEquals(alvo.getEmail(), usuarioRepository.findById(alvo.getId()).orElseThrow().getEmail());
     }
 
     @Test
@@ -469,6 +468,7 @@ class AuthRecoverySecurityIntegrationTest extends AbstractIntegrationTest {
                 .email(primeiro.getEmail().toUpperCase())
                 .senha(passwordEncoder.encode(SENHA))
                 .status(StatusEnum.ATIVO)
+                .emailConfirmadoEm(java.time.Instant.now())
                 .role(roleUser)
                 .build();
 
@@ -513,6 +513,7 @@ class AuthRecoverySecurityIntegrationTest extends AbstractIntegrationTest {
                 .email(emailNovo())
                 .senha(passwordEncoder.encode(SENHA))
                 .status(status)
+                .emailConfirmadoEm(java.time.Instant.now())
                 .role(roleUser)
                 .build());
     }
@@ -528,6 +529,7 @@ class AuthRecoverySecurityIntegrationTest extends AbstractIntegrationTest {
                 .email(emailNovo())
                 .senha(passwordEncoder.encode(SENHA))
                 .status(StatusEnum.ATIVO)
+                .emailConfirmadoEm(java.time.Instant.now())
                 .role(roleAdmin)
                 .build());
         MvcResult resultado = perform(post("/api/v1/auth/login")

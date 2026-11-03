@@ -1,11 +1,10 @@
 package br.ufla.citogenetica.usuario.internal.web.dto.request;
 
-import jakarta.validation.constraints.NotBlank;
-import jakarta.validation.constraints.Size;
+import jakarta.validation.constraints.NotNull;
 
 public record AtualizarSenhaRequestDTO(
 
-        @NotBlank(message = "É obrigatório informar a senha atual") String senhaAtual,
+        @NotNull(message = "É obrigatório informar a senha atual") String senhaAtual,
 
-        @NotBlank(message = "É obrigatório informar a nova senha") @Size(min = 8, message = "A nova senha deve ter no mínimo 8 caracteres") String novaSenha) {
+        @NotNull(message = "É obrigatório informar a nova senha") String novaSenha) {
 }

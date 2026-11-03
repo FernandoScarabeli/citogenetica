@@ -5,6 +5,8 @@ import br.ufla.citogenetica.shared.filter.FiltroInvalidoException;
 import br.ufla.citogenetica.shared.web.error.BusinessException;
 import br.ufla.citogenetica.shared.web.error.ErrorResponseDTO;
 import br.ufla.citogenetica.usuario.api.error.RecoveryChallengeException;
+import br.ufla.citogenetica.usuario.api.error.EmailConfirmationException;
+import br.ufla.citogenetica.usuario.api.error.PasswordPolicyException;
 import br.ufla.citogenetica.usuario.api.error.TooManyRequestsException;
 import br.ufla.citogenetica.usuario.api.error.ValidationConflictException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -134,6 +136,28 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(RecoveryChallengeException.class)
     public ResponseEntity<ErrorResponseDTO> handleRecoveryChallengeException(
             RecoveryChallengeException ex, HttpServletRequest request) {
+        ErrorResponseDTO errorResponse = new ErrorResponseDTO(
+                HttpStatus.BAD_REQUEST.value(),
+                HttpStatus.BAD_REQUEST.getReasonPhrase(),
+                ex.getMessage(),
+                request.getRequestURI());
+        return new ResponseEntity<>(errorResponse, HttpStatus.BAD_REQUEST);
+    }
+
+    @ExceptionHandler(EmailConfirmationException.class)
+    public ResponseEntity<ErrorResponseDTO> handleEmailConfirmationException(
+            EmailConfirmationException ex, HttpServletRequest request) {
+        ErrorResponseDTO errorResponse = new ErrorResponseDTO(
+                HttpStatus.BAD_REQUEST.value(),
+                HttpStatus.BAD_REQUEST.getReasonPhrase(),
+                ex.getMessage(),
+                request.getRequestURI());
+        return new ResponseEntity<>(errorResponse, HttpStatus.BAD_REQUEST);
+    }
+
+    @ExceptionHandler(PasswordPolicyException.class)
+    public ResponseEntity<ErrorResponseDTO> handlePasswordPolicyException(
+            PasswordPolicyException ex, HttpServletRequest request) {
         ErrorResponseDTO errorResponse = new ErrorResponseDTO(
                 HttpStatus.BAD_REQUEST.value(),
                 HttpStatus.BAD_REQUEST.getReasonPhrase(),

@@ -233,6 +233,7 @@ class SessionSecurityMigrationIntegrationTest extends AbstractIntegrationTest {
                 .email(UUID.randomUUID() + "@citogenetica.test")
                 .senha(passwordEncoder.encode(SENHA))
                 .status(StatusEnum.ATIVO)
+                .emailConfirmadoEm(java.time.Instant.now())
                 .role(role)
                 .build());
     }

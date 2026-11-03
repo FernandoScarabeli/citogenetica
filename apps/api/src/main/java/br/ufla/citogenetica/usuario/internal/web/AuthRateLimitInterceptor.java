@@ -38,6 +38,9 @@ public class AuthRateLimitInterceptor implements HandlerInterceptor {
             case "/api/v1/auth/recuperar-senha" -> AuthRateLimitRoute.RECOVERY_REQUEST;
             case "/api/v1/auth/validar-codigo" -> AuthRateLimitRoute.VALIDATE_RECOVERY;
             case "/api/v1/auth/redefinir-senha" -> AuthRateLimitRoute.RESET_PASSWORD;
+            case "/api/v1/auth/register" -> AuthRateLimitRoute.REGISTER;
+            case "/api/v1/auth/reenviar-confirmacao" -> AuthRateLimitRoute.RESEND_CONFIRMATION;
+            case "/api/v1/auth/confirmar-email" -> AuthRateLimitRoute.EMAIL_CONFIRMATION;
             default -> null;
         };
     }

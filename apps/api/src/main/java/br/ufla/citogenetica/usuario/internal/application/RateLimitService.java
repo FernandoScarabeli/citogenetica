@@ -71,6 +71,9 @@ public class RateLimitService {
             case RECOVERY_REQUEST -> properties.recoveryRequest();
             case VALIDATE_RECOVERY -> properties.validate();
             case RESET_PASSWORD -> properties.reset();
+            case REGISTER -> properties.register();
+            case RESEND_CONFIRMATION -> properties.resendConfirmation();
+            case EMAIL_CONFIRMATION -> properties.emailConfirmation();
         };
     }
 }

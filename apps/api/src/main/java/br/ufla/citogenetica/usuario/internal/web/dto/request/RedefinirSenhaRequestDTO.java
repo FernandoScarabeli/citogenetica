@@ -3,7 +3,7 @@ package br.ufla.citogenetica.usuario.internal.web.dto.request;
 import br.ufla.citogenetica.usuario.internal.domain.EmailNormalizer;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
-import jakarta.validation.constraints.Size;
+import jakarta.validation.constraints.NotNull;
 
 public record RedefinirSenhaRequestDTO(
         @NotBlank(message = "Email é obrigatório")
@@ -13,8 +13,7 @@ public record RedefinirSenhaRequestDTO(
         @NotBlank(message = "O código de verificação é obrigatório")
         String codigo,
 
-        @NotBlank(message = "É obrigatório informar a nova senha")
-        @Size(min = 8, message = "A nova senha deve ter no mínimo 8 caracteres")
+        @NotNull(message = "É obrigatório informar a nova senha")
         String novaSenha
 ) {
     public RedefinirSenhaRequestDTO {
