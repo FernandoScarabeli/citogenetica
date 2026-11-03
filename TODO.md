@@ -42,26 +42,26 @@ Nada é commitado até o fim da sequência.
 ## 1. Backend (API, banco e tal)
 
 ### 1.1 Correções na base existente
-- [ ] Recuperação de senha: código com `SecureRandom`, limite de tentativas, invalidar após N erros, rate limit nos endpoints públicos
-- [ ] Respostas iguais para e-mail existente e inexistente (evitar enumeração)
-- [ ] Usar `recovery-expiration-minutes` em vez dos 15 minutos fixos
-- [ ] `atualizarSenha`: só o próprio usuário pode trocar a senha
-- [ ] `SecurityFilter`: rejeitar usuário inativo ou removido com 401, não 500
-- [ ] `JWTConfig`: expiração com `Instant.now()`
-- [ ] Regras de rota: permitir que o usuário edite o próprio perfil
-- [ ] Decidir entre JWT em header e sessão com cookie HttpOnly + CSRF (sugerido no planejamento)
-- [ ] CORS único, com as origens vindas do `.env`
-- [ ] `CriteriaCreator`: campo inválido → 400; criar a extensão `unaccent` na migration
-- [ ] `show-sql` só em dev; actuator sem `show-details: always` em produção
-- [ ] Ajustar `GlobalExceptionHandler` para os casos novos
+- [x] Recuperação de senha: código com `SecureRandom`, limite de tentativas, invalidar após N erros, rate limit nos endpoints públicos
+- [x] Respostas iguais para e-mail existente e inexistente (evitar enumeração)
+- [x] Usar `recovery-expiration-minutes` em vez dos 15 minutos fixos
+- [x] `atualizarSenha`: só o próprio usuário pode trocar a senha
+- [x] `SecurityFilter`: rejeitar usuário inativo ou removido com 401, não 500
+- [x] `JWTConfig`: expiração com `Instant.now()` (não se aplica: JWT substituído por sessão)
+- [x] Regras de rota: permitir que o usuário edite o próprio perfil
+- [x] Decidir entre JWT em header e sessão com cookie HttpOnly + CSRF (sugerido no planejamento)
+- [x] CORS único, com as origens vindas do `.env`
+- [x] `CriteriaCreator`: campo inválido → 400; criar a extensão `unaccent` na migration
+- [x] `show-sql` só em dev; actuator sem `show-details: always` em produção
+- [x] Ajustar `GlobalExceptionHandler` para os casos novos
 
 ### 1.2 Notificações e SSE (arrumar, não remover)
-- [ ] `notificacao.usuario_id` + filtrar todas as consultas pelo usuário logado
-- [ ] `marcarComoLida`: conferir o dono
-- [ ] Emitters por usuário (`Map<usuarioId, List<SseEmitter>>`), com publish só para o destinatário
-- [ ] Publicar depois do commit (`@TransactionalEventListener(AFTER_COMMIT)`)
-- [ ] Autenticar o SSE sem token na URL (cookie ou ticket curto de uso único)
-- [ ] `/subscribers/count` só para admin, ou remover
+- [x] `notificacao.usuario_id` + filtrar todas as consultas pelo usuário logado
+- [x] `marcarComoLida`: conferir o dono
+- [x] Emitters por usuário (`Map<usuarioId, List<SseEmitter>>`), com publish só para o destinatário
+- [x] Publicar depois do commit (`@TransactionalEventListener(AFTER_COMMIT)`)
+- [x] Autenticar o SSE sem token na URL (cookie ou ticket curto de uso único)
+- [x] `/subscribers/count` só para admin, ou remover
 - [ ] ⚠️ Definir quais eventos geram notificação (convite, comentário, conflito...)
 
 ### 1.3 Base do domínio

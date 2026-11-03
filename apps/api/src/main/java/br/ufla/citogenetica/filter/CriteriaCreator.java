@@ -18,19 +18,15 @@ import jakarta.persistence.criteria.*;
 public class CriteriaCreator {
 
     private static final Set<String> PARAMETROS_RESERVADOS = Set.of("page", "size", "sort", "sortBy", "sortDirection");
-    private static final Set<String> DIRECOES_ORDENACAO = Set.of("asc", "desc");
     private static final Set<String> OPERADORES = Set.of("eq", "ne", "gt", "gte", "lt", "lte");
     private static final char ESCAPE_LIKE = '\\';
 
     /**
-     * Monta a Specification a partir dos parâmetros da requisição. Campos, ordenação e direção são
-     * validados aqui, antes da consulta: qualquer item fora de {@code campos} gera
-     * {@link FiltroInvalidoException} em vez de ser ignorado (o que alargaria a busca).
+     * Monta a Specification de filtros a partir dos parâmetros da requisição. Campos fora de
+     * {@code campos} geram {@link FiltroInvalidoException} em vez de serem ignorados.
      */
-    public static <T> Specification<T> byFilterMap(MultiValueMap<String, String> params, Class<T> clazz,
-                                                   CamposPermitidos campos, String sortBy, String sortDirection) {
-        validarOrdenacao(campos, sortBy, sortDirection);
-
+    public static <T> Specification<T> byFilterMap(MultiValueMap<String, String> params,
+                                                   CamposPermitidos campos) {
         Map<String, List<Object>> filterMap = new HashMap<>();
         for (Map.Entry<String, List<String>> entry : params.entrySet()) {
             List<Object> values = new ArrayList<>(entry.getValue());
@@ -89,10 +85,6 @@ public class CriteriaCreator {
                 finalPredicate = cb.and(finalPredicate, cb.or(orPredicates.toArray(new Predicate[0])));
             }
 
-            if (sortBy != null && !sortBy.isEmpty()) {
-                SortHelper.addSort(root, query, cb, sortBy, sortDirection);
-            }
-
             return finalPredicate;
         };
     }
@@ -103,15 +95,6 @@ public class CriteriaCreator {
             if (!campos.filtro().contains(nome)) {
                 throw new FiltroInvalidoException("Campo de filtro não permitido: '" + nome + "'.");
             }
-        }
-    }
-
-    private static void validarOrdenacao(CamposPermitidos campos, String sortBy, String sortDirection) {
-        if (sortBy != null && !sortBy.isBlank() && !campos.ordenacao().contains(sortBy)) {
-            throw new FiltroInvalidoException("Campo de ordenação não permitido: '" + sortBy + "'.");
-        }
-        if (sortDirection != null && !DIRECOES_ORDENACAO.contains(sortDirection.toLowerCase(Locale.ROOT))) {
-            throw new FiltroInvalidoException("Direção de ordenação inválida: use 'asc' ou 'desc'.");
         }
     }
 
@@ -258,6 +241,8 @@ public class CriteriaCreator {
         List<Predicate> predicates = new ArrayList<>();
         Object minValue = null;
         Object maxValue = null;
+        boolean minInclusive = true;
+        boolean maxInclusive = true;
 
         for (String value : values) {
             if (value == null)
@@ -270,24 +255,22 @@ public class CriteriaCreator {
             Object parsedDate = parseDate(path.getJavaType(), dateValue);
 
             switch (operator) {
-                case "gte" :
-                    if (minValue == null || compareDates(parsedDate, minValue) > 0) {
+                case "gte", "gt" :
+                    boolean inclusiveMinimum = operator.equals("gte");
+                    int minimumComparison = minValue == null ? 1 : compareDates(parsedDate, minValue);
+                    if (minValue == null || minimumComparison > 0
+                            || (minimumComparison == 0 && !inclusiveMinimum && minInclusive)) {
                         minValue = parsedDate;
+                        minInclusive = inclusiveMinimum;
                     }
                     break;
-                case "gt" :
-                    if (minValue == null || compareDates(parsedDate, minValue) >= 0) {
-                        minValue = parsedDate;
-                    }
-                    break;
-                case "lte" :
-                    if (maxValue == null || compareDates(parsedDate, maxValue) < 0) {
+                case "lte", "lt" :
+                    boolean inclusiveMaximum = operator.equals("lte");
+                    int maximumComparison = maxValue == null ? -1 : compareDates(parsedDate, maxValue);
+                    if (maxValue == null || maximumComparison < 0
+                            || (maximumComparison == 0 && !inclusiveMaximum && maxInclusive)) {
                         maxValue = parsedDate;
-                    }
-                    break;
-                case "lt" :
-                    if (maxValue == null || compareDates(parsedDate, maxValue) <= 0) {
-                        maxValue = parsedDate;
+                        maxInclusive = inclusiveMaximum;
                     }
                     break;
                 case "ne" :
@@ -301,37 +284,42 @@ public class CriteriaCreator {
             }
         }
 
-        if (minValue != null || maxValue != null) {
-            Class<?> type = path.getJavaType();
-            if (minValue != null && maxValue != null) {
-                if (type.equals(LocalDate.class)) {
-                    predicates.add(cb.between(path.as(LocalDate.class), (LocalDate) minValue, (LocalDate) maxValue));
-                } else if (type.equals(LocalDateTime.class)) {
-                    predicates.add(cb.between(path.as(LocalDateTime.class), (LocalDateTime) minValue,
-                            (LocalDateTime) maxValue));
-                } else if (type.equals(Date.class)) {
-                    predicates.add(cb.between(path.as(Date.class), (Date) minValue, (Date) maxValue));
-                }
-            } else if (minValue != null) {
-                if (type.equals(LocalDate.class)) {
-                    predicates.add(cb.greaterThanOrEqualTo(path.as(LocalDate.class), (LocalDate) minValue));
-                } else if (type.equals(LocalDateTime.class)) {
-                    predicates.add(cb.greaterThanOrEqualTo(path.as(LocalDateTime.class), (LocalDateTime) minValue));
-                } else if (type.equals(Date.class)) {
-                    predicates.add(cb.greaterThanOrEqualTo(path.as(Date.class), (Date) minValue));
-                }
-            } else {
-                if (type.equals(LocalDate.class)) {
-                    predicates.add(cb.lessThanOrEqualTo(path.as(LocalDate.class), (LocalDate) maxValue));
-                } else if (type.equals(LocalDateTime.class)) {
-                    predicates.add(cb.lessThanOrEqualTo(path.as(LocalDateTime.class), (LocalDateTime) maxValue));
-                } else if (type.equals(Date.class)) {
-                    predicates.add(cb.lessThanOrEqualTo(path.as(Date.class), (Date) maxValue));
-                }
-            }
+        if (minValue != null) {
+            predicates.add(compararData(cb, path, minValue, true, minInclusive));
+        }
+        if (maxValue != null) {
+            predicates.add(compararData(cb, path, maxValue, false, maxInclusive));
         }
 
         return predicates.isEmpty() ? cb.conjunction() : cb.and(predicates.toArray(new Predicate[0]));
+    }
+
+    private static Predicate compararData(CriteriaBuilder cb, Path<?> path, Object value,
+                                          boolean limiteInferior, boolean inclusivo) {
+        Class<?> type = path.getJavaType();
+        if (type.equals(LocalDate.class)) {
+            return compararPorLimite(cb, path.as(LocalDate.class), (LocalDate) value, limiteInferior, inclusivo);
+        }
+        if (type.equals(LocalDateTime.class)) {
+            return compararPorLimite(cb, path.as(LocalDateTime.class), (LocalDateTime) value,
+                    limiteInferior, inclusivo);
+        }
+        if (type.equals(Date.class)) {
+            return compararPorLimite(cb, path.as(Date.class), (Date) value, limiteInferior, inclusivo);
+        }
+        throw new UnsupportedOperationException("Tipo de data não suportado: " + type);
+    }
+
+    private static <T extends Comparable<? super T>> Predicate compararPorLimite(
+            CriteriaBuilder cb, Expression<T> expression, T value, boolean limiteInferior, boolean inclusivo) {
+        if (limiteInferior) {
+            return inclusivo
+                    ? cb.greaterThanOrEqualTo(expression, value)
+                    : cb.greaterThan(expression, value);
+        }
+        return inclusivo
+                ? cb.lessThanOrEqualTo(expression, value)
+                : cb.lessThan(expression, value);
     }
 
     /**
@@ -396,6 +384,8 @@ public class CriteriaCreator {
         List<Predicate> predicates = new ArrayList<>();
         Number minValue = null;
         Number maxValue = null;
+        boolean minInclusive = true;
+        boolean maxInclusive = true;
 
         for (String value : values) {
             if (value == null)
@@ -408,24 +398,22 @@ public class CriteriaCreator {
             Number number = parseNumber(path.getJavaType(), numericValue);
 
             switch (operator) {
-                case "gte" :
-                    if (minValue == null || compareNumbers(number, minValue) > 0) {
+                case "gte", "gt" :
+                    boolean inclusiveMinimum = operator.equals("gte");
+                    int minimumComparison = minValue == null ? 1 : compareNumbers(number, minValue);
+                    if (minValue == null || minimumComparison > 0
+                            || (minimumComparison == 0 && !inclusiveMinimum && minInclusive)) {
                         minValue = number;
+                        minInclusive = inclusiveMinimum;
                     }
                     break;
-                case "gt" :
-                    if (minValue == null || compareNumbers(number, minValue) >= 0) {
-                        minValue = number;
-                    }
-                    break;
-                case "lte" :
-                    if (maxValue == null || compareNumbers(number, maxValue) < 0) {
+                case "lte", "lt" :
+                    boolean inclusiveMaximum = operator.equals("lte");
+                    int maximumComparison = maxValue == null ? -1 : compareNumbers(number, maxValue);
+                    if (maxValue == null || maximumComparison < 0
+                            || (maximumComparison == 0 && !inclusiveMaximum && maxInclusive)) {
                         maxValue = number;
-                    }
-                    break;
-                case "lt" :
-                    if (maxValue == null || compareNumbers(number, maxValue) <= 0) {
-                        maxValue = number;
+                        maxInclusive = inclusiveMaximum;
                     }
                     break;
                 case "ne" :
@@ -439,69 +427,41 @@ public class CriteriaCreator {
             }
         }
 
-        if (minValue != null || maxValue != null) {
-            Class<?> expr = path.getJavaType();
-
-            boolean bInt = expr.equals(Integer.class) || expr.equals(int.class);
-            boolean bLong = expr.equals(Long.class) || expr.equals(long.class);
-            boolean bDouble = expr.equals(Double.class) || expr.equals(double.class);
-            boolean bFloat = expr.equals(Float.class) || expr.equals(float.class);
-            boolean bShort = expr.equals(Short.class) || expr.equals(short.class);
-            boolean bBigDecimal = expr.equals(BigDecimal.class);
-            boolean bBigInteger = expr.equals(BigInteger.class);
-
-            if (minValue != null && maxValue != null) {
-                if (bInt) {
-                    predicates.add(cb.between(path.as(Integer.class), (Integer) minValue, (Integer) maxValue));
-                } else if (bLong) {
-                    predicates.add(cb.between(path.as(Long.class), (Long) minValue, (Long) maxValue));
-                } else if (bDouble) {
-                    predicates.add(cb.between(path.as(Double.class), (Double) minValue, (Double) maxValue));
-                } else if (bFloat) {
-                    predicates.add(cb.between(path.as(Float.class), (Float) minValue, (Float) maxValue));
-                } else if (bShort) {
-                    predicates.add(cb.between(path.as(Short.class), (Short) minValue, (Short) maxValue));
-                } else if (bBigDecimal) {
-                    predicates.add(cb.between(path.as(BigDecimal.class), (BigDecimal) minValue, (BigDecimal) maxValue));
-                } else if (bBigInteger) {
-                    predicates.add(cb.greaterThanOrEqualTo(path.as(BigInteger.class), (BigInteger) minValue));
-                }
-            } else if (minValue != null) {
-                if (bInt) {
-                    predicates.add(cb.greaterThanOrEqualTo(path.as(Integer.class), (Integer) minValue));
-                } else if (bLong) {
-                    predicates.add(cb.greaterThanOrEqualTo(path.as(Long.class), (Long) minValue));
-                } else if (bDouble) {
-                    predicates.add(cb.greaterThanOrEqualTo(path.as(Double.class), (Double) minValue));
-                } else if (bFloat) {
-                    predicates.add(cb.greaterThanOrEqualTo(path.as(Float.class), (Float) minValue));
-                } else if (bShort) {
-                    predicates.add(cb.greaterThanOrEqualTo(path.as(Short.class), (Short) minValue));
-                } else if (bBigDecimal) {
-                    predicates.add(cb.greaterThanOrEqualTo(path.as(BigDecimal.class), (BigDecimal) minValue));
-                } else if (bBigInteger) {
-                    predicates.add(cb.greaterThanOrEqualTo(path.as(BigInteger.class), (BigInteger) minValue));
-                }
-            } else {
-                if (bInt) {
-                    predicates.add(cb.lessThanOrEqualTo(path.as(Integer.class), (Integer) maxValue));
-                } else if (bLong) {
-                    predicates.add(cb.lessThanOrEqualTo(path.as(Long.class), (Long) maxValue));
-                } else if (bDouble) {
-                    predicates.add(cb.lessThanOrEqualTo(path.as(Double.class), (Double) maxValue));
-                } else if (bFloat) {
-                    predicates.add(cb.lessThanOrEqualTo(path.as(Float.class), (Float) maxValue));
-                } else if (bShort) {
-                    predicates.add(cb.lessThanOrEqualTo(path.as(Short.class), (Short) maxValue));
-                } else if (bBigDecimal) {
-                    predicates.add(cb.lessThanOrEqualTo(path.as(BigDecimal.class), (BigDecimal) maxValue));
-                } else if (bBigInteger) {
-                    predicates.add(cb.greaterThanOrEqualTo(path.as(BigInteger.class), (BigInteger) minValue));
-                }
-            }
+        if (minValue != null) {
+            predicates.add(compararNumero(cb, path, minValue, true, minInclusive));
+        }
+        if (maxValue != null) {
+            predicates.add(compararNumero(cb, path, maxValue, false, maxInclusive));
         }
 
         return predicates.isEmpty() ? cb.conjunction() : cb.and(predicates.toArray(new Predicate[0]));
+    }
+
+    private static Predicate compararNumero(CriteriaBuilder cb, Path<?> path, Number value,
+                                            boolean limiteInferior, boolean inclusivo) {
+        Class<?> type = path.getJavaType();
+        if (type.equals(Integer.class) || type.equals(int.class)) {
+            return compararPorLimite(cb, path.as(Integer.class), value.intValue(), limiteInferior, inclusivo);
+        }
+        if (type.equals(Long.class) || type.equals(long.class)) {
+            return compararPorLimite(cb, path.as(Long.class), value.longValue(), limiteInferior, inclusivo);
+        }
+        if (type.equals(Double.class) || type.equals(double.class)) {
+            return compararPorLimite(cb, path.as(Double.class), value.doubleValue(), limiteInferior, inclusivo);
+        }
+        if (type.equals(Float.class) || type.equals(float.class)) {
+            return compararPorLimite(cb, path.as(Float.class), value.floatValue(), limiteInferior, inclusivo);
+        }
+        if (type.equals(Short.class) || type.equals(short.class)) {
+            return compararPorLimite(cb, path.as(Short.class), value.shortValue(), limiteInferior, inclusivo);
+        }
+        if (type.equals(BigDecimal.class)) {
+            return compararPorLimite(cb, path.as(BigDecimal.class), (BigDecimal) value, limiteInferior, inclusivo);
+        }
+        if (type.equals(BigInteger.class)) {
+            return compararPorLimite(cb, path.as(BigInteger.class), (BigInteger) value, limiteInferior, inclusivo);
+        }
+        throw new UnsupportedOperationException("Tipo numérico não suportado: " + type);
     }
 
     private static Number parseNumber(Class<?> type, String value) {

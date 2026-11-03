@@ -1,17 +1,25 @@
 package br.ufla.citogenetica;
 
 import br.ufla.citogenetica.model.roles.Role;
+import br.ufla.citogenetica.model.crudExemplo.Exemplo;
+import br.ufla.citogenetica.model.type.ExemploEnum;
 import br.ufla.citogenetica.model.type.RolesEnum;
 import br.ufla.citogenetica.model.type.StatusEnum;
 import br.ufla.citogenetica.model.usuario.Usuario;
+import br.ufla.citogenetica.repository.ExemploRepository;
 import br.ufla.citogenetica.repository.RoleRepository;
 import br.ufla.citogenetica.repository.UsuarioRepository;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.servlet.http.Cookie;
+import org.hibernate.resource.jdbc.spi.StatementInspector;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.autoconfigure.orm.jpa.HibernatePropertiesCustomizer;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
+import org.springframework.boot.test.context.TestConfiguration;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.test.web.servlet.MockMvc;
@@ -20,11 +28,19 @@ import org.springframework.test.web.servlet.ResultActions;
 import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Locale;
 import java.util.UUID;
+import java.util.concurrent.CopyOnWriteArrayList;
 
 import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.hasSize;
+import static org.junit.jupiter.api.Assertions.assertAll;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -36,6 +52,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
  */
 @AutoConfigureMockMvc
 @Transactional
+@Import(CriteriaFilterIntegrationTest.SqlCaptureConfiguration.class)
 class CriteriaFilterIntegrationTest extends AbstractIntegrationTest {
 
     private static final String SENHA = "SenhaDeTesteSegura123!";
@@ -55,6 +72,12 @@ class CriteriaFilterIntegrationTest extends AbstractIntegrationTest {
 
     @Autowired
     private RoleRepository roleRepository;
+
+    @Autowired
+    private ExemploRepository exemploRepository;
+
+    @Autowired
+    private CapturadorSql capturadorSql;
 
     @Autowired
     private PasswordEncoder passwordEncoder;
@@ -141,6 +164,90 @@ class CriteriaFilterIntegrationTest extends AbstractIntegrationTest {
                 .andExpect(jsonPath("$.content[1].nome").value("José Antônio " + marcador));
     }
 
+    @Test
+    void operadorNumericoGtDeveSerEstrito() throws Exception {
+        criarExemplosNoLimite();
+        requisicao(get("/api/v1/exemplos").param("valor", "gt:100"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.content", hasSize(1)))
+                .andExpect(jsonPath("$.content[0].descricao").value("acima"));
+    }
+
+    @Test
+    void operadorNumericoLtDeveSerEstrito() throws Exception {
+        criarExemplosNoLimite();
+        requisicao(get("/api/v1/exemplos").param("valor", "lt:100"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.content", hasSize(1)))
+                .andExpect(jsonPath("$.content[0].descricao").value("abaixo"));
+    }
+
+    @Test
+    void operadorDeDataGtDeveSerEstrito() throws Exception {
+        criarExemplosNoLimite();
+        requisicao(get("/api/v1/exemplos").param("dataExemplo", "gt:2026-01-01"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.content", hasSize(1)))
+                .andExpect(jsonPath("$.content[0].descricao").value("acima"));
+    }
+
+    @Test
+    void operadorDeDataLtDeveSerEstrito() throws Exception {
+        criarExemplosNoLimite();
+        requisicao(get("/api/v1/exemplos").param("dataExemplo", "lt:2026-01-01"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.content", hasSize(1)))
+                .andExpect(jsonPath("$.content[0].descricao").value("abaixo"));
+    }
+
+    @Test
+    void tamanhoMaximoDePaginaDeUsuariosDeveSerValidado() throws Exception {
+        requisicao(get(USUARIOS).param("size", "1000000"))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void tamanhoMaximoDePaginaDeExemplosDeveSerValidado() throws Exception {
+        requisicao(get("/api/v1/exemplos").param("size", "1000000"))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void ordenacaoDaListagemNaoDeveSerAplicadaNaConsultaDeContagem() throws Exception {
+        capturadorSql.limpar();
+        requisicao(get(USUARIOS)
+                        .param("nome", marcador)
+                        .param("size", "1")
+                        .param("sortBy", "nome")
+                        .param("sortDirection", "asc"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.content", hasSize(1)))
+                .andExpect(jsonPath("$.content[0].nome").value("Administrador " + marcador))
+                .andExpect(jsonPath("$.totalElements").value(3));
+
+        List<String> consultas = capturadorSql.consultas();
+        List<String> consultasContagem = consultas.stream()
+                .filter(sql -> sql.toLowerCase(Locale.ROOT).contains("select count("))
+                .toList();
+        assertFalse(consultasContagem.isEmpty(), "a paginação deve executar a consulta de contagem");
+        assertTrue(consultasContagem.stream().noneMatch(sql -> sql.toLowerCase(Locale.ROOT).contains("order by")),
+                "a consulta de contagem não deve conter ORDER BY");
+        assertTrue(consultas.stream().anyMatch(sql -> sql.toLowerCase(Locale.ROOT).contains("order by")
+                        && sql.toLowerCase(Locale.ROOT).contains("nome")),
+                "a consulta de conteúdo deve aplicar a ordenação solicitada");
+    }
+
+    @Test
+    void pageNegativaEOuSizeZeroDevemResponder400EmUsuariosEExemplos() {
+        assertAll(
+                () -> requisicao(get(USUARIOS).param("page", "-1")).andExpect(status().isBadRequest()),
+                () -> requisicao(get(USUARIOS).param("size", "0")).andExpect(status().isBadRequest()),
+                () -> requisicao(get("/api/v1/exemplos").param("page", "-1"))
+                        .andExpect(status().isBadRequest()),
+                () -> requisicao(get("/api/v1/exemplos").param("size", "0"))
+                        .andExpect(status().isBadRequest()));
+    }
+
     private ResultActions listar(String campo, String valor) throws Exception {
         return requisicao(get(USUARIOS).param(campo, valor));
     }
@@ -154,6 +261,22 @@ class CriteriaFilterIntegrationTest extends AbstractIntegrationTest {
                 .status(StatusEnum.ATIVO)
                 .role(role)
                 .build());
+    }
+
+    private void criarExemplo(String descricao, String valor, String data) {
+        exemploRepository.saveAndFlush(Exemplo.builder()
+                .enumType(ExemploEnum.TIPO_A)
+                .descricao(descricao)
+                .valor(new BigDecimal(valor))
+                .dataExemplo(LocalDate.parse(data))
+                .ativo(true)
+                .build());
+    }
+
+    private void criarExemplosNoLimite() {
+        criarExemplo("limite", "100", "2026-01-01");
+        criarExemplo("acima", "101", "2026-01-02");
+        criarExemplo("abaixo", "99", "2025-12-31");
     }
 
     private Cookie login(Usuario usuario) throws Exception {
@@ -181,5 +304,37 @@ class CriteriaFilterIntegrationTest extends AbstractIntegrationTest {
             objeto.put((String) pares[indice], pares[indice + 1]);
         }
         return objectMapper.writeValueAsString(objeto);
+    }
+
+    @TestConfiguration(proxyBeanMethods = false)
+    static class SqlCaptureConfiguration {
+
+        @Bean
+        CapturadorSql capturadorSql() {
+            return new CapturadorSql();
+        }
+
+        @Bean
+        HibernatePropertiesCustomizer sqlInspectorCustomizer(CapturadorSql capturadorSql) {
+            return properties -> properties.put("hibernate.session_factory.statement_inspector", capturadorSql);
+        }
+    }
+
+    static class CapturadorSql implements StatementInspector {
+        private final List<String> consultas = new CopyOnWriteArrayList<>();
+
+        @Override
+        public String inspect(String sql) {
+            consultas.add(sql);
+            return sql;
+        }
+
+        void limpar() {
+            consultas.clear();
+        }
+
+        List<String> consultas() {
+            return List.copyOf(consultas);
+        }
     }
 }

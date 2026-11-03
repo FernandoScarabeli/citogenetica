@@ -74,6 +74,12 @@ public class NotificacaoService {
     }
 
     @Transactional(readOnly = true)
+    public Page<NotificacaoResponseDTO> buscarLidas(Long destinatarioId, Pageable pageable) {
+        return notificacaoRepository.findByDestinatarioIdAndLidaTrueOrderByCreatedDateDesc(destinatarioId, pageable)
+                .map(notificacaoMapper::toResponseDTO);
+    }
+
+    @Transactional(readOnly = true)
     public long contarNaoLidas(Long destinatarioId) {
         return notificacaoRepository.countByDestinatarioIdAndLidaFalse(destinatarioId);
     }

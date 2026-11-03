@@ -10,6 +10,8 @@ import br.ufla.citogenetica.model.usuario.dto.request.AtualizarUsuarioRequestDTO
 import br.ufla.citogenetica.model.usuario.dto.request.UsuarioRequestDTO;
 import br.ufla.citogenetica.model.usuario.dto.response.UsuarioResponseDTO;
 import br.ufla.citogenetica.model.genericDto.PageResponseDTO;
+import br.ufla.citogenetica.pagination.PaginationConstants;
+import br.ufla.citogenetica.pagination.PageableFactory;
 import br.ufla.citogenetica.service.UsuarioService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -18,9 +20,10 @@ import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
+import jakarta.validation.constraints.Max;
+import jakarta.validation.constraints.Min;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
-import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.http.HttpStatus;
@@ -51,12 +54,16 @@ public class UsuarioController {
     @ApiResponse(responseCode = "200", description = "Lista retornada com sucesso")
     public ResponseEntity<PageResponseDTO<Usuario, UsuarioResponseDTO>> listarUsuarios(
             @Parameter(hidden = true) @RequestParam MultiValueMap<String, String> params,
-            @RequestParam(defaultValue = "0") int page,
-            @RequestParam(defaultValue = "10") int size,
+            @RequestParam(defaultValue = "0")
+            @Min(value = 0, message = "a página não pode ser negativa") int page,
+            @RequestParam(defaultValue = "10")
+            @Min(value = 1, message = "o tamanho da página deve ser no mínimo 1")
+            @Max(value = PaginationConstants.MAX_PAGE_SIZE,
+                    message = "o tamanho da página deve ser no máximo {value}") int size,
             @RequestParam(defaultValue = "id") String sortBy,
             @RequestParam(defaultValue = "asc") String sortDirection) {
-        Specification<Usuario> spec = CriteriaCreator.byFilterMap(params, Usuario.class, CAMPOS_LISTAGEM, sortBy, sortDirection);
-        Pageable pageable = PageRequest.of(page, size);
+        Specification<Usuario> spec = CriteriaCreator.byFilterMap(params, CAMPOS_LISTAGEM);
+        Pageable pageable = PageableFactory.criar(page, size, sortBy, sortDirection, CAMPOS_LISTAGEM);
         Page<Usuario> pageResult = this.usuarioService.buscarTodos(spec, pageable);
         PageResponseDTO<Usuario, UsuarioResponseDTO> response = new PageResponseDTO<>(pageResult,
                 usuarioMapper::toResponseDTO);

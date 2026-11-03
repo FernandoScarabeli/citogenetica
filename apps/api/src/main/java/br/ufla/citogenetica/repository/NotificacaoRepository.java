@@ -21,6 +21,8 @@ public interface NotificacaoRepository extends JpaRepository<Notificacao, Long> 
 
     Page<Notificacao> findByDestinatarioIdAndLidaFalseOrderByCreatedDateDesc(Long destinatarioId, Pageable pageable);
 
+    Page<Notificacao> findByDestinatarioIdAndLidaTrueOrderByCreatedDateDesc(Long destinatarioId, Pageable pageable);
+
     Page<Notificacao> findByDestinatarioIdOrderByCreatedDateDesc(Long destinatarioId, Pageable pageable);
 
     long countByDestinatarioIdAndLidaFalse(Long destinatarioId);
