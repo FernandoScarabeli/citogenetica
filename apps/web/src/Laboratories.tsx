@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState, type FormEvent, type ReactNode } from 'react';
-import { ArrowRight, Check, ChevronDown, ChevronRight, LogOut, Moon, Microscope, Plus, Search, UserRound, X } from 'lucide-react';
+import { ArrowRight, ChevronDown, ChevronRight, LogOut, Moon, Microscope, Plus, Search, UserRound, X } from 'lucide-react';
 import { Link, useLocation, useNavigate } from 'react-router';
 import { isConflict, isForbidden, isNotFound, isUnauthorized } from './api/errors';
 import type { LaboratorioResponseDTO, PapelLaboratorio, ParticipacaoResponseDTO } from './api/contracts/laboratorio';
@@ -10,6 +10,9 @@ import { LaboratoryOrientations } from './LaboratoryOrientations';
 import { RoleFields } from './RoleFields';
 import { typeClass } from './lib/type-scale';
 import './laboratories.css';
+import './laboratory-management.css';
+import { FloatingNotice } from './components/ui/floating-notice';
+import { TabTransition } from './components/ui/tab-transition';
 import { loadPreferences, savePreferences } from './preferences';
 import type { UsuarioResponseDTO } from './api/contracts/usuario';
 import { ProfileSettings } from './app/ProfileSettings';
@@ -334,6 +337,7 @@ export function Laboratories({ user, onLogout, onUserUpdate, renderSlides }: {
     const nome = createName.trim();
     if (!nome || creating) return;
     setCreating(true);
+    setNotice('');
     setPageError('');
     try {
       const lab = await laboratorioApi.criar(nome);
@@ -355,6 +359,7 @@ export function Laboratories({ user, onLogout, onUserUpdate, renderSlides }: {
     const nome = nameDraft.trim();
     if (!nome) return;
     setSavingName(true);
+    setNotice('');
     setPageError('');
     try {
       const updated = await laboratorioApi.atualizarNome(currentLab.id, nome);
@@ -418,6 +423,7 @@ export function Laboratories({ user, onLogout, onUserUpdate, renderSlides }: {
     if (!currentLab || currentLab.estado !== 'ATIVO' || !hasRole(currentLab.papeis, 'ADMIN') || savingRoles) return;
     const papeis = [...new Set([...rolesDraft, 'MEMBRO' as const])];
     setSavingRoles(true);
+    setNotice('');
     setPageError('');
     try {
       const updated = await laboratorioApi.alterarPapeis(currentLab.id, participation.id, participation.versao, papeis);
@@ -499,15 +505,15 @@ export function Laboratories({ user, onLogout, onUserUpdate, renderSlides }: {
         onLogout={onLogout} /></div>
     </div></header>
 
+    <FloatingNotice message={notice} onClose={() => setNotice('')} />
+
     {view === 'slides' ? <>
       {pageError && <div className="container lab-alert error" role="alert">{pageError}<button type="button" aria-label="Dispensar erro" onClick={() => setPageError('')}><X size={16} aria-hidden="true" /></button></div>}
-      {notice && <div className="container lab-alert" role="status"><span><Check size={16} aria-hidden="true" />{notice}</span><button type="button" aria-label="Dispensar aviso" onClick={() => setNotice('')}><X size={16} aria-hidden="true" /></button></div>}
       {slidesStatus === 'loading' ? <main className="container slide-access-state" aria-live="polite"><p>Carregando laboratório…</p></main>
         : slidesStatus === 'error' ? <main className="container slide-access-state"><h1>Não foi possível abrir as lâminas</h1><p>{pageError}</p><button className="button secondary" type="button" onClick={() => setSlidesRetry(value => value + 1)}>Tentar de novo</button><button className="text-button" type="button" onClick={goList}>Meus laboratórios</button></main>
           : renderSlides(slidesLab, goList, slidesLab?.estado === 'DESATIVADO')}
-    </> : <main className="container labs-main"><div className="labs-content">
+    </> : <main className={`container labs-main${view === 'manage' ? ' laboratory-management-page' : ''}`}><div className="labs-content">
       {(pageError || (listStatus === 'error' && view === 'list')) && !createOpen && !confirmation && <div className="lab-alert error" role="alert"><span>{pageError || listError}</span><button type="button" aria-label="Dispensar erro" onClick={() => { setPageError(''); setListError(''); }}><X size={16} aria-hidden="true" /></button></div>}
-      {notice && <div className="lab-alert" role="status"><span><Check size={16} aria-hidden="true" />{notice}</span><button type="button" aria-label="Dispensar aviso" onClick={() => setNotice('')}><X size={16} aria-hidden="true" /></button></div>}
       {view === 'profile' ? <ProfileSettings user={user} photo={preferences.photo} onBack={goList} onUserUpdate={onUserUpdate} onPhotoChange={photo => updatePreferences({ ...preferences, photo })} />
         : view === 'list' ? <>
           <div className="page-heading"><div><h1 className={typeClass('display')}>Meus laboratórios</h1><p>Escolha onde você vai continuar sua pesquisa.</p></div><button className="button primary" type="button" onClick={() => { setCreateName(''); setPageError(''); setCreateOpen(true); }}><Plus size={17} aria-hidden="true" />Criar laboratório</button></div>
@@ -529,20 +535,23 @@ export function Laboratories({ user, onLogout, onUserUpdate, renderSlides }: {
               : detailStatus === 'error' ? <div className="laboratory-empty"><p>{pageError || 'Não foi possível carregar os dados do laboratório.'}</p><button className="button secondary" type="button" onClick={() => setDetailRetry(value => value + 1)}>Tentar novamente</button></div>
               : currentLab && <>
                 <div className="page-heading laboratory-detail-heading"><div><h1>{currentLab.nome}</h1><div className="laboratory-detail-meta"><span className={`laboratory-state ${currentLab.estado === 'ATIVO' ? 'is-active' : 'is-disabled'}`}>{currentLab.estado === 'ATIVO' ? 'Ativo' : 'Desativado'}</span>{currentLab.estado === 'DESATIVADO' && <span>Somente leitura</span>}</div></div><button className="button primary" type="button" onClick={() => openSlides(currentLab)}>Acessar lâminas <ArrowRight size={16} aria-hidden="true" /></button></div>
-                <nav className="tabs laboratory-tabs" aria-label="Gestão do laboratório"><button type="button" className={section === 'members' ? 'selected' : ''} aria-current={section === 'members' ? 'page' : undefined} onClick={() => { setSection('members'); setEditingParticipation(null); }}>Membros <span>{members.length}</span></button><button type="button" className={section === 'orientation' ? 'selected' : ''} aria-current={section === 'orientation' ? 'page' : undefined} onClick={() => { setSection('orientation'); setEditingParticipation(null); }}>Orientação</button>{admin && <button type="button" className={section === 'invites' ? 'selected' : ''} aria-current={section === 'invites' ? 'page' : undefined} onClick={() => { setSection('invites'); setEditingParticipation(null); }}>Convites</button>}<button type="button" className={section === 'settings' ? 'selected' : ''} aria-current={section === 'settings' ? 'page' : undefined} onClick={() => { setSection('settings'); setEditingParticipation(null); }}>Configurações</button></nav>
+                <div className="laboratory-management-panel"><nav className="tabs laboratory-tabs" aria-label="Gestão do laboratório"><button type="button" className={section === 'members' ? 'selected' : ''} aria-current={section === 'members' ? 'page' : undefined} onClick={() => { setSection('members'); setEditingParticipation(null); }}>Membros <span>{members.length}</span></button><button type="button" className={section === 'orientation' ? 'selected' : ''} aria-current={section === 'orientation' ? 'page' : undefined} onClick={() => { setSection('orientation'); setEditingParticipation(null); }}>Orientação</button>{admin && <button type="button" className={section === 'invites' ? 'selected' : ''} aria-current={section === 'invites' ? 'page' : undefined} onClick={() => { setSection('invites'); setEditingParticipation(null); }}>Convites</button>}<button type="button" className={section === 'settings' ? 'selected' : ''} aria-current={section === 'settings' ? 'page' : undefined} onClick={() => { setSection('settings'); setEditingParticipation(null); }}>Configurações</button></nav>
+                <TabTransition tab={section}>
                 {section === 'members' ? <section className="members-section" aria-labelledby="members-title">
-                  <div className="members-toolbar"><div><h2 id="members-title">Membros do laboratório</h2><p>{members.length} {members.length === 1 ? 'participante ativo' : 'participantes ativos'}</p></div><label className="members-search"><Search size={16} aria-hidden="true" /><span className="sr-only">Buscar membro por nome ou e-mail</span><input type="search" value={memberQuery} onChange={event => setMemberQuery(event.target.value)} placeholder="Buscar membro" /></label></div>
-                  <div className="members-table-wrap"><table className="members-table"><thead><tr><th scope="col">Nome</th><th scope="col">E-mail</th><th scope="col">Papéis</th>{admin && <th scope="col"><span className="sr-only">Ações</span></th>}</tr></thead><tbody>
+                  <div className="members-toolbar"><div><h2 id="members-title">Equipe do laboratório</h2></div><label className="members-search"><Search size={16} aria-hidden="true" /><span className="sr-only">Buscar membro por nome ou e-mail</span><input type="search" value={memberQuery} onChange={event => setMemberQuery(event.target.value)} placeholder="Buscar membro" /></label></div>
+                  <div className="members-table-wrap"><table className="members-table"><thead><tr><th scope="col">Pessoa</th><th scope="col">Papéis</th>{admin && <th scope="col"><span className="sr-only">Ações</span></th>}</tr></thead><tbody>
                     {visibleMembers.map(participation => <MemberRows key={participation.id} participation={participation} isMe={isCurrentUser(participation, user.email)} admin={!!admin} readOnly={currentLab.estado === 'DESATIVADO'} editing={editingParticipation === participation.id} roles={rolesDraft} saving={savingRoles} onEdit={() => beginRoleEdit(participation)} onRoles={setRolesDraft} onSave={event => void saveRoles(event, participation)} onCancel={() => setEditingParticipation(null)} onRemove={() => setConfirmation({ kind: 'remove', participation })} />)}
                   </tbody></table>
                     {!visibleMembers.length && <div className="members-empty"><p>{memberQuery ? 'Nenhum membro encontrado.' : 'Não há membros ativos neste laboratório.'}</p>{memberQuery && <button className="text-button" type="button" onClick={() => setMemberQuery('')}>Limpar busca</button>}</div>}
                   </div>
-                </section> : section === 'orientation' ? <LaboratoryOrientations laboratorioId={currentLab.id} userId={user.id} isOrientador={hasRole(currentLab.papeis, 'ORIENTADOR')} isAdmin={!!admin} laboratorioAtivo={currentLab.estado === 'ATIVO'} /> : section === 'invites' && admin ? <LaboratoryInvitations laboratorioId={currentLab.id} /> : <section className="laboratory-settings" aria-labelledby="laboratory-settings-title">
+                </section> : section === 'orientation' ? <LaboratoryOrientations onNotice={setNotice} laboratorioId={currentLab.id} userId={user.id} isOrientador={hasRole(currentLab.papeis, 'ORIENTADOR')} isAdmin={!!admin} laboratorioAtivo={currentLab.estado === 'ATIVO'} /> : section === 'invites' && admin ? <LaboratoryInvitations laboratorioId={currentLab.id} onNotice={setNotice} /> : <section className="laboratory-settings" aria-labelledby="laboratory-settings-title">
                   <div><h2 id="laboratory-settings-title">Dados do laboratório</h2><p>O laboratório faz parte da UFLA.</p></div>
                   {admin ? <form className="laboratory-name-form" onSubmit={event => void saveLaboratoryName(event)}><label htmlFor="laboratory-name">Nome do laboratório</label><input id="laboratory-name" required maxLength={120} value={nameDraft} onChange={event => setNameDraft(event.target.value)} /><button className="button primary" type="submit" disabled={!nameDraft.trim() || savingName}>{savingName ? 'Salvando…' : 'Salvar nome'}</button></form>
                     : <div className="laboratory-read-only-name"><span>Nome do laboratório</span><strong>{currentLab.nome}</strong>{currentLab.estado === 'DESATIVADO' && <p>Este laboratório está desativado e disponível somente para consulta.</p>}</div>}
                 </section>}
-                {currentLab.estado === 'ATIVO' && <section className="leave-laboratory" aria-labelledby="leave-title"><div><h2 id="leave-title">Sair do laboratório</h2><p>Sua participação será encerrada.</p></div><button className="button secondary" type="button" onClick={() => setConfirmation({ kind: 'leave' })}><LogOut size={16} aria-hidden="true" />Sair do laboratório</button></section>}
+                {section === 'settings' && currentLab.estado === 'ATIVO' && <section className="leave-laboratory" aria-labelledby="leave-title"><div><h2 id="leave-title">Sair do laboratório</h2><p>Você perderá o acesso a este laboratório.</p></div><button className="button secondary" type="button" onClick={() => setConfirmation({ kind: 'leave' })}><LogOut size={16} aria-hidden="true" />Sair do laboratório</button></section>}
+                </TabTransition>
+                </div>
               </>}
         </>}
     </div><footer className="labs-footer"><span>Laboratório de Citogenética · UFLA</span></footer></main>}
@@ -569,11 +578,10 @@ function MemberRows({ participation, isMe, admin, readOnly, editing, roles, savi
   const canManage = admin && !readOnly;
   return <>
     <tr className="members-table-row">
-      <td data-label="Nome"><div className="members-person"><span className="member-initial" aria-hidden="true">{participation.nome.charAt(0).toLocaleUpperCase('pt-BR')}</span><span><strong>{participation.nome}</strong>{isMe && <small>Você</small>}</span></div></td>
-      <td data-label="E-mail" className="members-email">{participation.email || 'E-mail indisponível'}</td>
+      <td data-label="Nome"><div className="members-person"><span className="member-initial" aria-hidden="true">{participation.nome.charAt(0).toLocaleUpperCase('pt-BR')}</span><span><strong>{participation.nome}{isMe && <span className="member-self">Você</span>}</strong><small className="members-email">{participation.email || 'E-mail indisponível'}</small></span></div></td>
       <td data-label="Papéis"><div className="role-chips">{participation.papeis.map(role => <span className="role-chip" key={role}>{PAPEL_LABEL[role]}</span>)}</div></td>
       {admin && <td data-label="Ações" className="members-actions-cell">{canManage && <div className="members-actions"><button className="text-button" type="button" aria-label={`Alterar papéis de ${participation.nome}`} onClick={onEdit}>Alterar papéis</button>{!isMe && <button className="text-button danger-text" type="button" aria-label={`Remover ${participation.nome} do laboratório`} onClick={onRemove}>Remover</button>}</div>}</td>}
     </tr>
-    {editing && canManage && <tr className="members-edit-row"><td colSpan={admin ? 4 : 3}><form className="inline-role-editor" onSubmit={onSave}><RoleFields value={roles} onChange={onRoles} /><div className="dialog-actions"><button className="button secondary" type="button" onClick={onCancel}>Cancelar</button><button className="button primary" type="submit" disabled={saving}>{saving ? 'Salvando…' : 'Salvar papéis'}</button></div></form></td></tr>}
+    {editing && canManage && <tr className="members-edit-row"><td colSpan={admin ? 3 : 2}><form className="inline-role-editor" onSubmit={onSave}><RoleFields value={roles} onChange={onRoles} /><div className="dialog-actions"><button className="button secondary" type="button" onClick={onCancel}>Cancelar</button><button className="button primary" type="submit" disabled={saving}>{saving ? 'Salvando…' : 'Salvar papéis'}</button></div></form></td></tr>}
   </>;
 }

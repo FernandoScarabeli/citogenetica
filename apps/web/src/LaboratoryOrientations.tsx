@@ -1,3 +1,4 @@
+import { FloatingNotice } from './components/ui/floating-notice';
 import { useCallback, useEffect, useRef, useState, type FormEvent, type RefObject } from 'react';
 import { RefreshCw } from 'lucide-react';
 import { NetworkError, isConflict, isForbidden, isNotFound, isRateLimited, isUnauthorized } from './api/errors';
@@ -79,7 +80,8 @@ function ConfirmationDialog({ confirmation, busy, fallbackFocus, onClose, onConf
   </dialog>;
 }
 
-export function LaboratoryOrientations({ laboratorioId, userId, isOrientador, isAdmin, laboratorioAtivo }: {
+export function LaboratoryOrientations({ laboratorioId, userId, isOrientador, isAdmin, laboratorioAtivo, onNotice }: {
+  onNotice?: (message: string) => void;
   laboratorioId: string;
   userId: number;
   isOrientador: boolean;
@@ -95,6 +97,12 @@ export function LaboratoryOrientations({ laboratorioId, userId, isOrientador, is
   const [confirmation, setConfirmation] = useState<Confirmation | null>(null);
   const [errorMessage, setErrorMessage] = useState('');
   const [notice, setNotice] = useState('');
+  useEffect(() => {
+    if (notice && onNotice) {
+      onNotice(notice);
+      setNotice('');
+    }
+  }, [notice, onNotice]);
   const [rateLimitedWithoutRetryAfter, setRateLimitedWithoutRetryAfter] = useState(false);
   const activeLinksHeading = useRef<HTMLHeadingElement>(null);
   const pendingInvitationsHeading = useRef<HTMLHeadingElement>(null);
@@ -271,7 +279,7 @@ export function LaboratoryOrientations({ laboratorioId, userId, isOrientador, is
     {errorMessage && <p className={errorMessage === 'rate-limited' && !countdown.isWaiting ? 'orientation-notice' : 'orientation-error'} role={errorMessage === 'rate-limited' && !countdown.isWaiting ? 'status' : 'alert'}>
       {errorMessage === 'rate-limited' ? (rateLimitedWithoutRetryAfter ? 'Muitas solicitações. Tente novamente mais tarde.' : rateLimitMessage) : errorMessage}
     </p>}
-    {notice && <p className="orientation-notice" role="status">{notice}</p>}
+    {!onNotice && <FloatingNotice message={notice} onClose={() => setNotice('')} />}
 
     <section className="active-orientations" aria-labelledby="active-orientations-title" aria-busy={linkStatus === 'loading'}>
       <div className="section-heading"><h3 ref={activeLinksHeading} id="active-orientations-title" tabIndex={-1}>Vínculos ativos</h3></div>

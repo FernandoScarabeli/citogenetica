@@ -88,3 +88,40 @@ Conta, laboratórios, membros, papéis, convites e orientação usam a API real.
 - Não converter pendências de validação em decisões de produto confirmadas.
 
 Fontes: `apps/web/src/laboratories.css`, `apps/web/src/styles.css`, `apps/web/src/theme.css`, `apps/web/src/typography.css`, `apps/web/src/Laboratories.tsx`, `apps/web/README.md`, `.impeccable/laboratorios.md` e `.impeccable/review/critique.md`.
+
+## Gestão compacta do laboratório
+
+A gestão usa uma coluna de até 1100px e uma superfície única para as quatro abas,
+com borda discreta e sem sombra. Nome e estado ficam juntos no cabeçalho. Na lista
+de membros, o e-mail acompanha o nome; os papéis e ações mantêm colunas próprias.
+Formulários de nome e convite têm largura máxima de 600px, com ações próximas aos
+campos. A saída do laboratório aparece somente em Configurações.
+
+Os ajustes ficam em `apps/web/src/laboratory-management.css`, limitados à gestão,
+e usam os tokens existentes, inclusive no modo escuro. No celular, as abas rolam
+horizontalmente e membros e formulários passam a uma coluna.
+
+## Avisos de sucesso
+
+Confirmações de criação e alteração de laboratório, papéis, convites e orientação
+usam um aviso flutuante no canto superior direito, sem alterar o fluxo da página.
+O aviso fecha em cinco segundos, oferece fechamento manual e pausa enquanto há
+mouse ou foco sobre ele ou enquanto a página está oculta. Usa Inter, verde escuro
+e ícones Lucide. Erros que exigem correção continuam junto do respectivo fluxo.
+
+Componentes reutilizáveis em `apps/web/src/components/ui/alert-1.tsx` e
+`floating-notice.tsx`, adaptados à estrutura React/TypeScript e ao tema existente,
+sem novas dependências.
+
+O aviso entra em 220ms e sai em 180ms, com opacidade e deslocamento vertical de
+12px, usando transições que podem ser interrompidas por uma nova mensagem.
+O conteúdo permanece montado durante a saída. Com movimento reduzido, somente
+a opacidade muda.
+
+## Movimento entre abas
+
+As abas de gestão usam os tokens de Fluid Functionalism em `src/lib/springs.ts`,
+com entrada `moderate` de 160ms e saída de 120ms, sem quique. O conteúdo combina
+fade com deslocamento curto. Abas em saída ficam inertes e fora da árvore de
+acessibilidade. A preferência por movimento reduzido mantém somente o fade.
+Motion carrega seus recursos de animação em um arquivo separado, sob demanda.
