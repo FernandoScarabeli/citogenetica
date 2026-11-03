@@ -12,6 +12,7 @@ import { Slides } from '../Slides';
 import { LoginPage } from './LoginPage';
 import { CreateAccountPage } from './CreateAccountPage';
 import { ConfirmEmailPage } from './ConfirmEmailPage';
+import { ConfirmEmailChangePage } from './ConfirmEmailChangePage';
 import { RecoverPasswordPage } from './RecoverPasswordPage';
 import { prepareInitialConfirmationToken } from './confirmation-token';
 import { SessionProvider, isSessionNetworkError, useSession } from './SessionProvider';
@@ -21,7 +22,7 @@ function PrepareConfirmationToken({ children }: { children: ReactNode }) {
   const location = useLocation();
 
   useLayoutEffect(() => {
-    if (location.pathname === '/confirmar-email') prepareInitialConfirmationToken();
+    prepareInitialConfirmationToken();
   }, [location.pathname, location.search, location.hash]);
 
   return children;
@@ -63,11 +64,12 @@ function NotFoundPage() {
 }
 
 function AuthenticatedApp() {
-  const { user, logout } = useSession();
+  const { user, logout, updateUser } = useSession();
   if (!user) return null;
   return <Laboratories
     user={user}
     onLogout={logout}
+    onUserUpdate={updateUser}
     renderSlides={(laboratory, onBack) => <Slides key={laboratory?.id ?? 'avulsas'} laboratory={laboratory} onBack={onBack}/>}
   />;
 }
@@ -78,6 +80,7 @@ function RouteTable() {
     <Route path="/entrar" element={<LoginPage/>}/>
     <Route path="/criar-conta" element={<CreateAccountPage/>}/>
     <Route path="/confirmar-email" element={<ConfirmEmailPage/>}/>
+    <Route path="/confirmar-troca-email" element={<ConfirmEmailChangePage/>}/>
     <Route path="/recuperar-senha" element={<RecoverPasswordPage/>}/>
     <Route element={<ProtectedRoutes/>}>
       <Route path="/app" element={<AuthenticatedApp/>}/>

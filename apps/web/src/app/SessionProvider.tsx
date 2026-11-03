@@ -2,8 +2,9 @@ import { createContext, useCallback, useContext, useEffect, useRef, useState, ty
 import { useLocation, useNavigate } from 'react-router';
 import { authApi, type createAuthApi } from '../api/auth-api';
 import { httpClient, type HttpClient } from '../api/http-client';
+import { usuarioApi, type createUsuarioApi } from '../api/usuario-api';
 import { isUnauthorized, type NetworkError } from '../api/errors';
-import type { UsuarioResponseDTO } from '../api/contracts/auth';
+import type { UsuarioResponseDTO } from '../api/contracts/usuario';
 import { currentInternalPath } from './return-path';
 
 type AuthApi = ReturnType<typeof createAuthApi>;
@@ -16,17 +17,20 @@ interface SessionContextValue {
   retry: () => Promise<void>;
   login: (email: string, senha: string) => Promise<UsuarioResponseDTO>;
   logout: () => Promise<void>;
+  updateUser: (user: UsuarioResponseDTO) => void;
+  clearSession: () => void;
 }
 
 interface SessionProviderProps {
   children: ReactNode;
   auth?: AuthApi;
+  usuario?: ReturnType<typeof createUsuarioApi>;
   client?: HttpClient;
 }
 
 const SessionContext = createContext<SessionContextValue | null>(null);
 
-export function SessionProvider({ children, auth = authApi, client = httpClient }: SessionProviderProps) {
+export function SessionProvider({ children, auth = authApi, usuario = usuarioApi, client = httpClient }: SessionProviderProps) {
   const [user, setUser] = useState<UsuarioResponseDTO | null>(null);
   const [status, setStatus] = useState<SessionStatus>('loading');
   const [loadError, setLoadError] = useState<unknown>(null);
@@ -34,18 +38,22 @@ export function SessionProvider({ children, auth = authApi, client = httpClient 
   const location = useLocation();
   const statusRef = useRef(status);
   const locationRef = useRef(location);
+  const sessionGenerationRef = useRef(0);
 
   statusRef.current = status;
   locationRef.current = location;
 
   const retry = useCallback(async () => {
+    const requestGeneration = ++sessionGenerationRef.current;
     setStatus('loading');
     setLoadError(null);
     try {
-      const currentUser = await auth.getMe();
+      const currentUser = await usuario.getMe();
+      if (requestGeneration !== sessionGenerationRef.current) return;
       setUser(currentUser);
       setStatus('authenticated');
     } catch (error) {
+      if (requestGeneration !== sessionGenerationRef.current) return;
       setUser(null);
       if (isUnauthorized(error)) {
         setStatus('unauthenticated');
@@ -54,7 +62,7 @@ export function SessionProvider({ children, auth = authApi, client = httpClient 
       setLoadError(error);
       setStatus('error');
     }
-  }, [auth]);
+  }, [usuario]);
 
   useEffect(() => {
     void retry();
@@ -62,43 +70,68 @@ export function SessionProvider({ children, auth = authApi, client = httpClient 
 
   useEffect(() => client.onUnauthorized(() => {
     const currentLocation = locationRef.current;
-    if (statusRef.current !== 'authenticated' || currentLocation.pathname === '/entrar') return;
+    if (statusRef.current !== 'authenticated') return;
 
-    const returnTo = currentInternalPath(
-      currentLocation.pathname,
-      currentLocation.search,
-      currentLocation.hash,
-    );
+    sessionGenerationRef.current += 1;
+    const publicConfirmation = currentLocation.pathname === '/confirmar-email'
+      || currentLocation.pathname === '/confirmar-troca-email';
     setUser(null);
     setLoadError(null);
     setStatus('unauthenticated');
-    navigate('/entrar', { replace: true, state: { returnTo } });
+    if (currentLocation.pathname !== '/entrar' && !publicConfirmation) {
+      const returnTo = currentInternalPath(
+        currentLocation.pathname,
+        currentLocation.search,
+        currentLocation.hash,
+      );
+      navigate('/entrar', { replace: true, state: { returnTo } });
+    }
   }), [client, navigate]);
 
   const login = useCallback(async (email: string, senha: string) => {
+    const requestGeneration = ++sessionGenerationRef.current;
     await auth.login({ email: email.trim(), senha });
-    const currentUser = await auth.getMe();
+    const currentUser = await usuario.getMe();
+    if (requestGeneration === sessionGenerationRef.current) {
+      setUser(currentUser);
+      setLoadError(null);
+      setStatus('authenticated');
+    }
+    return currentUser;
+  }, [auth, usuario]);
+
+  const updateUser = useCallback((currentUser: UsuarioResponseDTO) => {
+    sessionGenerationRef.current += 1;
     setUser(currentUser);
     setLoadError(null);
     setStatus('authenticated');
-    return currentUser;
-  }, [auth]);
+  }, []);
+
+  const clearSession = useCallback(() => {
+    sessionGenerationRef.current += 1;
+    setUser(null);
+    setLoadError(null);
+    setStatus('unauthenticated');
+  }, []);
 
   const logout = useCallback(async () => {
+    const requestGeneration = ++sessionGenerationRef.current;
     let notice: string | undefined;
     try {
       await auth.logout();
     } catch {
       notice = 'Não foi possível confirmar o encerramento da sessão. Tente novamente.';
     } finally {
-      setUser(null);
-      setLoadError(null);
-      setStatus('unauthenticated');
-      navigate('/entrar', { replace: true, state: notice ? { notice } : null });
+      if (requestGeneration === sessionGenerationRef.current) {
+        setUser(null);
+        setLoadError(null);
+        setStatus('unauthenticated');
+        navigate('/entrar', { replace: true, state: notice ? { notice } : null });
+      }
     }
   }, [auth, navigate]);
 
-  return <SessionContext.Provider value={{ user, status, loadError, retry, login, logout }}>
+  return <SessionContext.Provider value={{ user, status, loadError, retry, login, logout, updateUser, clearSession }}>
     {children}
   </SessionContext.Provider>;
 }

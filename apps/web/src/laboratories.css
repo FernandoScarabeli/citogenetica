@@ -394,6 +394,14 @@ html[data-appearance="dark"] .account-panel { background: var(--lab-surface); }
 .profile-heading h1{margin-bottom:24px}
 @media(max-width:700px){.profile-heading h1{margin-bottom:18px}}
 
+.profile-security-section+.profile-security-section{border-top:1px solid var(--lab-line)}
+.profile-security-section .profile-personal-heading p{max-width:48ch}
+.profile-security-section .profile-form{padding:28px 32px 32px}
+.profile-field-error,.profile-field-hint{font-size:12px;line-height:1.4}
+.profile-field-error{color:#a4443a}
+.profile-field-hint{color:var(--lab-muted)}
+@media(max-width:700px){.profile-security-section .profile-form{padding:24px 20px}}
+
 /* Neutral dark details shared by lists, counting, menus and profile settings. */
 html[data-appearance="dark"] :is(.labs-app, dialog) { accent-color: #dedede; }
 html[data-appearance="dark"] :is(button,input,select,textarea,a):focus-visible,
@@ -403,7 +411,7 @@ html[data-appearance="dark"] ::selection { background: #555; color: #fff; }
 html[data-appearance="dark"] :is(input,textarea)::placeholder { color: #aaa; opacity: 1; }
 html[data-appearance="dark"] :is(.profile-form .profile-field input,.search input) { background: transparent; }
 html[data-appearance="dark"] :is(.profile-field,.brand-mark,.overview-symbol,.slide-icon,.slide-icon span,.slide-icon span:after) { border-color: #555; color: #bbb; }
-html[data-appearance="dark"] :is(.tabs,.footer,.labs-footer,.lab-scope-nav,.list-labels,.phase-row,.summary-main,.summary-item,.overview-stat,.notes,.activity,th,td,.history-row,.profile-personal-heading,.profile-photo-area) { border-color: #383838; }
+html[data-appearance="dark"] :is(.tabs,.footer,.labs-footer,.lab-scope-nav,.list-labels,.phase-row,.summary-main,.summary-item,.overview-stat,.notes,.activity,th,td,.history-row,.profile-personal-heading,.profile-photo-area,.profile-security-section) { border-color: #383838; }
 html[data-appearance="dark"] :is(.tabs button,.back-link,.text-button,.phase-adjust,.protocol-field,.batch-header h3,.batch-fields legend,.batch-quantity,.protocol-option,.protocol-trigger svg,.lab-scope-nav a) { color: #c9c9c9; }
 html[data-appearance="dark"] :is(.tabs button.selected,.profile-tabs button.selected) { color: #f1f1f1; border-color: #e0e0e0; }
 html[data-appearance="dark"] :is(.batch-header p,.batch-footer p,.batch-hint,.batch-empty,.modal-description,.empty-state p,.notes p,.history-date,.history-row p,.activity p,.activity time,.history-row time,td small,th,.list-labels,.footer,.summary-main small,.summary-item small,.progress-line>div:first-child,.progress-line strong span,.select-placeholder) { color: #b0b0b0; }
@@ -415,7 +423,7 @@ html[data-appearance="dark"] :is(.progress-track span,.activity-dot,.note-dot,.s
 html[data-appearance="dark"] :is([aria-pressed="true"] .account-switch,.appearance-toggle[aria-checked="true"]) { background: #aaa; }
 html[data-appearance="dark"] :is(.account-switch span,.appearance-toggle span) { background: #fff; }
 html[data-appearance="dark"] :is(.lab-alert.error,.lab-confirm,.error-banner) { background: #352321; color: #f1b7ae; border-color: #70453f; }
-html[data-appearance="dark"] :is(.select-error,.create-lab-dialog .create-dialog-error,.labs-app .profile-feedback.error,.member-menu .member-menu-remove) { color: #f1a99e; }
+html[data-appearance="dark"] :is(.select-error,.create-lab-dialog .create-dialog-error,.labs-app .profile-feedback.error,.profile-field-error,.member-menu .member-menu-remove) { color: #f1a99e; }
 html[data-appearance="dark"] .profile-toast.error .profile-toast-icon { background: #422a27; color: #f1a99e; }
 html[data-appearance="dark"] dialog::backdrop { background: rgb(0 0 0 / 65%); }
 @media print { html[data-appearance="dark"], html[data-appearance="dark"] body { color-scheme: light; background: #fff; color: #111; } }

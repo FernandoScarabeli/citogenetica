@@ -1,11 +1,8 @@
 import type {
-  AtualizarMeuPerfilRequestDTO,
-  AtualizarSenhaRequestDTO,
   LoginRequestDTO,
   RecuperarSenhaRequestDTO,
   RedefinirSenhaRequestDTO,
   UsuarioRequestDTO,
-  UsuarioResponseDTO,
   ValidarCodigoRequestDTO,
 } from './contracts/auth.js';
 import { httpClient, type HttpClient } from './http-client.js';
@@ -61,6 +58,14 @@ export function createAuthApi(client: HttpClient = httpClient) {
       });
     },
 
+    confirmEmailChange(token: string, options?: AuthApiOptions): Promise<void> {
+      return client.request<void>('/api/v1/auth/confirmar-troca-email', {
+        method: 'POST',
+        json: { token },
+        signal: options?.signal,
+      });
+    },
+
     requestPasswordRecovery(data: RecuperarSenhaRequestDTO, options?: AuthApiOptions): Promise<void> {
       return client.request<void>('/api/v1/auth/recuperar-senha', {
         method: 'POST',
@@ -80,26 +85,6 @@ export function createAuthApi(client: HttpClient = httpClient) {
     resetPassword(data: RedefinirSenhaRequestDTO, options?: AuthApiOptions): Promise<void> {
       return client.request<void>('/api/v1/auth/redefinir-senha', {
         method: 'POST',
-        json: data,
-        signal: options?.signal,
-      });
-    },
-
-    getMe(options?: AuthApiOptions): Promise<UsuarioResponseDTO> {
-      return client.request<UsuarioResponseDTO>('/api/v1/usuarios/me', { signal: options?.signal });
-    },
-
-    updateMe(data: AtualizarMeuPerfilRequestDTO, options?: AuthApiOptions): Promise<UsuarioResponseDTO> {
-      return client.request<UsuarioResponseDTO>('/api/v1/usuarios/me', {
-        method: 'PUT',
-        json: data,
-        signal: options?.signal,
-      });
-    },
-
-    updateMyPassword(data: AtualizarSenhaRequestDTO, options?: AuthApiOptions): Promise<void> {
-      return client.request<void>('/api/v1/usuarios/me/senha', {
-        method: 'PUT',
         json: data,
         signal: options?.signal,
       });
