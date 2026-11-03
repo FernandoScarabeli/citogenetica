@@ -126,6 +126,15 @@
   opacity: 1;
   cursor: not-allowed;
 }
+.access-signin:not(:disabled) {
+  background: var(--access-green);
+  color: var(--access-white);
+  text-decoration: none;
+  cursor: pointer;
+  transition: background-color 160ms ease-out;
+}
+.access-signin:not(:disabled):hover { background: var(--access-hover); }
+.access-signin:not(:disabled):active { background: var(--access-ink); }
 .access-status {
   margin: -8px 0 0;
   color: var(--access-muted);

@@ -1,4 +1,4 @@
-import { defineConfig } from 'vite';
+import { defineConfig } from 'vitest/config';
 import { fileURLToPath } from 'node:url';
 import react from '@vitejs/plugin-react';
 import tailwindcss from '@tailwindcss/vite';
@@ -28,6 +28,13 @@ export default defineConfig(() => {
           },
         },
       },
+    },
+    test: {
+      environment: 'jsdom',
+      include: ['tests/**/*.test.tsx'],
+      setupFiles: ['./tests/setup.ts'],
+      restoreMocks: true,
+      clearMocks: true,
     },
   };
 });
