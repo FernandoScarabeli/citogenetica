@@ -8,7 +8,7 @@ Os nomes de módulos de domínio são em português (`usuario`, `notificacao`, `
 
 ## Módulos e dependências permitidas
 
-`A → B` significa que A pode usar somente a API pública de B. `config` é a raiz de composição: pode conectar APIs públicas, mas nenhum módulo pode depender dela. `shared` não depende de módulos de negócio nem de `config`. O grafo precisa permanecer acíclico.
+`A → B` significa que A pode usar somente a API pública de B. `config` é a raiz de composição: pode conectar módulos e infraestrutura, mas nenhum módulo nem adaptador pode depender dela. `shared` não depende de módulos de negócio, de `config` ou de `infra`. Módulos de domínio não importam adaptadores concretos; consumidores legados serão migrados para portas técnicas públicas junto dos módulos nos próximos PRs. O grafo precisa permanecer acíclico.
 
 ```text
 usuario        → shared
@@ -26,7 +26,7 @@ analise        → shared, contagem.api, protocolo.api, pesquisa.api
 
 `notificacao` consome eventos públicos dos módulos produtores de convites, contagens e colaboração (`laboratorio`, `contagem`, `colaboracao`). Os produtores não dependem de `notificacao`, evitando ciclos. Consultas/comandos que precisem de resposta imediata usam uma fachada pública. Eventos representam fatos já ocorridos, são imutáveis, não carregam entidades JPA e são tratados após commit quando houver efeito externo.
 
-`infra.email` e `infra.storage` implementam gateways técnicos publicados em `shared`; módulos não importam os adaptadores concretos. Templates e intenção dos e-mails pertencem ao módulo que inicia cada fluxo.
+`infra.email` e `infra.storage` concentram os adaptadores SMTP e RustFS/S3 e suas propriedades. Os utilitários de segredo (`SecretValue`, `@ValidSecret` e validador) ficam em `shared.secret` porque são usados pela configuração da aplicação e pelos dois adaptadores; o conversor Spring fica em `config.secret`. Prefixos de propriedades não mudam. Templates e intenção dos e-mails pertencem ao módulo que inicia cada fluxo; o template e o listener de recuperação continuam no legado até o PR 3. Até lá, esse listener legado ainda chama o adaptador SMTP diretamente.
 
 ## Responsabilidades
 
@@ -44,7 +44,9 @@ analise        → shared, contagem.api, protocolo.api, pesquisa.api
 
 ## Infraestrutura e persistência
 
-`config` reúne segurança HTTP, sessão, OpenAPI e configuração global. A integração de autenticação específica de usuário fica em `usuario.internal`. O contrato de erro HTTP fica em `shared.web`; o handler global permanece na área legada até a reorganização do tratamento de erros no PR 2, pois hoje ele conhece exceções de autenticação.
+`config` reúne segurança HTTP, sessão, CSRF, CORS, proxy confiável, OpenAPI, SSE e configuração global. As propriedades de banco ficam em `config.properties`; propriedades de e-mail e storage ficam junto dos adaptadores. `SecurityConfiguration` ainda compõe temporariamente `SessionUserValidationFilter` e `UsuarioPrincipal` do legado e chama `EventPublisherService` no logout. O acoplamento direto ao SSE será substituído por evento de sessão no PR 4, sem alteração neste PR. Rate limit e executor da recuperação continuam no legado para o PR 3.
+
+O contrato HTTP de erro, `NotFoundException` e `BusinessException` compartilhada ficam reunidos em `shared.web.error`; `FiltroInvalidoException` permanece em `shared.filter`. O handler global fica em `config.web`. Ele ainda mapeia exceções específicas de autenticação/perfil que estão no legado; essas exceções acompanham `usuario` no PR 3, sem dependência de `shared` para negócio.
 
 `CriteriaCreator` e `CamposPermitidos` ficam em `shared.filter`; `PageableFactory`, constantes e resposta paginada em `shared.pagination`; contratos e interfaces de mapper genérico em `shared.mapper`; auditoria/versionamento comum em `shared.persistence`. A base atual usa `IDENTITY` para IDs numéricos. `GenericDTO` também mantém o ID `Long` legado; ambos devem ser revistos antes de atender entidades UUID geradas no cliente.
 
@@ -52,7 +54,7 @@ Os pacotes permanecem abaixo de `br.ufla.citogenetica`, raiz de `@SpringBootAppl
 
 ## Verificação e migração
 
-ArchUnit, em escopo de teste, verifica acesso apenas a APIs públicas, ausência de dependências de `shared` para negócio/config, ausência de dependências de módulos para `config` e aciclicidade. Há também um teste de regressão do conjunto de paths em `/v3/api-docs`. O teste documenta os pacotes legados ainda tolerados; cada PR remove os pacotes correspondentes da lista.
+ArchUnit, em escopo de teste, verifica acesso apenas a APIs públicas, ausência de dependências de `shared` para negócio/config, ausência de dependências de módulos para `config` e aciclicidade. Há também um teste de regressão do conjunto de paths em `/v3/api-docs`. O teste documenta os pacotes legados ainda tolerados (`controller`, `exception`, `filter`, `mapper`, `model`, `repository` e `service`); os PRs 3–4 removem os pacotes correspondentes da lista.
 
 Migração aprovada em quatro PRs:
 

@@ -1,6 +1,5 @@
 package br.ufla.citogenetica.service;
 
-import br.ufla.citogenetica.configuration.security.RateLimitProperties;
 import br.ufla.citogenetica.exception.TooManyRequestsException;
 import org.springframework.dao.EmptyResultDataAccessException;
 import org.springframework.jdbc.core.JdbcTemplate;

@@ -1,6 +1,6 @@
 package br.ufla.citogenetica.service;
 
-import br.ufla.citogenetica.configuration.email.EmailTemplates;
+import br.ufla.citogenetica.infra.email.EmailService;
 import br.ufla.citogenetica.model.usuario.RecoveryEmailRequestedEvent;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.scheduling.annotation.Async;

@@ -1,6 +1,6 @@
 package br.ufla.citogenetica.service;
 
-import br.ufla.citogenetica.configuration.sse.SseProperties;
+import br.ufla.citogenetica.config.sse.SseProperties;
 import br.ufla.citogenetica.model.event.NotificacaoCriadaEvent;
 import br.ufla.citogenetica.model.event.ServerEvent;
 import br.ufla.citogenetica.model.event.SessoesRevogadasEvent;
