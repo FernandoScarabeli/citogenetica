@@ -9,14 +9,27 @@ import java.time.LocalDateTime;
 import java.util.*;
 import java.util.regex.Pattern;
 
+import br.ufla.citogenetica.exception.FiltroInvalidoException;
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.util.MultiValueMap;
 
 import jakarta.persistence.criteria.*;
 
 public class CriteriaCreator {
-    public static <T> Specification<T> byFilterMap(MultiValueMap<String, String> params, Class<T> clazz, String sortBy,
-                                                   String sortDirection) {
+
+    private static final Set<String> PARAMETROS_RESERVADOS = Set.of("page", "size", "sort", "sortBy", "sortDirection");
+    private static final Set<String> DIRECOES_ORDENACAO = Set.of("asc", "desc");
+    private static final Set<String> OPERADORES = Set.of("eq", "ne", "gt", "gte", "lt", "lte");
+    private static final char ESCAPE_LIKE = '\\';
+
+    /**
+     * Monta a Specification a partir dos parâmetros da requisição. Campos, ordenação e direção são
+     * validados aqui, antes da consulta: qualquer item fora de {@code campos} gera
+     * {@link FiltroInvalidoException} em vez de ser ignorado (o que alargaria a busca).
+     */
+    public static <T> Specification<T> byFilterMap(MultiValueMap<String, String> params, Class<T> clazz,
+                                                   CamposPermitidos campos, String sortBy, String sortDirection) {
+        validarOrdenacao(campos, sortBy, sortDirection);
 
         Map<String, List<Object>> filterMap = new HashMap<>();
         for (Map.Entry<String, List<String>> entry : params.entrySet()) {
@@ -24,11 +37,8 @@ public class CriteriaCreator {
             filterMap.put(entry.getKey(), values);
         }
 
-        filterMap.remove("page");
-        filterMap.remove("size");
-        filterMap.remove("sort");
-        filterMap.remove("sortBy");
-        filterMap.remove("sortDirection");
+        filterMap.keySet().removeAll(PARAMETROS_RESERVADOS);
+        filterMap.keySet().forEach(chave -> validarCamposDeFiltro(campos, chave));
 
         return (Root<T> root, CriteriaQuery<?> query, CriteriaBuilder cb) -> {
             Predicate finalPredicate = cb.conjunction();
@@ -49,32 +59,25 @@ public class CriteriaCreator {
                             boolean isJsonField = orKey.startsWith("dto.");
 
                             Predicate predicate;
+                            if (isJsonField) {
+                                String jsonPath = orKey.substring(4);
+                                predicate = createJsonbPredicate(root, cb, jsonPath, values.get(0));
+                            } else {
+                                Path<?> path = navigatePath(root, orKey);
 
-                            try {
-                                if (isJsonField) {
-                                    String jsonPath = orKey.substring(4);
-                                    predicate = createJsonbPredicate(root, cb, jsonPath, values.get(0));
-                                } else {
-                                    Path<?> path = navigatePath(root, orKey);
-
-                                    List<Object> convertedValues = new ArrayList<>();
-                                    for (Object value : values) {
-                                        convertedValues.add(convertValueToFieldType(path, value));
-                                    }
-
-                                    // Extrai o nome do campo do orKey
-                                    String fieldName = orKey.contains(".") ? orKey.substring(orKey.lastIndexOf(".") + 1) : orKey;
-                                    predicate = createPredicate(cb, path, convertedValues, fieldName);
+                                List<Object> convertedValues = new ArrayList<>();
+                                for (Object value : values) {
+                                    convertedValues.add(convertValueToFieldType(path, value));
                                 }
-                                currentOrPredicates.add(predicate);
-                            } catch (Exception e) {
-                                String errorMsg = String.format("Erro no campo '%s': %s", orKey, e.getMessage());
+
+                                // Extrai o nome do campo do orKey
+                                String fieldName = orKey.contains(".") ? orKey.substring(orKey.lastIndexOf(".") + 1) : orKey;
+                                predicate = createPredicate(cb, path, convertedValues, fieldName);
                             }
+                            currentOrPredicates.add(predicate);
                         }
 
-                        if (!currentOrPredicates.isEmpty()) {
-                            orPredicates.add(cb.or(currentOrPredicates.toArray(new Predicate[0])));
-                        }
+                        orPredicates.add(cb.or(currentOrPredicates.toArray(new Predicate[0])));
                     } else {
                         Predicate predicate = createPredicateForEntry(root, cb, key, values);
                         finalPredicate = cb.and(finalPredicate, predicate);
@@ -92,6 +95,37 @@ public class CriteriaCreator {
 
             return finalPredicate;
         };
+    }
+
+    private static void validarCamposDeFiltro(CamposPermitidos campos, String chave) {
+        for (String campo : chave.split("!")) {
+            String nome = campo.trim();
+            if (!campos.filtro().contains(nome)) {
+                throw new FiltroInvalidoException("Campo de filtro não permitido: '" + nome + "'.");
+            }
+        }
+    }
+
+    private static void validarOrdenacao(CamposPermitidos campos, String sortBy, String sortDirection) {
+        if (sortBy != null && !sortBy.isBlank() && !campos.ordenacao().contains(sortBy)) {
+            throw new FiltroInvalidoException("Campo de ordenação não permitido: '" + sortBy + "'.");
+        }
+        if (sortDirection != null && !DIRECOES_ORDENACAO.contains(sortDirection.toLowerCase(Locale.ROOT))) {
+            throw new FiltroInvalidoException("Direção de ordenação inválida: use 'asc' ou 'desc'.");
+        }
+    }
+
+    /** Escapa os curingas do LIKE para que o valor digitado seja buscado literalmente. */
+    private static String padraoContem(String valor) {
+        String normalizado = removeAccents(valor.toLowerCase());
+        StringBuilder escapado = new StringBuilder("%");
+        for (char caractere : normalizado.toCharArray()) {
+            if (caractere == '%' || caractere == '_' || caractere == ESCAPE_LIKE) {
+                escapado.append(ESCAPE_LIKE);
+            }
+            escapado.append(caractere);
+        }
+        return escapado.append('%').toString();
     }
 
     private static <T> Predicate createPredicateForEntry(Root<T> root, CriteriaBuilder cb, String key,
@@ -123,12 +157,10 @@ public class CriteriaCreator {
 
     private static <T> Predicate createJsonbPredicate(Root<T> root, CriteriaBuilder cb, String jsonPath, Object value) {
         Expression<String> jsonExpr = buildJsonbExtractPath(root, cb, jsonPath);
-        String processedValue = "%" + removeAccents(value.toString().toLowerCase()) + "%";
-
         Expression<String> unaccentLowerExpr = cb.function("unaccent", String.class,
                 cb.function("lower", String.class, jsonExpr));
 
-        return cb.like(unaccentLowerExpr, processedValue);
+        return cb.like(unaccentLowerExpr, padraoContem(value.toString()), ESCAPE_LIKE);
     }
 
     private static <T> Expression<String> buildJsonbExtractPath(Root<T> root, CriteriaBuilder cb, String jsonPath) {
@@ -207,9 +239,8 @@ public class CriteriaCreator {
         List<Predicate> predicates = new ArrayList<>();
         for (Object value : values) {
             if (String.class.isAssignableFrom(path.getJavaType())) {
-                String processedValue = "%" + removeAccents(((String) value).toLowerCase()) + "%";
                 Expression<String> unaccentLowerExpr = getUnaccentLowerExpression(cb, path);
-                predicates.add(cb.like(unaccentLowerExpr, processedValue));
+                predicates.add(cb.like(unaccentLowerExpr, padraoContem((String) value), ESCAPE_LIKE));
             } else {
                 predicates.add(cb.equal(path, value));
             }
@@ -232,46 +263,41 @@ public class CriteriaCreator {
             if (value == null)
                 continue;
 
-            String[] parts = value.split(":");
-            String operator = parts.length > 1 ? parts[0].toLowerCase() : "eq";
-            String dateValue = parts.length > 1 ? parts[1] : value;
+            String[] operadorEValor = separarOperador(value);
+            String operator = operadorEValor[0];
+            String dateValue = operadorEValor[1];
 
-            try {
-                Object parsedDate = parseDate(path.getJavaType(), dateValue);
+            Object parsedDate = parseDate(path.getJavaType(), dateValue);
 
-                switch (operator) {
-                    case "gte" :
-                        if (minValue == null || compareDates(parsedDate, minValue) > 0) {
-                            minValue = parsedDate;
-                        }
-                        break;
-                    case "gt" :
-                        if (minValue == null || compareDates(parsedDate, minValue) >= 0) {
-                            minValue = parsedDate;
-                        }
-                        break;
-                    case "lte" :
-                        if (maxValue == null || compareDates(parsedDate, maxValue) < 0) {
-                            maxValue = parsedDate;
-                        }
-                        break;
-                    case "lt" :
-                        if (maxValue == null || compareDates(parsedDate, maxValue) <= 0) {
-                            maxValue = parsedDate;
-                        }
-                        break;
-                    case "ne" :
-                        predicates.add(cb.notEqual(path, parsedDate));
-                        break;
-                    case "eq" :
-                    default :
-                        predicates.add(cb.equal(path, parsedDate));
-                        break;
-                }
-            } catch (Exception e) {
-                String processedValue = "%" + removeAccents(value.toLowerCase()) + "%";
-                Expression<String> unaccentLowerExpr = getUnaccentLowerExpression(cb, path);
-                predicates.add(cb.like(unaccentLowerExpr, processedValue));
+            switch (operator) {
+                case "gte" :
+                    if (minValue == null || compareDates(parsedDate, minValue) > 0) {
+                        minValue = parsedDate;
+                    }
+                    break;
+                case "gt" :
+                    if (minValue == null || compareDates(parsedDate, minValue) >= 0) {
+                        minValue = parsedDate;
+                    }
+                    break;
+                case "lte" :
+                    if (maxValue == null || compareDates(parsedDate, maxValue) < 0) {
+                        maxValue = parsedDate;
+                    }
+                    break;
+                case "lt" :
+                    if (maxValue == null || compareDates(parsedDate, maxValue) <= 0) {
+                        maxValue = parsedDate;
+                    }
+                    break;
+                case "ne" :
+                    predicates.add(cb.notEqual(path, parsedDate));
+                    break;
+                case "eq" :
+                    predicates.add(cb.equal(path, parsedDate));
+                    break;
+                default :
+                    throw operadorInvalido(operator);
             }
         }
 
@@ -308,6 +334,26 @@ public class CriteriaCreator {
         return predicates.isEmpty() ? cb.conjunction() : cb.and(predicates.toArray(new Predicate[0]));
     }
 
+    /**
+     * Separa "operador:valor". Só um operador conhecido conta como prefixo; assim valores com ':'
+     * (como 2026-01-01T10:00) continuam sendo comparados por igualdade.
+     */
+    private static String[] separarOperador(String value) {
+        int separador = value.indexOf(':');
+        if (separador > 0) {
+            String operador = value.substring(0, separador).toLowerCase(Locale.ROOT);
+            if (OPERADORES.contains(operador)) {
+                return new String[]{operador, value.substring(separador + 1)};
+            }
+        }
+        return new String[]{"eq", value};
+    }
+
+    private static FiltroInvalidoException operadorInvalido(String operador) {
+        return new FiltroInvalidoException(
+                "Operador de filtro inválido: '" + operador + "'. Use eq, ne, gt, gte, lt ou lte.");
+    }
+
     private static int compareDates(Object date1, Object date2) {
         if (date1 instanceof LocalDate && date2 instanceof LocalDate) {
             return ((LocalDate) date1).compareTo((LocalDate) date2);
@@ -333,7 +379,7 @@ public class CriteriaCreator {
                 return new SimpleDateFormat("yyyy-MM-dd").parse(value);
             }
         } catch (Exception e) {
-            throw new IllegalArgumentException("Formato de data inválido: " + value);
+            throw new FiltroInvalidoException("Formato de data inválido: '" + value + "'. Use AAAA-MM-DD.");
         }
         throw new UnsupportedOperationException("Tipo de data não suportado: " + type);
     }
@@ -355,45 +401,41 @@ public class CriteriaCreator {
             if (value == null)
                 continue;
 
-            String[] parts = value.split(":");
-            String operator = parts.length > 1 ? parts[0].toLowerCase() : "eq";
-            String numericValue = parts.length > 1 ? parts[1] : value;
+            String[] operadorEValor = separarOperador(value);
+            String operator = operadorEValor[0];
+            String numericValue = operadorEValor[1];
 
-            try {
-                Number number = parseNumber(path.getJavaType(), numericValue);
+            Number number = parseNumber(path.getJavaType(), numericValue);
 
-                switch (operator) {
-                    case "gte" :
-                        if (minValue == null || compareNumbers(number, minValue) > 0) {
-                            minValue = number;
-                        }
-                        break;
-                    case "gt" :
-                        if (minValue == null || compareNumbers(number, minValue) >= 0) {
-                            minValue = number;
-                        }
-                        break;
-                    case "lte" :
-                        if (maxValue == null || compareNumbers(number, maxValue) < 0) {
-                            maxValue = number;
-                        }
-                        break;
-                    case "lt" :
-                        if (maxValue == null || compareNumbers(number, maxValue) <= 0) {
-                            maxValue = number;
-                        }
-                        break;
-                    case "ne" :
-                        predicates.add(cb.notEqual(path, number));
-                        break;
-                    case "eq" :
-                    default :
-                        predicates.add(cb.equal(path, number));
-                        break;
-                }
-            } catch (Exception e) {
-                throw new IllegalArgumentException(
-                        "Valor numérico inválido: " + value + ". Detalhe: " + e.getMessage());
+            switch (operator) {
+                case "gte" :
+                    if (minValue == null || compareNumbers(number, minValue) > 0) {
+                        minValue = number;
+                    }
+                    break;
+                case "gt" :
+                    if (minValue == null || compareNumbers(number, minValue) >= 0) {
+                        minValue = number;
+                    }
+                    break;
+                case "lte" :
+                    if (maxValue == null || compareNumbers(number, maxValue) < 0) {
+                        maxValue = number;
+                    }
+                    break;
+                case "lt" :
+                    if (maxValue == null || compareNumbers(number, maxValue) <= 0) {
+                        maxValue = number;
+                    }
+                    break;
+                case "ne" :
+                    predicates.add(cb.notEqual(path, number));
+                    break;
+                case "eq" :
+                    predicates.add(cb.equal(path, number));
+                    break;
+                default :
+                    throw operadorInvalido(operator);
             }
         }
 
@@ -480,7 +522,7 @@ public class CriteriaCreator {
                 return new BigInteger(value);
             }
         } catch (Exception e) {
-            throw new IllegalArgumentException("Formato numérico inválido: " + value);
+            throw new FiltroInvalidoException("Formato numérico inválido: '" + value + "'.");
         }
         throw new UnsupportedOperationException("Tipo numérico não suportado: " + type);
     }
@@ -528,8 +570,8 @@ public class CriteriaCreator {
                 return Enum.valueOf((Class<Enum>) fieldType, stringValue);
             }
         } catch (Exception e) {
-            throw new IllegalArgumentException(
-                    "Valor '" + stringValue + "' inválido para tipo " + fieldType.getSimpleName());
+            throw new FiltroInvalidoException(
+                    "Valor '" + stringValue + "' inválido para o tipo " + fieldType.getSimpleName() + ".");
         }
 
         return value;

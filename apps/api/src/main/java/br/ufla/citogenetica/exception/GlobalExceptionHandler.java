@@ -58,6 +58,17 @@ public class GlobalExceptionHandler {
         return new ResponseEntity<>(errorResponse, HttpStatus.BAD_REQUEST);
     }
 
+    @ExceptionHandler(FiltroInvalidoException.class)
+    public ResponseEntity<ErrorResponseDTO> handleFiltroInvalido(FiltroInvalidoException ex, HttpServletRequest request) {
+        ErrorResponseDTO errorResponse = new ErrorResponseDTO(
+                HttpStatus.BAD_REQUEST.value(),
+                HttpStatus.BAD_REQUEST.getReasonPhrase(),
+                "Filtro inválido",
+                request.getRequestURI(),
+                List.of(ex.getMessage()));
+        return new ResponseEntity<>(errorResponse, HttpStatus.BAD_REQUEST);
+    }
+
     @ExceptionHandler(MethodArgumentTypeMismatchException.class)
     public ResponseEntity<ErrorResponseDTO> handleMethodArgumentTypeMismatch(
             MethodArgumentTypeMismatchException ex, HttpServletRequest request) {
