@@ -72,7 +72,7 @@ O relatório usa a impressão do navegador: na aba **Resumo**, escolha **Imprimi
 
 Após entrar, `/laboratorios` consulta os laboratórios da conta em `/api/v1/laboratorios`. A criação envia somente o nome; a API atribui Membro e Administrador a quem cria. O nome pode ser alterado por Administradores. Participantes ativos veem nome, e-mail e papéis. Os papéis Membro, Administrador e Orientador são combináveis; Membro é obrigatório. A API é a fonte de autorização e de conflitos, incluindo a proteção do último Administrador. Um laboratório desativado fica disponível apenas para consulta, inclusive nas lâminas locais.
 
-A configuração local antiga `citogenetica:laboratories:v1` é removida silenciosamente na inicialização. A limpeza afeta somente essa chave; `citogenetica:workspace:v1` e `citogenetica:preferences:v1` permanecem intactas. Convites (F08) e orientação (F09) ainda não fazem parte da interface; o sino de notificações ficará oculto até a integração prevista na F10.
+A configuração local antiga `citogenetica:laboratories:v1` é removida silenciosamente na inicialização. A limpeza afeta somente essa chave; `citogenetica:workspace:v1` e `citogenetica:preferences:v1` permanecem intactas. Convites e orientação são geridos pela API e o cabeçalho autenticado mostra as notificações da conta.
 
 As lâminas novas em um laboratório real recebem o UUID dele e aparecem somente naquele espaço. Lâminas sem `labId` e lâminas com identificadores locais antigos que não são UUID continuam acessíveis em **Lâminas avulsas**. As lâminas e contagens continuam locais e não são transferidas nem apagadas ao criar ou sair de um laboratório. O backup aberto em um laboratório contém somente as lâminas daquele UUID; em **Lâminas avulsas**, inclui os registros sem vínculo real.
 
@@ -85,3 +85,9 @@ A ação de quantidade adiciona ou remove células por fase e classificação; p
 O nome e o e-mail exibidos no perfil vêm da conta autenticada. O nome é atualizado em /api/v1/usuarios/me; a senha é atualizada em /api/v1/usuarios/me/senha, mantendo a sessão atual e encerrando as demais. Foto e aparência continuam salvas apenas neste navegador. O campo name de versões antigas das preferências é ignorado, sem impedir a leitura da foto e do tema.
 
 A troca de e-mail no front segue o contrato registrado em docs/handoff-coordenacao.md (POST /api/v1/usuarios/me/email e POST /api/v1/auth/confirmar-troca-email). Os controllers presentes neste checkout ainda não expõem essas rotas; até a implementação correspondente na API, as duas chamadas retornarão erro. A API também não oferece gerenciamento de dispositivos, por isso o perfil não mostra essa aba.
+
+## Notificações
+
+O sino consulta a contagem de não lidas e a lista paginada na API. Enquanto a sessão estiver ativa, cada aba mantém uma única conexão SSE autenticada pelo cookie; os eventos invalidam os dados locais e, ao abrir o painel ou retornar à aba, a contagem também é consultada novamente. Convites de laboratório e de orientação não incluem token na notificação; a pessoa deve usar o link recebido por e-mail.
+
+O `EventSource` nativo não permite ler o status HTTP nem o cabeçalho `Retry-After` em uma falha. Quando o servidor encerra a conexão, o cliente verifica a sessão pela API antes de agendar nova tentativa. A falha por limite de conexões usa a espera de 30 segundos definida pela API; as falhas recuperáveis usam espera exponencial com teto de 30 segundos.
