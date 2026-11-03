@@ -18,6 +18,11 @@ RUN java -Djarmode=tools -jar target/app.jar extract --layers --launcher --desti
 FROM eclipse-temurin:17-jre-jammy AS final
 WORKDIR /application
 
+# curl é usado pelo healthcheck do Compose para consultar /actuator/health.
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends curl && \
+    rm -rf /var/lib/apt/lists/*
+
 ARG UID=10001
 RUN adduser \
     --disabled-password \

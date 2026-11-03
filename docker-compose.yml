@@ -12,9 +12,9 @@ services:
       mailpit:
         condition: service_healthy
     ports:
-      - "${SERVER_PORT:?Defina SERVER_PORT no arquivo .env}:${SERVER_PORT:?Defina SERVER_PORT no arquivo .env}"
+      - "${SERVER_PORT:?Defina SERVER_PORT no arquivo .env}:8080"
     environment:
-      SERVER_PORT: ${SERVER_PORT:?Defina SERVER_PORT no arquivo .env}
+      SERVER_PORT: "8080"
       SPRING_DATASOURCE_HOST: db
       SPRING_DATASOURCE_PORT: ${SPRING_DATASOURCE_PORT:?Defina SPRING_DATASOURCE_PORT no arquivo .env}
       SPRING_DATASOURCE_DATABASE: ${SPRING_DATASOURCE_DATABASE:?Defina SPRING_DATASOURCE_DATABASE no arquivo .env}
@@ -39,8 +39,29 @@ services:
       STORAGE_SECRET_KEY: ${STORAGE_SECRET_KEY:?Defina STORAGE_SECRET_KEY no arquivo .env}
       STORAGE_PRESIGNED_URL_VALIDITY_SECONDS: ${STORAGE_PRESIGNED_URL_VALIDITY_SECONDS:?Defina STORAGE_PRESIGNED_URL_VALIDITY_SECONDS no arquivo .env}
       SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE:?Defina SPRING_PROFILES_ACTIVE no arquivo .env}
+      # Confia nos cabeçalhos X-Forwarded-* somente vindos do serviço web (IP fixo abaixo), para que
+      # limites por IP vejam o cliente real e ninguém consiga forjar o próprio endereço.
+      API_SECURITY_TRUSTED_PROXY_REGEX: ${API_SECURITY_TRUSTED_PROXY_REGEX:-10\.89\.57\.10}
     env_file:
       - .env
+    healthcheck:
+      test: [ "CMD", "curl", "--fail", "--silent", "--show-error", "--max-time", "5", "--output", "/dev/null", "http://127.0.0.1:8080/actuator/health" ]
+      interval: 15s
+      timeout: 6s
+      retries: 5
+      start_period: 60s
+
+  web:
+    build:
+      context: ./apps/web
+    depends_on:
+      api:
+        condition: service_healthy
+    ports:
+      - "${WEB_PORT:?Defina WEB_PORT no arquivo .env}:8080"
+    networks:
+      default:
+        ipv4_address: 10.89.57.10
 
   db:
     image: postgres:${POSTGRES_VERSION:?Defina POSTGRES_VERSION no arquivo .env}-alpine
@@ -93,3 +114,10 @@ services:
 volumes:
   db-data:
   rustfs-data:
+
+networks:
+  default:
+    ipam:
+      config:
+        # Sub-rede fixa para dar ao serviço web um IP conhecido (proxy confiável da API).
+        - subnet: 10.89.57.0/24
