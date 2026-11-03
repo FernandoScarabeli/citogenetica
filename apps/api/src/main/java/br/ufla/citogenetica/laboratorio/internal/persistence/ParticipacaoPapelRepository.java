@@ -16,6 +16,8 @@ public interface ParticipacaoPapelRepository extends JpaRepository<ParticipacaoP
 
     List<ParticipacaoPapel> findAllByParticipacaoIdInAndRevogadoEmIsNull(Collection<UUID> participacaoIds);
 
+    boolean existsByParticipacaoIdAndPapelAndRevogadoEmIsNull(UUID participacaoId, PapelLaboratorio papel);
+
     @Query("select count(distinct participacao.id) from Participacao participacao "
             + "join ParticipacaoPapel papel on papel.participacao.id = participacao.id "
             + "where participacao.laboratorio.id = :laboratorioId "

@@ -46,6 +46,7 @@ public class LaboratorioService {
     private final ParticipacaoRepository participacaoRepository;
     private final ParticipacaoPapelRepository papelRepository;
     private final LaboratorioAccessPolicy accessPolicy;
+    private final OrientacaoLifecycleService orientacaoLifecycleService;
     private final UsuarioRosterQuery usuarioRosterQuery;
     private final UuidFactory uuidFactory;
     private final Clock clock;
@@ -57,6 +58,7 @@ public class LaboratorioService {
                               ParticipacaoRepository participacaoRepository,
                               ParticipacaoPapelRepository papelRepository,
                               LaboratorioAccessPolicy accessPolicy,
+                              OrientacaoLifecycleService orientacaoLifecycleService,
                               UsuarioRosterQuery usuarioRosterQuery,
                               UuidFactory uuidFactory,
                               Clock clock) {
@@ -64,6 +66,7 @@ public class LaboratorioService {
         this.participacaoRepository = participacaoRepository;
         this.papelRepository = papelRepository;
         this.accessPolicy = accessPolicy;
+        this.orientacaoLifecycleService = orientacaoLifecycleService;
         this.usuarioRosterQuery = usuarioRosterQuery;
         this.uuidFactory = uuidFactory;
         this.clock = clock;
@@ -150,6 +153,11 @@ public class LaboratorioService {
         if (papeisAtuais.equals(papeisDesejados)) {
             return resumoParticipacao(alvo, papeisAtuais, versaoEsperada);
         }
+        if (papeisAtuais.contains(PapelLaboratorio.ORIENTADOR)
+                && !papeisDesejados.contains(PapelLaboratorio.ORIENTADOR)) {
+            orientacaoLifecycleService.exigirSemVinculosAtivos(alvo.getId());
+            orientacaoLifecycleService.encerrarDaParticipacao(laboratorioId, alvo.getId(), atorId, clock.instant());
+        }
         if (papeisAtuais.contains(PapelLaboratorio.ADMIN)
                 && !papeisDesejados.contains(PapelLaboratorio.ADMIN)
                 && papelRepository.contarParticipacoesAtivasComPapel(laboratorioId, PapelLaboratorio.ADMIN) <= 1) {
@@ -230,6 +238,7 @@ public class LaboratorioService {
         }
 
         Instant agora = clock.instant();
+        orientacaoLifecycleService.encerrarDaParticipacao(laboratorioId, alvo.getId(), atorId, agora);
         if (estadoFinal == EstadoParticipacao.SAIU) {
             alvo.sair(atorId, agora);
         } else {

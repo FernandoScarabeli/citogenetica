@@ -38,6 +38,7 @@ public abstract class AbstractIntegrationTest {
         properties.add("api.security.email-confirmation.frontend-url", () -> "https://front.citogenetica.test/confirmar-email");
         properties.add("api.security.email-change-confirmation.frontend-url", () -> "https://front.citogenetica.test/confirmar-troca-email");
         properties.add("api.security.laboratory-invitations.frontend-url", () -> "https://front.citogenetica.test/convites/aceitar");
+        properties.add("api.security.orientation-invitations.frontend-url", () -> "https://front.citogenetica.test/orientacoes/convites/aceitar");
         properties.add("api.email.from", () -> "testes@citogenetica.test");
 
         properties.add("app.datasource.password", () -> TestcontainersConfiguration.DATABASE_PASSWORD);
