@@ -3,6 +3,7 @@ import { ArrowRight } from 'lucide-react';
 import { Link, useNavigate } from 'react-router';
 import { ApiError, NetworkError, isRateLimited } from '../api/errors';
 import { conviteApi } from '../api/convite-api';
+import { orientacaoApi } from '../api/orientacao-api';
 import { AuthLayout } from './AuthLayout';
 import { useInvitationToken } from './invitation-token-context';
 import { useSession } from './SessionProvider';
@@ -13,7 +14,7 @@ type InvitationAction = 'accept' | 'refuse';
 
 const INVALID_INVITATION = 'Convite inválido ou indisponível. Ele pode ter expirado, sido cancelado ou ser para outro e-mail.';
 
-export function InvitationAcceptancePage() {
+export function InvitationAcceptancePage({ kind = 'laboratory' }: { kind?: 'laboratory' | 'orientation' }) {
   const { token, clearToken } = useInvitationToken();
   const { user, status: sessionStatus, loadError, retry } = useSession();
   const navigate = useNavigate();
@@ -46,11 +47,15 @@ export function InvitationAcceptancePage() {
 
     try {
       if (action === 'accept') {
-        await conviteApi.aceitar(token);
+        if (kind === 'orientation') await orientacaoApi.aceitarConvite(token);
+        else await conviteApi.aceitar(token);
         clearToken();
-        navigate('/laboratorios', { replace: true, state: { notice: 'Convite aceito. O laboratório foi adicionado à sua lista.' } });
+        navigate('/laboratorios', { replace: true, state: { notice: kind === 'orientation'
+          ? 'Convite de orientação aceito. Você agora é orientado e participa do laboratório.'
+          : 'Convite aceito. O laboratório foi adicionado à sua lista.' } });
       } else {
-        await conviteApi.recusar(token);
+        if (kind === 'orientation') await orientacaoApi.recusarConvite(token);
+        else await conviteApi.recusar(token);
         clearToken();
         setResult('refused');
       }
@@ -89,7 +94,9 @@ export function InvitationAcceptancePage() {
       ? 'Não foi possível usar este convite.'
       : !token
         ? 'O link precisa conter um convite ativo.'
-        : 'Aceite ou recuse o convite recebido por e-mail.';
+        : kind === 'orientation'
+          ? 'Ao aceitar, você passará a ser orientado por esta pessoa e entrará no laboratório como Membro caso ainda não participe. Você também pode recusar o convite.'
+          : 'Aceite ou recuse o convite recebido por e-mail.';
 
   const retryMessage = countdown.isWaiting
     ? `Muitas tentativas. ${retryCountdownMessage(countdown.remainingSeconds ?? 0)}`
@@ -114,7 +121,7 @@ export function InvitationAcceptancePage() {
       <p>Entre ou crie sua conta com o e-mail que recebeu o convite.</p>
       <p>Se precisar criar uma conta e confirmar o e-mail em outra aba ou pelo link recebido, abra novamente o link do convite depois da confirmação.</p>
       <div className="invitation-actions">
-        <Link className="access-signin" to="/entrar" state={{ returnTo: '/convites/aceitar' }}>Entrar <ArrowRight size={17} aria-hidden="true" /></Link>
+        <Link className="access-signin" to="/entrar" state={{ returnTo: kind === 'orientation' ? '/orientacoes/convites/aceitar' : '/convites/aceitar' }}>Entrar <ArrowRight size={17} aria-hidden="true" /></Link>
         <Link className="invitation-secondary-action" to="/criar-conta">Criar conta</Link>
       </div>
     </div>}

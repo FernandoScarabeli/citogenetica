@@ -29,6 +29,8 @@ function mockApi(options: {
   authenticated?: boolean;
   accept?: () => Response | Promise<Response>;
   refuse?: () => Response | Promise<Response>;
+  orientationAccept?: () => Response | Promise<Response>;
+  orientationRefuse?: () => Response | Promise<Response>;
 } = {}) {
   let authenticated = options.authenticated ?? false;
   let csrfCount = 0;
@@ -55,6 +57,8 @@ function mockApi(options: {
     if (path === '/api/v1/laboratorios' && method === 'GET') return response(200, []);
     if (path === '/api/v1/convites/aceitar') return options.accept ? options.accept() : response(204);
     if (path === '/api/v1/convites/recusar') return options.refuse ? options.refuse() : response(204);
+    if (path === '/api/v1/orientacoes/convites/aceitar') return options.orientationAccept ? options.orientationAccept() : response(204);
+    if (path === '/api/v1/orientacoes/convites/recusar') return options.orientationRefuse ? options.orientationRefuse() : response(204);
     return apiError(404, path, 'Não encontrado.');
   });
 
@@ -62,8 +66,9 @@ function mockApi(options: {
   return { calls, fetchMock };
 }
 
-function openInvitation(token = 'abc%2B123') {
-  window.history.replaceState(null, '', `/convites/aceitar#token=${token}`);
+function openInvitation(token = 'abc%2B123', kind: 'laboratory' | 'orientation' = 'laboratory') {
+  const route = kind === 'orientation' ? '/orientacoes/convites/aceitar' : '/convites/aceitar';
+  window.history.replaceState(null, '', `${route}#token=${token}`);
 }
 
 beforeEach(() => {
@@ -157,5 +162,65 @@ describe('aceite de convites', () => {
     expect((await screen.findByRole('alert')).textContent).toContain('Tente novamente em 4 segundos.');
     expect((screen.getByRole('button', { name: 'Aguarde 4 s' }) as HTMLButtonElement).disabled).toBe(true);
     expect(calls.filter(call => call.path === '/api/v1/convites/aceitar')).toHaveLength(1);
+  });
+
+  it('remove o token de orientação antes das requisições e volta à mesma página após login', async () => {
+    const { calls } = mockApi({ authenticated: false });
+    openInvitation('token-orientacao%2Bseguro', 'orientation');
+    render(<App/>);
+
+    expect(await screen.findByRole('link', { name: 'Entrar' })).toBeTruthy();
+    expect(screen.getByText(/Ao aceitar, você passará a ser orientado/)).toBeTruthy();
+    expect(screen.getByText(/entrará no laboratório como Membro caso ainda não participe/)).toBeTruthy();
+    expect(window.location.hash).toBe('');
+
+    const user = userEvent.setup();
+    await user.click(screen.getByRole('link', { name: 'Entrar' }));
+    await screen.findByRole('heading', { name: 'Acesse sua pesquisa.' });
+    await user.type(screen.getByRole('textbox', { name: 'E-mail' }), 'ana@ufla.br');
+    await user.type(screen.getByLabelText('Senha'), 'senha-correta');
+    await user.click(screen.getByRole('button', { name: 'Entrar' }));
+
+    expect(await screen.findByRole('button', { name: 'Aceitar convite' })).toBeTruthy();
+    expect(window.location.pathname).toBe('/orientacoes/convites/aceitar');
+    expect(window.location.hash).toBe('');
+    await user.click(screen.getByRole('button', { name: 'Aceitar convite' }));
+
+    expect(await screen.findByRole('heading', { name: 'Nenhum laboratório ainda' })).toBeTruthy();
+    expect((await screen.findByRole('status')).textContent).toContain('Você agora é orientado e participa do laboratório.');
+    const acceptCalls = calls.filter(call => call.path === '/api/v1/orientacoes/convites/aceitar');
+    expect(acceptCalls).toHaveLength(1);
+    expect(acceptCalls[0].body).toEqual({ token: 'token-orientacao+seguro' });
+    expect(calls.every(call => call.hashAtRequest === '')).toBe(true);
+  });
+
+  it('recusa convite de orientação uma vez e não revela detalhes do serviço', async () => {
+    const { calls } = mockApi({
+      authenticated: true,
+      orientationRefuse: async () => response(204),
+      orientationAccept: async () => apiError(400, '/api/v1/orientacoes/convites/aceitar', 'Detalhe interno do token.'),
+    });
+    openInvitation('token-recusado', 'orientation');
+    render(<App/>);
+    await userEvent.setup().click(await screen.findByRole('button', { name: 'Recusar' }));
+
+    expect(await screen.findByRole('heading', { name: 'Convite recusado' })).toBeTruthy();
+    expect(calls.filter(call => call.path === '/api/v1/orientacoes/convites/recusar')).toHaveLength(1);
+    expect(calls.find(call => call.path === '/api/v1/orientacoes/convites/recusar')?.body).toEqual({ token: 'token-recusado' });
+    expect(screen.queryByText('Detalhe interno do token.')).toBeNull();
+  });
+
+  it('usa uma mensagem genérica para erro 400 ao aceitar orientação', async () => {
+    mockApi({
+      authenticated: true,
+      orientationAccept: async () => apiError(400, '/api/v1/orientacoes/convites/aceitar', 'Detalhe interno do token.'),
+    });
+    openInvitation('token-invalido', 'orientation');
+    render(<App/>);
+    await userEvent.setup().click(await screen.findByRole('button', { name: 'Aceitar convite' }));
+
+    expect(await screen.findByRole('heading', { name: 'Convite indisponível' })).toBeTruthy();
+    expect(screen.getByRole('alert').textContent).toContain('Convite inválido ou indisponível. Ele pode ter expirado, sido cancelado ou ser para outro e-mail.');
+    expect(screen.queryByText('Detalhe interno do token.')).toBeNull();
   });
 });

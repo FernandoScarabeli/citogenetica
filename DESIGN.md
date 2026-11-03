@@ -78,13 +78,13 @@ Cantos discretos nos controles e painéis, conforme os raios extraídos. Iniciai
 
 Ações primárias verdes; secundárias brancas com borda. Papéis e estados aparecem em etiquetas textuais; abas têm sublinhado na seleção. Em Laboratórios, foco visível usa contorno de 3px, afastado 3px. Botões têm altura mínima de 40px, passando a 44px até 700px. Transições de cor de 160ms e deslocamento de 1px ao pressionar respeitam movimento reduzido.
 
-O login e a sessão usam a API real. A gestão de laboratórios, convites e papéis permanece local: não envia e-mail, não autentica participantes convidados e não tem expiração real. Os registros de pesquisa também permanecem no navegador e não são isolados por conta. Orientação e visibilidade coletiva seguem pendentes de validação.
+Conta, laboratórios, membros, papéis, convites e orientação usam a API real. Os registros de pesquisa (lâminas e contagens) ainda ficam no navegador e não são isolados por conta, até a etapa de contagem da API.
 
 ## Do's and Don'ts
 
 - Preservar Inter, verde/sálvia, margens e cabeçalho herdados ao estender telas.
 - Preservar foco visível, linguagem clara sobre estados locais e ordem linear no celular.
-- Não apresentar acesso e convites locais como serviços reais.
+- Não apresentar lâminas e contagens locais como sincronizadas com o servidor.
 - Não converter pendências de validação em decisões de produto confirmadas.
 
 Fontes: `apps/web/src/laboratories.css`, `apps/web/src/styles.css`, `apps/web/src/theme.css`, `apps/web/src/typography.css`, `apps/web/src/Laboratories.tsx`, `apps/web/README.md`, `.impeccable/laboratorios.md` e `.impeccable/review/critique.md`.

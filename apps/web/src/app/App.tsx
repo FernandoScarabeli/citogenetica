@@ -26,7 +26,7 @@ function PrepareConfirmationToken({ children }: { children: ReactNode }) {
 
   useLayoutEffect(() => {
     prepareInitialRouteToken();
-    if (location.pathname === '/convites/aceitar') {
+    if (location.pathname === '/convites/aceitar' || location.pathname === '/orientacoes/convites/aceitar') {
       const token = takeInvitationToken();
       if (token) invitationToken.setToken(token);
     }
@@ -89,6 +89,7 @@ function RouteTable() {
     <Route path="/confirmar-email" element={<ConfirmEmailPage/>}/>
     <Route path="/confirmar-troca-email" element={<ConfirmEmailChangePage/>}/>
     <Route path="/convites/aceitar" element={<InvitationAcceptancePage/>}/>
+    <Route path="/orientacoes/convites/aceitar" element={<InvitationAcceptancePage kind="orientation"/>}/>
     <Route path="/recuperar-senha" element={<RecoverPasswordPage/>}/>
     <Route element={<ProtectedRoutes/>}>
       <Route path="/app" element={<AuthenticatedApp/>}/>
