@@ -162,6 +162,7 @@ public class SecurityConfiguration {
 
                         .requestMatchers("/api/v1/admin/laboratorios/**").hasRole("ADMIN")
                         .requestMatchers("/api/v1/laboratorios", "/api/v1/laboratorios/**").authenticated()
+                        .requestMatchers("/api/v1/convites/**").authenticated()
 
                         .requestMatchers(HttpMethod.GET, "/api/events/subscribe").authenticated()
                         .requestMatchers(HttpMethod.GET, "/api/events/**").authenticated()
