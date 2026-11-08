@@ -21,12 +21,16 @@ public record LaminaResponseDTO(
         String observacoes,
         @Schema(description = "Meta de células; nula quando não há meta", nullable = true)
         Integer meta,
+        @Schema(description = "Total de células contadas: soma da quantidade dos registros não excluídos da lâmina; "
+                + "0 quando não há registros")
+        long totalCelulas,
         Instant criadaEm,
         Instant atualizadaEm) {
 
     public static LaminaResponseDTO de(LaminaResumo resumo) {
         return new LaminaResponseDTO(resumo.id(), resumo.versao(), resumo.donoUsuarioId(), resumo.donoNome(),
                 resumo.laboratorioId(), resumo.protocoloVersaoId(), resumo.nome(), resumo.especie(),
-                resumo.tratamento(), resumo.observacoes(), resumo.meta(), resumo.criadaEm(), resumo.atualizadaEm());
+                resumo.tratamento(), resumo.observacoes(), resumo.meta(), resumo.totalCelulas(),
+                resumo.criadaEm(), resumo.atualizadaEm());
     }
 }

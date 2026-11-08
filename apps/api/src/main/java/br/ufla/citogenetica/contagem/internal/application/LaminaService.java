@@ -12,6 +12,7 @@ import java.time.Clock;
 
 import br.ufla.citogenetica.contagem.internal.domain.Lamina;
 import br.ufla.citogenetica.contagem.internal.persistence.LaminaRepository;
+import br.ufla.citogenetica.contagem.internal.persistence.RegistroContagemRepository;
 import br.ufla.citogenetica.contagem.internal.persistence.VersaoProtocoloRepository;
 import br.ufla.citogenetica.laboratorio.api.LaboratorioAccessQuery;
 import br.ufla.citogenetica.shared.web.error.ConflictException;
@@ -41,6 +42,7 @@ public class LaminaService {
 
     private final LaminaRepository laminaRepository;
     private final VersaoProtocoloRepository versaoRepository;
+    private final RegistroContagemRepository registroRepository;
     private final AcessoLamina acesso;
     private final LaboratorioAccessQuery laboratorioAccessQuery;
     private final UsuarioRosterQuery usuarioRosterQuery;
@@ -185,11 +187,18 @@ public class LaminaService {
         return new PageImpl<>(resumos, pagina.getPageable(), pagina.getTotalElements());
     }
 
-    /** Resolve os nomes dos donos numa única consulta, sem N+1. */
+    /** Resolve os nomes dos donos e o total de células numa consulta cada, sem N+1. */
     private List<LaminaResumo> resumir(Collection<Lamina> laminas) {
+        if (laminas.isEmpty()) {
+            return List.of();
+        }
         List<Long> donoIds = laminas.stream().map(Lamina::getDonoUsuarioId).distinct().toList();
         Map<Long, UsuarioRosterInfo> donos = usuarioRosterQuery.buscarPorIds(donoIds).stream()
                 .collect(Collectors.toMap(UsuarioRosterInfo::usuarioId, Function.identity()));
+        Map<UUID, Long> totais = registroRepository
+                .totaisPorLamina(laminas.stream().map(Lamina::getId).toList()).stream()
+                .collect(Collectors.toMap(RegistroContagemRepository.TotalLamina::getLaminaId,
+                        RegistroContagemRepository.TotalLamina::getTotal));
         return laminas.stream().map(lamina -> {
             UsuarioRosterInfo dono = donos.get(lamina.getDonoUsuarioId());
             if (dono == null) {
@@ -198,6 +207,7 @@ public class LaminaService {
             return new LaminaResumo(lamina.getId(), lamina.getVersion(), lamina.getDonoUsuarioId(), dono.nome(),
                     lamina.getLaboratorioId(), lamina.getProtocoloVersaoId(), lamina.getNome(), lamina.getEspecie(),
                     lamina.getTratamento(), lamina.getObservacoes(), lamina.getMeta(),
+                    totais.getOrDefault(lamina.getId(), 0L),
                     lamina.getCreatedAt(), lamina.getLastModifiedAt());
         }).toList();
     }

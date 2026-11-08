@@ -185,6 +185,113 @@ class ContagemHistoricoDesfazerIntegrationTest extends AbstractContagemIntegrati
         }
     }
 
+    // ---------------------------------------------------------------- total de células na lâmina
+
+    @Test
+    void laminaSemRegistrosTemTotalDeCelulasZeroEmTodasAsRotas() throws Exception {
+        Usuario dono = criarUsuario();
+        UUID id = UUID.randomUUID();
+        Map<String, Object> corpo = new LinkedHashMap<>();
+        corpo.put("id", id.toString());
+        corpo.put("protocoloVersaoId", versaoPublicada("mitose").toString());
+        corpo.put("nome", "Sem registros");
+        String json = objectMapper.writeValueAsString(corpo);
+
+        JsonNode criada = json(requisicaoAutenticada(sessao(dono), post(LAMINAS)
+                .contentType(MediaType.APPLICATION_JSON).content(json)).andExpect(status().isCreated()).andReturn());
+        JsonNode repetida = json(requisicaoAutenticada(sessao(dono), post(LAMINAS)
+                .contentType(MediaType.APPLICATION_JSON).content(json)).andExpect(status().isOk()).andReturn());
+        JsonNode editada = json(requisicaoAutenticada(sessao(dono), patch(LAMINAS + "/{id}", id)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(Map.of("versaoEsperada", 0, "nome", "Renomeada"))))
+                .andExpect(status().isOk()).andReturn());
+
+        assertThat(criada.path("totalCelulas").isIntegralNumber()).isTrue();
+        assertThat(criada.path("totalCelulas").asLong()).isZero();
+        assertThat(repetida.path("totalCelulas").asLong()).isZero();
+        assertThat(editada.path("totalCelulas").asLong()).isZero();
+        assertThat(lamina(dono, id).path("totalCelulas").asLong()).isZero();
+        assertThat(totalNaListagem(dono, id)).isZero();
+    }
+
+    @Test
+    void totalDeCelulasSomaLotesIgnoraExcluidosEIgualaOResumo() throws Exception {
+        Usuario dono = criarUsuario();
+        UUID id = criarLamina(dono, null);
+        UUID profase = fase("mitose", "Prófase");
+        UUID anafase = fase("mitose", "Anáfase");
+        UUID ponte = tipoFixo("mitose", "Anáfase", "Ponte");
+        registro(dono, id, profase, "NORMAL", List.of(), 10);
+        registro(dono, id, profase, "NORMAL", List.of(), 5);
+        UUID excluido = registro(dono, id, anafase, "ANORMAL", List.of(ponte), 4);
+        jdbcTemplate.update("UPDATE registro_contagem SET excluido_em = now() WHERE id = ?", excluido);
+
+        assertThat(lamina(dono, id).path("totalCelulas").asLong()).isEqualTo(15);
+        assertThat(totalNaListagem(dono, id)).isEqualTo(15);
+        assertThat(resumo(dono, id).path("total").asLong()).isEqualTo(15);
+
+        registro(dono, id, anafase, "ANORMAL", List.of(ponte), 6);
+        assertThat(lamina(dono, id).path("totalCelulas").asLong()).isEqualTo(21);
+        assertThat(resumo(dono, id).path("total").asLong()).isEqualTo(21);
+    }
+
+    @Test
+    void totalDeCelulasReduzDepoisDeDesfazerParteDeUmLote() throws Exception {
+        Usuario dono = criarUsuario();
+        UUID id = criarLamina(dono, null);
+        UUID profase = fase("mitose", "Prófase");
+        registro(dono, id, profase, "NORMAL", List.of(), 10);
+        assertThat(lamina(dono, id).path("totalCelulas").asLong()).isEqualTo(10);
+
+        desfazer(dono, id, UUID.randomUUID(), profase, "NORMAL", List.of(), 3).andExpect(status().isOk());
+
+        assertThat(lamina(dono, id).path("totalCelulas").asLong()).isEqualTo(7);
+        assertThat(resumo(dono, id).path("total").asLong()).isEqualTo(7);
+    }
+
+    @Test
+    void listagemTrazOTotalCertoDeCadaLaminaSemConsultaPorLamina() throws Exception {
+        Usuario dono = criarUsuario();
+        UUID profase = fase("mitose", "Prófase");
+        Statistics estatisticas = entityManagerFactory.unwrap(SessionFactory.class).getStatistics();
+        UUID primeira = criarLamina(dono, null);
+        registro(dono, primeira, profase, "NORMAL", List.of(), 3);
+        JsonNode comUma = listarLaminas(dono);
+        estatisticas.setStatisticsEnabled(true);
+        try {
+            estatisticas.clear();
+            listarLaminas(dono);
+            long consultasComUma = estatisticas.getPrepareStatementCount();
+
+            Map<UUID, Long> esperado = new LinkedHashMap<>();
+            esperado.put(primeira, 3L);
+            for (int i = 1; i <= 5; i++) {
+                UUID outra = criarLamina(dono, null);
+                if (i % 2 == 1) {
+                    registro(dono, outra, profase, "NORMAL", List.of(), i);
+                    registro(dono, outra, profase, "NORMAL", List.of(), 100);
+                    esperado.put(outra, i + 100L);
+                } else {
+                    esperado.put(outra, 0L);
+                }
+            }
+            estatisticas.clear();
+            JsonNode comSeis = listarLaminas(dono);
+            long consultasComSeis = estatisticas.getPrepareStatementCount();
+
+            assertThat(comUma.path("content")).hasSize(1);
+            assertThat(comSeis.path("content")).hasSize(6);
+            for (JsonNode item : comSeis.path("content")) {
+                assertThat(item.path("totalCelulas").asLong())
+                        .as("total da lâmina %s", item.path("id").asText())
+                        .isEqualTo(esperado.get(UUID.fromString(item.path("id").asText())));
+            }
+            assertThat(consultasComSeis).as("consultas com 1 e com 6 lâminas").isEqualTo(consultasComUma);
+        } finally {
+            estatisticas.setStatisticsEnabled(false);
+        }
+    }
+
     // ---------------------------------------------------------------- edição
 
     @Test
@@ -1055,6 +1162,25 @@ class ContagemHistoricoDesfazerIntegrationTest extends AbstractContagemIntegrati
         return json(requisicaoAutenticada(sessao(usuario),
                 get(LAMINAS + "/{id}/registros" + (consulta.isEmpty() ? "" : "?" + consulta), lamina))
                 .andExpect(status().isOk()).andReturn());
+    }
+
+    private JsonNode lamina(Usuario usuario, UUID id) throws Exception {
+        return json(requisicaoAutenticada(sessao(usuario), get(LAMINAS + "/{id}", id))
+                .andExpect(status().isOk()).andReturn());
+    }
+
+    private JsonNode listarLaminas(Usuario usuario) throws Exception {
+        return json(requisicaoAutenticada(sessao(usuario), get(LAMINAS + "?size=100"))
+                .andExpect(status().isOk()).andReturn());
+    }
+
+    private long totalNaListagem(Usuario usuario, UUID id) throws Exception {
+        for (JsonNode item : listarLaminas(usuario).path("content")) {
+            if (item.path("id").asText().equals(id.toString())) {
+                return item.path("totalCelulas").asLong();
+            }
+        }
+        throw new AssertionError("Lâmina ausente da listagem: " + id);
     }
 
     private JsonNode resumo(Usuario usuario, UUID lamina) throws Exception {

@@ -49,6 +49,9 @@ Quando uma resposta mudar, atualize o item e a data, não apague o histórico da
 | Casas decimais nos percentuais | decidido (2026-11-08, mantenedor) | A API guarda as contagens e devolve o número sem arredondar. A tela mostra 2 casas. |
 | Alcance do "desfazer" entre aparelhos | decidido (2026-11-08, mantenedor) | Desfaz os últimos registros da pessoa naquela lâmina, em qualquer aparelho. |
 | A contagem gera notificação? | decidido (2026-11-08, mantenedor) | Não nesta etapa. |
+| A tela de contagem funciona sem internet antes da Etapa 4? | decidido (2026-11-08, mantenedor) | Não. Ao ligar a tela ao servidor, lâminas novas e contagens exigem conexão; sem ela, a tela avisa e nada é contado. |
+| Data original das contagens enviadas do navegador | decidido (2026-11-08, mantenedor) | Fica guardada como hora do aparelho e o histórico a mostra. A hora oficial continua sendo a do servidor. |
+| Cópia local depois do envio ao servidor | decidido (2026-11-08, mantenedor) | A pessoa baixa um backup antes de enviar; com o envio confirmado, a lâmina sai do navegador. |
 | Quais eventos geram notificação (convite, comentário, conflito...) | pendente (Etapa 1 em diante) | Convites já geram. Definir os demais junto com cada etapa. |
 
 ## Dados, exportação e operação
