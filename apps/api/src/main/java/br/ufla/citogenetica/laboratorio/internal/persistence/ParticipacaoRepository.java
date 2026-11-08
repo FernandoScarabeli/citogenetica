@@ -1,5 +1,6 @@
 package br.ufla.citogenetica.laboratorio.internal.persistence;
 
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -39,9 +40,23 @@ public interface ParticipacaoRepository extends JpaRepository<Participacao, UUID
 
     List<Participacao> findAllByUsuarioIdAndEstado(Long usuarioId, EstadoParticipacao estado);
 
+    @Query("select participacao.laboratorio.id as laboratorioId, count(participacao.id) as quantidade "
+            + "from Participacao participacao "
+            + "where participacao.laboratorio.id in :laboratorioIds "
+            + "and participacao.estado = br.ufla.citogenetica.laboratorio.internal.domain.EstadoParticipacao.ATIVA "
+            + "group by participacao.laboratorio.id")
+    List<ContagemParticipacoesAtivas> contarAtivasPorLaboratorio(
+            @Param("laboratorioIds") Collection<UUID> laboratorioIds);
+
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("select participacao from Participacao participacao "
             + "where participacao.id = :id and participacao.laboratorio.id = :laboratorioId")
     Optional<Participacao> findByIdAndLaboratorioIdForUpdate(
             @Param("id") UUID id, @Param("laboratorioId") UUID laboratorioId);
+
+    interface ContagemParticipacoesAtivas {
+        UUID getLaboratorioId();
+
+        long getQuantidade();
+    }
 }
