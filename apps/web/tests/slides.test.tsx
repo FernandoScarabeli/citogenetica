@@ -302,6 +302,8 @@ describe('contagem rápida', () => {
     const user = userEvent.setup();
     renderSlides();
     await openSlide(user);
+    // A lista lê as lâminas antigas para oferecer o envio; contar não pode tocar no armazenamento.
+    get.mockClear();
     await user.click(normalButton());
     await waitFor(() => expect(api.buscarResumo).toHaveBeenCalledTimes(2));
     for (const spy of [get, set, remove]) {
