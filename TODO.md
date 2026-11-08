@@ -76,7 +76,7 @@ Nada é commitado até o fim da sequência.
 
 ### 1.4 Etapas da API (seguindo o planejamento)
 - [x] **Etapa 1 · Base**: Laboratório, Participação (ATIVA/SAIU/REMOVIDA), Convite (hash do token, expiração, aceite atômico), Vínculo de orientação, regra do último administrador; `LaboratorioAccessQuery` pronta para as lâminas da Etapa 2
-- [ ] **Etapa 2 · Contagem**: Protocolo, Versão (imutável quando publicada), Fase (`conta_como_divisao`), Tipo de anormalidade (fixo e personalizado, normalização), Lâmina, Registro (`quantidade`, `registrado_em`, `fuso_registro`, exclusão lógica, versão), cálculos oficiais (totais, %, IM), desfazer, edição, histórico; seed de meiose e mitose
+- [~] **Etapa 2 · Contagem** (back-end pronto; falta ligar a tela e migrar as lâminas locais): Protocolo, Versão (imutável quando publicada), Fase (`conta_como_divisao`), Tipo de anormalidade (fixo e personalizado, normalização), Lâmina, Registro (`quantidade`, `registrado_em`, `fuso_registro`, exclusão lógica, versão), cálculos oficiais (totais, %, IM), desfazer, edição, histórico; seed de meiose e mitose
 - [ ] **Etapa 3 · Dados**: exportação JSON versionada, importador dos backups legados (sem duplicar), CSV (resumo e uma linha por registro), PDF
 - [ ] **Etapa 4 · Offline/sync**: operações idempotentes (`operacao_id` + hash do payload), revisões, conflitos, consulta incremental com cursor
 - [ ] **Etapa 5 · Pesquisa**: Projeto, Experimento, editor de protocolos configuráveis
@@ -88,7 +88,7 @@ Nada é commitado até o fim da sequência.
 ## 2. Frontend
 
 ### 2.1 Correções no que já existe
-- [~] Papéis sem hierarquia: admin não herda permissão de editar contagens (o planejamento é explícito) — papéis de laboratório já vêm da API e são combináveis; falta aplicar às contagens (Etapa 2)
+- [x] Papéis sem hierarquia: admin não herda permissão de editar contagens (o planejamento é explícito) — papéis de laboratório já vêm da API e são combináveis; aplicado às contagens na API (Etapa 2)
 - [ ] Histórico por dia + edição de registro (o modal existe, mas nada abre ele)
 - [ ] "Desfazer" sem apagar registros em sequência depois de recarregar (limite e/ou confirmação)
 - [ ] Lote como **1 registro com `quantidade`**, e não N registros
@@ -138,8 +138,8 @@ Ver `docs/questoes-validacao.md`. As principais:
 - [ ] Visibilidade das lâminas entre pesquisadores
 - [ ] Quem cria o vínculo orientador ↔ pesquisador; se pode haver mais de um orientador
 - [ ] Uma célula pode ter mais de uma anormalidade?
-- [ ] Limites do lote, meta configurável, casas decimais
-- [ ] Alcance do "desfazer" entre aparelhos
+- [x] Limites do lote, meta configurável, casas decimais: decididos em 2026-11-08 (ver `docs/questoes-validacao.md`)
+- [x] Alcance do "desfazer" entre aparelhos: vale em qualquer aparelho (decidido em 2026-11-08)
 - [ ] Backups reais (ou fictícios) dos HTMLs antigos para testar a migração
 - [ ] Formato de CSV e PDF esperado (Excel, R, SISVAR)
 - [ ] Hospedagem e responsável pela manutenção

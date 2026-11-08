@@ -1,16 +1,18 @@
 package br.ufla.citogenetica.contagem.internal.persistence;
 
 import java.time.Instant;
+import java.util.Collection;
 import java.util.List;
 import java.util.UUID;
 
 import br.ufla.citogenetica.contagem.internal.domain.RegistroContagem;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
-public interface RegistroContagemRepository extends JpaRepository<RegistroContagem, UUID> {
+public interface RegistroContagemRepository extends JpaRepository<RegistroContagem, UUID>, JpaSpecificationExecutor<RegistroContagem> {
 
     /** Totais de uma fase da lâmina; fases sem registro ativo vêm zeradas. */
     interface TotalFase {
@@ -67,6 +69,58 @@ public interface RegistroContagemRepository extends JpaRepository<RegistroContag
     @Query(value = "SELECT tipo_id FROM registro_contagem_tipo WHERE registro_id = :registroId ORDER BY tipo_id",
             nativeQuery = true)
     List<UUID> findTipoIds(@Param("registroId") UUID registroId);
+
+    /** Aumenta a versão de um registro cuja linha não mudou (edição só dos tipos). A lâmina deve estar travada. */
+    @Modifying(flushAutomatically = true)
+    @Query(value = "UPDATE registro_contagem SET version = version + 1, last_modified_at = :agora WHERE id = :id",
+            nativeQuery = true)
+    void aumentarVersao(@Param("id") UUID id, @Param("agora") Instant agora);
+
+    @Modifying
+    @Query(value = "DELETE FROM registro_contagem_tipo WHERE registro_id = :registroId", nativeQuery = true)
+    void removerTipos(@Param("registroId") UUID registroId);
+
+    /** Tipo de um registro com o nome, para o histórico mostrar também os tipos personalizados do dono. */
+    interface TipoDoRegistro {
+        UUID getRegistroId();
+
+        UUID getTipoId();
+
+        String getNome();
+    }
+
+    /** Tipos de vários registros numa só consulta (sem N+1), em ordem crescente do UUID dentro de cada registro. */
+    @Query(value = """
+            SELECT rt.registro_id AS "registroId", t.id AS "tipoId", t.nome AS "nome"
+              FROM registro_contagem_tipo rt
+              JOIN tipo_anormalidade t ON t.id = rt.tipo_id
+             WHERE rt.registro_id IN (:registroIds)
+             ORDER BY rt.registro_id, rt.tipo_id
+            """, nativeQuery = true)
+    List<TipoDoRegistro> findTiposDosRegistros(@Param("registroIds") Collection<UUID> registroIds);
+
+    /**
+     * Registros ativos da lâmina com a fase, a situação e exatamente o conjunto de tipos pedido, do mais recente ao
+     * mais antigo, até somar {@code quantidade} células. {@code chaveTipos} são os ids em minúsculas, em ordem
+     * crescente e separados por vírgula (vazio = nenhum tipo). Se o disponível for menor que o pedido, devolve todos
+     * os que combinam. Chamar só com a lâmina travada.
+     */
+    @Query(value = """
+            SELECT c.id
+              FROM (SELECT r.id, r.quantidade, r.registrado_em,
+                           SUM(r.quantidade) OVER (ORDER BY r.registrado_em DESC, r.id DESC) AS acumulado
+                      FROM registro_contagem r
+                     WHERE r.lamina_id = :laminaId AND r.fase_id = :faseId AND r.status = :status
+                       AND r.excluido_em IS NULL
+                       AND COALESCE((SELECT string_agg(CAST(rt.tipo_id AS text), ',' ORDER BY rt.tipo_id)
+                                       FROM registro_contagem_tipo rt
+                                      WHERE rt.registro_id = r.id), '') = :chaveTipos) c
+             WHERE c.acumulado - c.quantidade < :quantidade
+             ORDER BY c.acumulado
+            """, nativeQuery = true)
+    List<UUID> findIdsParaDesfazer(
+            @Param("laminaId") UUID laminaId, @Param("faseId") UUID faseId, @Param("status") String status,
+            @Param("chaveTipos") String chaveTipos, @Param("quantidade") int quantidade);
 
     /** Uma linha por fase da versão, na ordem do protocolo, somando só registros não excluídos da lâmina. */
     @Query(value = """

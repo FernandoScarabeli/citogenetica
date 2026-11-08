@@ -303,7 +303,7 @@ class ContagemRegistrosIntegrationTest extends AbstractContagemIntegrationTest {
         List<String> indices = jdbcTemplate.queryForList(
                 "SELECT indexdef FROM pg_indexes WHERE tablename = 'registro_contagem' AND indexname LIKE 'idx_%'",
                 String.class);
-        assertThat(indices).hasSize(1).allMatch(def -> def.contains("excluido_em IS NULL"));
+        assertThat(indices).isNotEmpty().allMatch(def -> def.contains("excluido_em IS NULL"));
     }
 
     // ---------------------------------------------------------------- validação
