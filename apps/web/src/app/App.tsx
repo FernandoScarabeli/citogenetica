@@ -9,6 +9,7 @@ import { SizeProvider } from '../lib/size-context';
 import { Landing } from '../Landing';
 import { Laboratories } from '../Laboratories';
 import { Slides } from '../Slides';
+import { AdminLaboratoriesPage } from './AdminLaboratoriesPage';
 import { LoginPage } from './LoginPage';
 import { CreateAccountPage } from './CreateAccountPage';
 import { ConfirmEmailPage } from './ConfirmEmailPage';
@@ -95,6 +96,7 @@ function RouteTable() {
       <Route path="/app" element={<AuthenticatedApp/>}/>
       <Route path="/laboratorios" element={<AuthenticatedApp/>}/>
       <Route path="/perfil" element={<AuthenticatedApp/>}/>
+      <Route path="/admin/laboratorios" element={<AdminLaboratoriesPage/>}/>
     </Route>
     <Route path="*" element={<NotFoundPage/>}/>
   </Routes>;

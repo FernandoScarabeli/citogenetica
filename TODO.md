@@ -70,7 +70,7 @@ Nada é commitado até o fim da sequência.
 - [x] `./mvnw test` precisa passar num clone limpo, sem `.env` nem banco rodando: perfil de teste + Postgres via Testcontainers no teste de contexto (hoje ele exige variáveis de e-mail e banco no ar)
 - [x] IDs UUID nas entidades novas (gerados no cliente quando vierem offline) — ADR 0003
 - [x] Papel por laboratório (Participação), não global no usuário
-- [~] Admin global da plataforma (acima dos laboratórios): primeiro admin por comando de uso único (ADR 0002) e desativar/reativar laboratório feitos; faltam parâmetros do sistema, listagem global de laboratórios e o painel (dashboard)
+- [~] Admin global da plataforma (acima dos laboratórios): primeiro admin por comando de uso único (ADR 0002) e desativar/reativar laboratório feitos; listagem global de laboratórios e painel feitos; faltam parâmetros do sistema
 - [x] Auto-cadastro + verificação de e-mail (e troca de e-mail com confirmação no endereço novo)
 - [x] Testes de integração com Testcontainers + OpenAPI atualizado a cada etapa
 
@@ -104,7 +104,7 @@ Nada é commitado até o fim da sequência.
 - [x] Laboratórios, convites e membros reais (e orientação)
 - [ ] Contagem, lâminas, resumo e IM vindos da API
 - [x] Notificações via SSE no sino
-- [ ] Painel do admin da plataforma (desativar/reativar laboratório) — depende de rota de listagem global na API
+- [x] Painel do admin da plataforma: lista, busca, filtro, desativar e reativar laboratório
 - [ ] Importador dos backups dos HTMLs antigos (meiose e mitose)
 
 ### 2.3 PWA e offline (Etapa 4)
