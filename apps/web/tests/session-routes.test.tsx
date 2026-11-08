@@ -245,4 +245,36 @@ describe('sessão e rotas', () => {
     expect(screen.getByRole('heading', { name: 'Página não encontrada' })).toBeTruthy();
     expect(screen.getByRole('link', { name: 'Voltar à página inicial' })).toBeTruthy();
   });
+  it('abre a administração da plataforma para o admin geral e consulta a API de admin', async () => {
+    const adminUser = { ...userDto, role: { ...userDto.role, nome: 'ADMIN' } };
+    const { calls } = mockApi({
+      me: async () => response(200, adminUser),
+      other: async () => response(200, { content: [], currentPage: 0, totalPages: 0, totalElements: 0 }),
+    });
+    setPath('/admin/laboratorios');
+
+    render(<App/>);
+
+    expect(await screen.findByRole('heading', { name: 'Laboratórios da plataforma' })).toBeTruthy();
+    expect(calls.some(call => call.path === '/api/v1/admin/laboratorios' && call.method === 'GET')).toBe(true);
+  });
+
+  it('mostra sem permissão a usuário comum sem chamar a API de admin', async () => {
+    const { calls } = mockApi({ me: async () => response(200, userDto) });
+    setPath('/admin/laboratorios');
+
+    render(<App/>);
+
+    expect(await screen.findByRole('heading', { name: 'Sem permissão para acessar esta página' })).toBeTruthy();
+    expect(calls.some(call => call.path.startsWith('/api/v1/admin/'))).toBe(false);
+  });
+
+  it('manda quem não tem sessão da administração para o login', async () => {
+    mockApi();
+    setPath('/admin/laboratorios');
+
+    render(<App/>);
+
+    expect(await screen.findByRole('heading', { name: 'Acesse sua pesquisa.' })).toBeTruthy();
+  });
 });

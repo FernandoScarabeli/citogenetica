@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState, type FormEvent, type ReactNode } from 'react';
-import { ArrowRight, ChevronDown, ChevronRight, LogOut, Moon, Microscope, Plus, Search, UserRound, X } from 'lucide-react';
+import { ArrowRight, ChevronDown, ChevronRight, LogOut, Moon, Microscope, Plus, Search, ShieldCheck, UserRound, X } from 'lucide-react';
 import { Link, useLocation, useNavigate } from 'react-router';
 import { isConflict, isForbidden, isNotFound, isUnauthorized } from './api/errors';
 import type { LaboratorioResponseDTO, PapelLaboratorio, ParticipacaoResponseDTO } from './api/contracts/laboratorio';
@@ -34,11 +34,12 @@ function isCurrentUser(participation: ParticipacaoResponseDTO, email: string): b
   return !!participation.email && participation.email.trim().toLocaleLowerCase('pt-BR') === email.trim().toLocaleLowerCase('pt-BR');
 }
 
-function AccountMenu({ name, email, photo, dark, onProfile, onAppearance, onLogout }: {
+function AccountMenu({ name, email, photo, dark, platformAdmin, onProfile, onAppearance, onLogout }: {
   name: string;
   email: string;
   photo?: string;
   dark: boolean;
+  platformAdmin: boolean;
   onProfile: () => void;
   onAppearance: () => void;
   onLogout: () => void;
@@ -77,6 +78,7 @@ function AccountMenu({ name, email, photo, dark, onProfile, onAppearance, onLogo
       <div className="account-panel-identity"><span className="account-initial" aria-hidden="true">{photo ? <img src={photo} alt="" /> : initial}</span><div><strong>{name}</strong><small>{email}</small></div></div>
       <div className="account-panel-actions">
         <button type="button" onClick={() => { setOpen(false); onProfile(); }}><UserRound size={18} aria-hidden="true" />Configurações do perfil</button>
+        {platformAdmin && <Link to="/admin/laboratorios" onClick={() => setOpen(false)}><ShieldCheck size={18} aria-hidden="true" />Administração da plataforma</Link>}
         <button type="button" aria-pressed={dark} onClick={onAppearance}><Moon size={18} aria-hidden="true" /><span>Modo escuro</span><span className="account-switch" aria-hidden="true"><span /></span></button>
       </div>
       <div className="account-panel-footer"><button type="button" onClick={() => { setOpen(false); onLogout(); }}><LogOut size={18} aria-hidden="true" />Sair</button></div>
@@ -499,7 +501,7 @@ export function Laboratories({ user, onLogout, onUserUpdate, renderSlides }: {
   return <div className="labs-app">
     <header className="topbar"><div className="topbar-inner">
       <Link className="brand" to="/laboratorios"><span className="brand-mark"><Microscope size={21} aria-hidden="true" /></span><span>citogenética<small>Laboratório de Citogenética · UFLA</small></span></Link>
-      <div className="lab-account"><NotificationCenter/><AccountMenu name={user.nome} email={user.email} photo={preferences.photo} dark={preferences.dark}
+      <div className="lab-account"><NotificationCenter/><AccountMenu name={user.nome} email={user.email} photo={preferences.photo} dark={preferences.dark} platformAdmin={user.role.nome === 'ADMIN'}
         onProfile={() => { if (location.pathname !== '/perfil') navigate('/perfil'); setView('profile'); setPageError(''); setNotice(''); }}
         onAppearance={() => updatePreferences({ ...preferences, dark: !preferences.dark })}
         onLogout={onLogout} /></div>

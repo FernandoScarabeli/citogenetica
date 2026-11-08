@@ -48,8 +48,9 @@ html[data-appearance="dark"] .labs-app {
 .labs-app .account-panel-identity strong { overflow: hidden; font-size: 14px; font-weight: 550; text-overflow: ellipsis; white-space: nowrap; }
 .labs-app .account-panel-identity small { overflow-wrap: anywhere; color: var(--lab-muted); font-size: 12px; }
 .labs-app .account-panel-actions { display: grid; gap: 3px; padding: 10px 0; }
-.labs-app .account-panel-actions button,.labs-app .account-panel-footer button { display: flex; align-items: center; gap: 10px; width: 100%; min-height: 42px; padding: 8px; border: 0; border-radius: 4px; background: transparent; color: var(--lab-ink); font-size: 13px; text-align: left; }
-.labs-app .account-panel-actions button:hover,.labs-app .account-panel-footer button:hover { background: var(--lab-ground); }
+.labs-app .account-panel-actions :is(button, a),.labs-app .account-panel-footer button { display: flex; align-items: center; gap: 10px; width: 100%; min-height: 42px; padding: 8px; border: 0; border-radius: 4px; background: transparent; color: var(--lab-ink); font-size: 13px; text-align: left; }
+.labs-app .account-panel-actions a { color: var(--lab-ink); text-decoration: none; }
+.labs-app .account-panel-actions :is(button, a):hover,.labs-app .account-panel-footer button:hover { background: var(--lab-ground); }
 .labs-app .account-switch { display: flex; align-items: center; width: 34px; height: 19px; margin-left: auto; padding: 2px; border-radius: 12px; background: #c5cdc7; }
 .labs-app .account-switch > span { width: 15px; height: 15px; border-radius: 50%; background: #fff; transition: translate 160ms ease; }
 .labs-app .account-trigger[aria-pressed="true"] ~ .account-switch > span { translate: 15px; }

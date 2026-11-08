@@ -1,0 +1,58 @@
+.labs-app .admin-account { gap: 14px; }
+.labs-app .admin-identity { display: grid; min-width: 0; gap: 2px; text-align: right; }
+.labs-app .admin-identity strong { max-width: 220px; overflow: hidden; font-size: 13px; font-weight: 550; text-overflow: ellipsis; white-space: nowrap; }
+.labs-app .admin-identity small { max-width: 220px; overflow: hidden; color: var(--lab-muted); font-size: 12px; text-overflow: ellipsis; white-space: nowrap; }
+.labs-app .admin-back { display: inline-flex; align-items: center; gap: 4px; min-height: 40px; margin-bottom: 8px; color: var(--lab-muted); font-size: 13px; text-decoration: none; }
+.labs-app .admin-back:hover { color: var(--lab-ink); text-decoration: underline; text-underline-offset: 3px; }
+.labs-app .admin-forbidden { align-content: center; justify-items: start; display: grid; gap: 12px; max-width: 640px; }
+.labs-app .admin-forbidden h1 { margin: 0; font-size: 24px; line-height: 30px; font-weight: 550; }
+.labs-app .admin-forbidden p { margin: 0 0 8px; color: var(--lab-muted); }
+.labs-app .admin-forbidden .button { text-decoration: none; }
+.admin-filters { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px 20px; margin-bottom: 16px; }
+.admin-search { display: flex; flex: 1 1 320px; max-width: 480px; gap: 8px; }
+.admin-search .laboratory-search { flex: 1; width: auto; margin: 0; }
+.admin-state-filter { display: inline-flex; border: 1px solid var(--lab-line); border-radius: 5px; background: var(--lab-surface); }
+.admin-state-filter button:first-child { border-radius: 4px 0 0 4px; }
+.admin-state-filter button:last-child { border-radius: 0 4px 4px 0; }
+.admin-state-filter button { min-height: 40px; padding: 0 14px; border: 0; border-right: 1px solid var(--lab-line); background: transparent; color: var(--lab-ink); font-size: 13px; }
+.admin-state-filter button:last-child { border-right: 0; }
+.admin-state-filter button:hover { background: var(--lab-ground); }
+.admin-state-filter button.selected { background: var(--lab-accent); color: var(--lab-surface); font-weight: 550; }
+.admin-table-wrap { border: 1px solid var(--lab-line); border-radius: 6px; background: var(--lab-surface); }
+.labs-app .admin-table { width: 100%; table-layout: fixed; border-collapse: collapse; }
+.labs-app .admin-table th,.labs-app .admin-table td { padding: 14px 18px; border-bottom: 1px solid var(--lab-line); color: var(--lab-ink); font-size: 13px; line-height: 20px; text-align: left; vertical-align: top; overflow-wrap: anywhere; }
+.labs-app .admin-table th { height: 40px; color: var(--lab-muted); font-size: 12px; font-weight: 500; }
+.labs-app .admin-table tr:last-child td { border-bottom: 0; }
+.labs-app .admin-table th:nth-child(1) { width: 26%; }
+.labs-app .admin-table th:nth-child(2) { width: 14%; }
+.labs-app .admin-table th:nth-child(3) { width: 12%; }
+.labs-app .admin-table th:nth-child(4) { width: 31%; }
+.labs-app .admin-table th:nth-child(5) { width: 17%; }
+.labs-app .admin-table td strong { font-size: 14px; font-weight: 550; }
+.labs-app .admin-count { font-variant-numeric: tabular-nums; }
+.admin-people { display: grid; gap: 8px; margin: 0; padding: 0; list-style: none; }
+.admin-people li { display: grid; gap: 1px; }
+.admin-people a { color: var(--lab-accent); font-size: 12px; text-underline-offset: 3px; }
+.admin-none { color: var(--lab-muted); font-style: italic; }
+.labs-app .admin-actions { text-align: right; }
+.admin-pagination { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; margin-top: 16px; color: var(--lab-muted); font-size: 13px; }
+.admin-pagination div { display: flex; gap: 8px; }
+@media (max-width: 800px) {
+  .admin-search { max-width: none; }
+}
+@media (max-width: 700px) {
+  .labs-app .admin-identity { display: none; }
+  .admin-state-filter { width: 100%; }
+  .admin-state-filter button { flex: 1; min-height: 44px; }
+}
+@media (max-width: 900px) {
+  .admin-table-wrap { border: 0; background: transparent; }
+  .labs-app .admin-table,.labs-app .admin-table tbody,.labs-app .admin-table tr,.labs-app .admin-table td { display: block; width: 100%; }
+  .labs-app .admin-table thead { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; }
+  .labs-app .admin-table tr { display: grid; gap: 10px; margin-bottom: 12px; padding: 16px; border: 1px solid var(--lab-line); border-radius: 6px; background: var(--lab-surface); }
+  .labs-app .admin-table td { padding: 0; border: 0; }
+  .labs-app .admin-table td[data-label]:not(:first-child)::before { content: attr(data-label); display: block; margin-bottom: 2px; color: var(--lab-muted); font-size: 12px; }
+  .labs-app .admin-actions { text-align: left; }
+  .admin-pagination { align-items: stretch; flex-direction: column; }
+  .admin-pagination div .button { flex: 1; }
+}
