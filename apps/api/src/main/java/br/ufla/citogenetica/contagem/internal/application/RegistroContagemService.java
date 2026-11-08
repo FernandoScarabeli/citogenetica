@@ -6,27 +6,14 @@ import java.time.Instant;
 import java.time.ZoneId;
 import java.time.format.DateTimeParseException;
 import java.time.temporal.ChronoUnit;
-import java.util.Comparator;
-import java.util.HashSet;
 import java.util.List;
-import java.util.Map;
-import java.util.Objects;
-import java.util.Set;
 import java.util.UUID;
-import java.util.function.Function;
-import java.util.stream.Collectors;
 
-import br.ufla.citogenetica.contagem.internal.domain.FaseProtocolo;
 import br.ufla.citogenetica.contagem.internal.domain.Lamina;
-import br.ufla.citogenetica.contagem.internal.domain.ParametroContagem;
 import br.ufla.citogenetica.contagem.internal.domain.RegistroContagem;
 import br.ufla.citogenetica.contagem.internal.domain.StatusRegistro;
-import br.ufla.citogenetica.contagem.internal.domain.TipoAnormalidade;
-import br.ufla.citogenetica.contagem.internal.persistence.FaseProtocoloRepository;
 import br.ufla.citogenetica.contagem.internal.persistence.LaminaRepository;
-import br.ufla.citogenetica.contagem.internal.persistence.ParametroContagemRepository;
 import br.ufla.citogenetica.contagem.internal.persistence.RegistroContagemRepository;
-import br.ufla.citogenetica.contagem.internal.persistence.TipoAnormalidadeRepository;
 import br.ufla.citogenetica.shared.web.error.BadRequestException;
 import br.ufla.citogenetica.shared.web.error.ConflictException;
 import br.ufla.citogenetica.shared.web.error.NotFoundException;
@@ -48,12 +35,11 @@ import static br.ufla.citogenetica.contagem.internal.application.ProtocoloServic
 @RequiredArgsConstructor
 public class RegistroContagemService {
 
-    public static final int MAXIMO_TIPOS = 50;
     public static final int MAXIMO_FUSO = 64;
 
+    private static final String VERSAO_DESATUALIZADA =
+            "O registro foi alterado depois da versão informada. Atualize os dados e tente novamente.";
     private static final String ID_COM_OUTRO_CONTEUDO = "Este identificador já foi usado em outro registro.";
-    private static final String FASE_OU_TIPO_INVALIDO =
-            "Fase ou tipo de anormalidade inválido para o protocolo desta lâmina.";
     // Faixa que o PostgreSQL e o ISO-8601 representam sem ambiguidade; fora dela a hora é certamente um erro.
     private static final Instant HORA_MINIMA = Instant.parse("1970-01-01T00:00:00Z");
     private static final Instant HORA_MAXIMA = Instant.parse("9999-12-31T23:59:59Z");
@@ -61,9 +47,7 @@ public class RegistroContagemService {
     private final AcessoLamina acesso;
     private final LaminaRepository laminaRepository;
     private final RegistroContagemRepository registroRepository;
-    private final FaseProtocoloRepository faseRepository;
-    private final TipoAnormalidadeRepository tipoRepository;
-    private final ParametroContagemRepository parametroRepository;
+    private final ValidadorRegistro validador;
     private final Clock clock;
 
     @PersistenceContext
@@ -77,8 +61,8 @@ public class RegistroContagemService {
      */
     @Transactional
     public CriacaoRegistro criar(NovoRegistro novo, Long usuarioId) {
-        StatusRegistro status = status(novo.status());
-        List<UUID> tipoIds = tiposOrdenados(novo.tipoIds(), status);
+        StatusRegistro status = ValidadorRegistro.status(novo.status());
+        List<UUID> tipoIds = ValidadorRegistro.tiposOrdenados(novo.tipoIds(), status);
         Instant horaAparelho = horaAparelho(novo.horaAparelho());
         String fusoAparelho = fusoAparelho(novo.fusoAparelho());
         int quantidade = novo.quantidade();
@@ -91,8 +75,8 @@ public class RegistroContagemService {
         }
 
         Lamina lamina = acesso.carregarParaEscrita(novo.laminaId(), usuarioId);
-        exigirQuantidadeDentroDoLimite(quantidade);
-        validarFaseETipos(lamina, novo.faseId(), status, tipoIds);
+        validador.exigirQuantidadeDentroDoLimite(quantidade);
+        validador.validarFaseETipos(lamina, novo.faseId(), status, tipoIds);
 
         entityManager.refresh(lamina, LockModeType.PESSIMISTIC_WRITE);
         if (lamina.estaExcluida()) {
@@ -112,6 +96,50 @@ public class RegistroContagemService {
         return repeticao(gravado, hash, usuarioId);
     }
 
+    /**
+     * Edição de um registro ativo da lâmina. Mesmas validações da criação; {@code registradoEm}, hora e fuso do
+     * aparelho e o hash da criação não mudam. Toda edição que altere algo (inclusive só os tipos) aumenta a versão;
+     * pedido idêntico ao estado atual não altera nada. A lâmina é travada antes de ler o registro: edições, criações
+     * e desfazeres da mesma lâmina ficam em fila, então a checagem da versão é exata e a perdedora recebe 409.
+     */
+    @Transactional
+    public RegistroResumo atualizar(EdicaoRegistro edicao, Long usuarioId) {
+        StatusRegistro status = ValidadorRegistro.status(edicao.status());
+        List<UUID> tipoIds = ValidadorRegistro.tiposOrdenados(edicao.tipoIds(), status);
+        int quantidade = edicao.quantidade();
+
+        Lamina lamina = acesso.carregarParaEscrita(edicao.laminaId(), usuarioId);
+        validador.exigirQuantidadeDentroDoLimite(quantidade);
+        validador.validarFaseETipos(lamina, edicao.faseId(), status, tipoIds);
+
+        entityManager.refresh(lamina, LockModeType.PESSIMISTIC_WRITE);
+        if (lamina.estaExcluida()) {
+            throw new NotFoundException(NAO_ENCONTRADO);
+        }
+        RegistroContagem registro = registroRepository.findById(edicao.registroId())
+                .filter(candidato -> candidato.getLaminaId().equals(lamina.getId()) && !candidato.estaExcluido())
+                .orElseThrow(() -> new NotFoundException(NAO_ENCONTRADO));
+        if (!registro.getVersion().equals(edicao.versaoEsperada())) {
+            throw new ConflictException(VERSAO_DESATUALIZADA);
+        }
+
+        boolean camposMudam = registro.mudaCampos(edicao.faseId(), status, quantidade);
+        boolean tiposMudam = !registroRepository.findTipoIds(registro.getId()).equals(tipoIds);
+        if (tiposMudam) {
+            registroRepository.removerTipos(registro.getId());
+            tipoIds.forEach(tipoId -> registroRepository.inserirTipo(registro.getId(), tipoId));
+        }
+        if (camposMudam) {
+            registro.alterar(edicao.faseId(), status, quantidade);
+            registroRepository.saveAndFlush(registro);
+        } else if (tiposMudam) {
+            // Só os tipos mudaram: a linha do registro não está suja, então a versão é aumentada explicitamente.
+            registroRepository.aumentarVersao(registro.getId(), clock.instant().truncatedTo(ChronoUnit.MICROS));
+            entityManager.refresh(registro);
+        }
+        return resumir(registro, tipoIds);
+    }
+
     /** Id de outro dono é indistinguível de recurso desconhecido. A resposta é o estado atual do registro. */
     private CriacaoRegistro repeticao(RegistroContagem existente, String hash, Long usuarioId) {
         Lamina lamina = laminaRepository.findById(existente.getLaminaId())
@@ -125,77 +153,10 @@ public class RegistroContagemService {
         return new CriacaoRegistro(resumir(existente, registroRepository.findTipoIds(existente.getId())), false);
     }
 
-    private static RegistroResumo resumir(RegistroContagem registro, List<UUID> tipoIds) {
+    static RegistroResumo resumir(RegistroContagem registro, List<UUID> tipoIds) {
         return new RegistroResumo(registro.getId(), registro.getVersion(), registro.getLaminaId(),
                 registro.getFaseId(), registro.getStatus(), tipoIds, registro.getQuantidade(),
                 registro.getRegistradoEm(), registro.getHoraAparelho(), registro.getFusoAparelho());
-    }
-
-    private void exigirQuantidadeDentroDoLimite(int quantidade) {
-        int limite = parametroRepository.findById(ParametroContagem.ID_UNICO)
-                .orElseThrow(() -> new IllegalStateException("Parâmetros da contagem não encontrados."))
-                .getLimiteCelulasPorRegistro();
-        if (quantidade > limite) {
-            throw new BadRequestException(
-                    "A quantidade por registro deve ser de 1 a " + limite + " células.");
-        }
-    }
-
-    /** Fase da versão de protocolo da lâmina e tipos dessa fase, fixos ou personalizados do dono no mesmo escopo. */
-    private void validarFaseETipos(Lamina lamina, UUID faseId, StatusRegistro status, List<UUID> tipoIds) {
-        FaseProtocolo fase = faseRepository.findById(faseId)
-                .filter(candidata -> candidata.getVersaoId().equals(lamina.getProtocoloVersaoId()))
-                .orElseThrow(() -> new BadRequestException(FASE_OU_TIPO_INVALIDO));
-        if (status == StatusRegistro.NORMAL) {
-            return;
-        }
-        Map<UUID, TipoAnormalidade> encontrados = tipoRepository.findAllById(tipoIds).stream()
-                .collect(Collectors.toMap(TipoAnormalidade::getId, Function.identity()));
-        for (UUID tipoId : tipoIds) {
-            TipoAnormalidade tipo = encontrados.get(tipoId);
-            if (tipo == null || !tipoPodeSerUsado(tipo, fase, lamina)) {
-                throw new BadRequestException(FASE_OU_TIPO_INVALIDO);
-            }
-        }
-    }
-
-    private static boolean tipoPodeSerUsado(TipoAnormalidade tipo, FaseProtocolo fase, Lamina lamina) {
-        if (!tipo.getFaseId().equals(fase.getId())) {
-            return false;
-        }
-        if (tipo.getUsuarioId() == null) {
-            return true;
-        }
-        return tipo.getUsuarioId().equals(lamina.getDonoUsuarioId())
-                && Objects.equals(tipo.getLaboratorioId(), lamina.getLaboratorioId());
-    }
-
-    private static StatusRegistro status(String bruto) {
-        for (StatusRegistro status : StatusRegistro.values()) {
-            if (status.name().equals(bruto)) {
-                return status;
-            }
-        }
-        throw new BadRequestException("A situação deve ser NORMAL ou ANORMAL.");
-    }
-
-    /** Normal não tem tipo; anormal tem ao menos um; sem repetição. Devolve ordenado pelo texto canônico. */
-    private static List<UUID> tiposOrdenados(List<UUID> brutos, StatusRegistro status) {
-        List<UUID> tipos = brutos == null ? List.of() : brutos;
-        if (tipos.size() > MAXIMO_TIPOS) {
-            throw new BadRequestException("Informe no máximo " + MAXIMO_TIPOS + " tipos de anormalidade.");
-        }
-        Set<UUID> distintos = new HashSet<>(tipos);
-        if (distintos.size() != tipos.size()) {
-            throw new BadRequestException("Os tipos de anormalidade não podem se repetir.");
-        }
-        if (status == StatusRegistro.NORMAL && !tipos.isEmpty()) {
-            throw new BadRequestException("Um registro normal não pode ter tipos de anormalidade.");
-        }
-        if (status == StatusRegistro.ANORMAL && tipos.isEmpty()) {
-            throw new BadRequestException("Um registro anormal precisa de ao menos um tipo de anormalidade.");
-        }
-        return tipos.stream().sorted(Comparator.comparing(UUID::toString)).toList();
     }
 
     private static Instant horaAparelho(String bruta) {

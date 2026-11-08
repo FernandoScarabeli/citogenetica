@@ -17,7 +17,9 @@ import org.hibernate.type.SqlTypes;
 /**
  * Registro de contagem: um lote de {@code quantidade} células da mesma fase e situação. A criação é feita pelo
  * repositório com {@code INSERT ... ON CONFLICT DO NOTHING}. {@code registradoEm} é a hora oficial do servidor;
- * hora e fuso do aparelho são só informativos. Os tipos de anormalidade ficam em {@code registro_contagem_tipo}.
+ * hora e fuso do aparelho são só informativos, e o hash da criação identifica o pedido original; nenhum desses
+ * muda. Fase, situação e quantidade mudam por edição ou por desfazer, e a exclusão é lógica. Os tipos de
+ * anormalidade ficam em {@code registro_contagem_tipo}.
  */
 @Entity
 @Table(name = "registro_contagem")
@@ -28,11 +30,11 @@ public class RegistroContagem extends UuidEntity {
     @Column(name = "lamina_id", nullable = false, updatable = false)
     private UUID laminaId;
 
-    @Column(name = "fase_id", nullable = false, updatable = false)
+    @Column(name = "fase_id", nullable = false)
     private UUID faseId;
 
     @Enumerated(EnumType.STRING)
-    @Column(name = "status", nullable = false, length = 10, updatable = false)
+    @Column(name = "status", nullable = false, length = 10)
     private StatusRegistro status;
 
     @Column(name = "quantidade", nullable = false)
@@ -53,4 +55,27 @@ public class RegistroContagem extends UuidEntity {
 
     @Column(name = "excluido_em")
     private Instant excluidoEm;
+
+    public boolean estaExcluido() {
+        return excluidoEm != null;
+    }
+
+    public boolean mudaCampos(UUID novaFaseId, StatusRegistro novoStatus, int novaQuantidade) {
+        return !faseId.equals(novaFaseId) || status != novoStatus || quantidade != novaQuantidade;
+    }
+
+    public void alterar(UUID novaFaseId, StatusRegistro novoStatus, int novaQuantidade) {
+        this.faseId = novaFaseId;
+        this.status = novoStatus;
+        this.quantidade = novaQuantidade;
+    }
+
+    /** Desfazer só parte do lote: o registro continua ativo com menos células. */
+    public void reduzirQuantidade(int celulas) {
+        this.quantidade -= celulas;
+    }
+
+    public void excluir(Instant quando) {
+        this.excluidoEm = quando;
+    }
 }
