@@ -9,7 +9,7 @@ COPY . .
 RUN npm run build
 
 # Imagem final contém apenas Nginx e os arquivos estáticos da aplicação.
-FROM nginx:1.30.6-alpine3.24 AS runtime
+FROM nginx:1.31.8-alpine3.24 AS runtime
 
 RUN rm -f /etc/nginx/conf.d/default.conf && \
     mkdir -p \
