@@ -22,30 +22,26 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.Pageable;
-import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import static br.ufla.citogenetica.contagem.internal.application.ProtocoloService.NAO_ENCONTRADO;
 
 /**
- * Lâminas de contagem. Lâmina avulsa (sem laboratório) é do dono e de mais ninguém. Lâmina de laboratório
- * obedece a {@link LaboratorioAccessQuery}: o papel global ADMIN não concede acesso e nenhuma regra de
- * participação é reimplementada aqui. Ordem das respostas, para não revelar o estado do laboratório a quem
- * não o enxerga: inexistente/excluída/alheia/ex-membro = 404; vê o laboratório mas não os dados do dono = 403;
- * escrita sem permissão de edição = 403; versão desatualizada = 409.
+ * Lâminas de contagem. As regras de acesso (404/403) ficam em {@link AcessoLamina}; aqui entram o ciclo de vida
+ * da lâmina e o controle de versão (versão desatualizada = 409).
  */
 @Service
 @RequiredArgsConstructor
 public class LaminaService {
 
-    private static final String ACESSO_NEGADO = "Acesso negado.";
     private static final String ID_COM_OUTRO_CONTEUDO = "Este identificador já foi usado em outra lâmina.";
     private static final String VERSAO_DESATUALIZADA =
             "A lâmina foi alterada por outra operação. Atualize os dados e tente novamente.";
 
     private final LaminaRepository laminaRepository;
     private final VersaoProtocoloRepository versaoRepository;
+    private final AcessoLamina acesso;
     private final LaboratorioAccessQuery laboratorioAccessQuery;
     private final UsuarioRosterQuery usuarioRosterQuery;
     private final Clock clock;
@@ -71,14 +67,13 @@ public class LaminaService {
 
         UUID laboratorioId = nova.laboratorioId();
         if (laboratorioId != null) {
-            exigirVisibilidadePropria(laboratorioId, usuarioId);
+            acesso.exigirVisibilidadePropria(laboratorioId, usuarioId);
         }
         if (versaoRepository.findByIdAndPublicadaEmIsNotNull(nova.protocoloVersaoId()).isEmpty()) {
             throw new NotFoundException(NAO_ENCONTRADO);
         }
-        if (laboratorioId != null
-                && !laboratorioAccessQuery.podeEditarDadosDoPesquisador(laboratorioId, usuarioId, usuarioId)) {
-            throw new AccessDeniedException(ACESSO_NEGADO);
+        if (laboratorioId != null) {
+            acesso.exigirEdicaoNoLaboratorio(laboratorioId, usuarioId, usuarioId);
         }
 
         int inseridas = laminaRepository.inserirSeAusente(nova.id(), clock.instant(), usuarioId, laboratorioId,
@@ -124,7 +119,7 @@ public class LaminaService {
                     ? Page.empty(pageable)
                     : laminaRepository.findAvulsasAtivas(usuarioId, pageable);
         } else {
-            exigirVisibilidadePropria(laboratorioId, usuarioId);
+            acesso.exigirVisibilidadePropria(laboratorioId, usuarioId);
             List<Long> permitidos = laminaRepository.findDonosComLaminaAtiva(laboratorioId).stream()
                     .filter(dono -> donoFiltro == null || dono.equals(donoFiltro))
                     .filter(dono -> laboratorioAccessQuery.podeVerDadosDoPesquisador(laboratorioId, dono, usuarioId))
@@ -138,7 +133,7 @@ public class LaminaService {
 
     @Transactional(readOnly = true)
     public LaminaResumo buscar(UUID id, Long usuarioId) {
-        return resumir(carregarParaLeitura(id, usuarioId));
+        return resumir(acesso.carregarParaLeitura(id, usuarioId));
     }
 
     @Transactional
@@ -149,7 +144,7 @@ public class LaminaService {
         String tratamentoFinal = TextoLamina.tratamento(tratamento);
         String observacoesFinal = TextoLamina.observacoes(observacoes);
 
-        Lamina lamina = carregarParaEscrita(id, usuarioId);
+        Lamina lamina = acesso.carregarParaEscrita(id, usuarioId);
         exigirVersao(lamina, versaoEsperada);
         lamina.substituirDescricao(nomeFinal, especieFinal, tratamentoFinal, observacoesFinal, meta);
         // O flush leva a falha de versão (corrida entre duas atualizações) para dentro deste método.
@@ -169,58 +164,10 @@ public class LaminaService {
             }
             throw new NotFoundException(NAO_ENCONTRADO);
         }
-        exigirEscrita(lamina, usuarioId);
+        acesso.exigirEscrita(lamina, usuarioId);
         exigirVersao(lamina, versaoEsperada);
         lamina.excluir(clock.instant());
         laminaRepository.saveAndFlush(lamina);
-    }
-
-    private Lamina carregarParaLeitura(UUID id, Long usuarioId) {
-        Lamina lamina = laminaRepository.findById(id)
-                .filter(candidata -> !candidata.estaExcluida())
-                .orElseThrow(() -> new NotFoundException(NAO_ENCONTRADO));
-        exigirLeitura(lamina, usuarioId);
-        return lamina;
-    }
-
-    private Lamina carregarParaEscrita(UUID id, Long usuarioId) {
-        Lamina lamina = laminaRepository.findById(id)
-                .filter(candidata -> !candidata.estaExcluida())
-                .orElseThrow(() -> new NotFoundException(NAO_ENCONTRADO));
-        exigirEscrita(lamina, usuarioId);
-        return lamina;
-    }
-
-    private void exigirLeitura(Lamina lamina, Long usuarioId) {
-        if (lamina.ehAvulsa()) {
-            if (!usuarioId.equals(lamina.getDonoUsuarioId())) {
-                throw new NotFoundException(NAO_ENCONTRADO);
-            }
-            return;
-        }
-        UUID laboratorioId = lamina.getLaboratorioId();
-        exigirVisibilidadePropria(laboratorioId, usuarioId);
-        if (!laboratorioAccessQuery.podeVerDadosDoPesquisador(laboratorioId, lamina.getDonoUsuarioId(), usuarioId)) {
-            throw new AccessDeniedException(ACESSO_NEGADO);
-        }
-    }
-
-    private void exigirEscrita(Lamina lamina, Long usuarioId) {
-        exigirLeitura(lamina, usuarioId);
-        if (lamina.ehAvulsa()) {
-            return;
-        }
-        if (!laboratorioAccessQuery.podeEditarDadosDoPesquisador(
-                lamina.getLaboratorioId(), lamina.getDonoUsuarioId(), usuarioId)) {
-            throw new AccessDeniedException(ACESSO_NEGADO);
-        }
-    }
-
-    /** Laboratório alheio, inexistente ou do qual o usuário saiu responde 404, sem revelar a diferença. */
-    private void exigirVisibilidadePropria(UUID laboratorioId, Long usuarioId) {
-        if (!laboratorioAccessQuery.podeVerDadosDoPesquisador(laboratorioId, usuarioId, usuarioId)) {
-            throw new NotFoundException(NAO_ENCONTRADO);
-        }
     }
 
     private static void exigirVersao(Lamina lamina, Long versaoEsperada) {

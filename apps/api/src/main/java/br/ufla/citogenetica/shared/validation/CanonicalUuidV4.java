@@ -12,7 +12,7 @@ import jakarta.validation.Payload;
 @Documented
 @Constraint(validatedBy = CanonicalUuidV4Validator.class)
 @Target({ElementType.FIELD, ElementType.METHOD, ElementType.PARAMETER,
-        ElementType.ANNOTATION_TYPE, ElementType.RECORD_COMPONENT})
+        ElementType.ANNOTATION_TYPE, ElementType.RECORD_COMPONENT, ElementType.TYPE_USE})
 @Retention(RetentionPolicy.RUNTIME)
 public @interface CanonicalUuidV4 {
 
