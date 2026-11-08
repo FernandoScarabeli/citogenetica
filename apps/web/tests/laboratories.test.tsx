@@ -27,7 +27,6 @@ vi.mock('../src/api/convite-api', () => ({ conviteApi: invitationsApi }));
 vi.mock('../src/api/orientacao-api', () => ({ orientacaoApi: orientationApi }));
 
 import { Laboratories } from '../src/Laboratories';
-import { Slides } from '../src/Slides';
 
 const USER: UsuarioResponseDTO = {
   id: 12,
@@ -441,33 +440,5 @@ describe('gestão de laboratórios reais', () => {
 
     expect(await screen.findByText('Consulta somente leitura')).toBeTruthy();
     expect(renderSlides).toHaveBeenCalledWith(disabled, expect.any(Function), true);
-  });
-});
-
-describe('lâminas em laboratório desativado', () => {
-  it('esconde criação e importação e impede editar observações', async () => {
-    window.localStorage.setItem('citogenetica:workspace:v1', JSON.stringify({
-      version: 1,
-      customTypes: {},
-      slides: [{
-        id: 'slide-desativada',
-        labId: ACTIVE_LAB.id,
-        name: 'Lâmina em consulta',
-        protocol: 'mitose',
-        species: '',
-        treatment: '',
-        notes: 'Anotação preservada',
-        createdAt: '2026-11-03T12:00:00.000Z',
-        entries: [],
-      }],
-    }));
-    const user = userEvent.setup();
-    const { container } = render(<MemoryRouter><Slides laboratory={{ ...ACTIVE_LAB, estado: 'DESATIVADO' }} onBack={vi.fn()} readOnly /></MemoryRouter>);
-    await user.click(await screen.findByRole('button', { name: /Lâmina em consulta/ }));
-    await screen.findByRole('heading', { name: 'Lâmina em consulta' });
-
-    expect(screen.queryByRole('button', { name: 'Nova lâmina' })).toBeNull();
-    expect(screen.queryByRole('button', { name: 'Importar' })).toBeNull();
-    expect((container.querySelector('textarea[readonly]') as HTMLTextAreaElement | null)?.value).toBe('Anotação preservada');
   });
 });

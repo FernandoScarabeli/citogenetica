@@ -87,3 +87,18 @@ dialog:has(.entry-form){overflow:visible}
 .batch-editor .entry-options,.batch-editor .entry-options.opens-up{position:static;margin-top:5px}
 .batch-hint,.batch-empty{display:block;margin:7px 0 0;color:#596b5e;font-size:13px;line-height:1.5}
 .batch-empty{margin-top:16px}
+.type-checklist{border:0;margin:16px 0 0;padding:0;min-width:0}
+.type-checklist legend{padding:0;margin-bottom:8px;font-size:var(--fs-caption);line-height:var(--lh-caption);font-weight:550;color:#4c5b50}
+.type-options{display:grid;gap:2px;max-height:220px;overflow-y:auto;border:1px solid #dce4dd;border-radius:4px;padding:4px;background:#fff}
+.type-checklist[aria-invalid=true] .type-options{border-color:#963e34}
+form label.check-option{display:flex;align-items:center;gap:10px;min-height:40px;margin:0;padding:0 8px;border-radius:4px;font-weight:400;color:#34433a;font-size:var(--fs-body);line-height:var(--lh-body);cursor:pointer}
+form label.check-option:hover{background:#f2f5f2}
+form label.check-option input{display:inline-block;flex:none;width:18px;height:18px;margin:0;padding:0;accent-color:#263d32}
+form label.check-option span{color:inherit;font-weight:inherit}
+.slide-notice{margin:12px auto;color:#596b5e;font-size:var(--fs-caption);line-height:var(--lh-caption)}
+.slide-state{padding:54px 20px;text-align:center}
+.slide-state p{color:#7c867d}
+.owner-note{margin:0 0 18px;padding:11px 14px;border:1px solid #dce5dd;border-radius:6px;background:#f5f8f5;color:#46544a;font-size:var(--fs-caption);line-height:var(--lh-caption)}
+.history-row .history-edit{flex:none}
+.history-more{display:flex;justify-content:center;margin:16px 0}
+.notes-actions{display:flex;justify-content:flex-end;margin-top:10px}
