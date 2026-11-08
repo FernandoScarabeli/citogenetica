@@ -16,6 +16,7 @@ usuario         → shared
 notificacao     → shared, usuario.api, laboratorio.api
 exemplo         → shared
 laboratorio     → shared, usuario.api
+contagem        → shared, usuario.api, laboratorio.api
 infra.email     → shared
 infra.storage   → shared
 shared          → (nenhum módulo)
@@ -35,6 +36,8 @@ br.ufla.citogenetica
 │   ├── secret
 │   ├── security
 │   └── web
+├── contagem
+│   └── internal/{application,domain,persistence,web}
 ├── exemplo
 │   └── internal/{application,domain,mapper,persistence,web}
 ├── infra
@@ -62,6 +65,7 @@ br.ufla.citogenetica
 - `notificacao`: notificações do destinatário e entrega em tempo real por SSE.
 - `exemplo`: CRUD vertical mantido como padrão de referência para novos módulos.
 - `laboratorio`: laboratórios, participações, papéis locais, convites e vínculos de orientação. O papel global `usuario.ADMIN` não concede acesso a laboratórios. Convites são enviados após commit; notificações recebem somente o evento público sem token de ação. `LaboratorioAccessQuery` publica as consultas de leitura e edição de dados do pesquisador para consumidores como lâminas. A leitura permanece disponível em laboratório desativado; edição exige laboratório ativo e participação do próprio pesquisador. A saída ou remoção encerra seus vínculos ativos de orientação, e o papel `ORIENTADOR` não pode ser retirado enquanto houver vínculo ativo.
+- `contagem`: protocolos versionados (meiose e mitose), fases e tipos de anormalidade fixos e personalizados. Versão publicada, suas fases e seus tipos fixos são imutáveis por triggers do banco; novos protocolos e versões entram por migration, sem rota de escrita. O módulo ainda não publica `api`. Tipos personalizados são do usuário, por fase e escopo (laboratório ou lâmina avulsa), com criação idempotente pelo id do cliente (ADR 0003) e nome único ignorando espaços, caixa e acentos (`NomeTipoAnormalidade`). Acesso a laboratório usa `LaboratorioAccessQuery`; o papel global `ADMIN` não concede acesso. Lâminas, registros e cálculos virão em PRs seguintes.
 - `config`: segurança HTTP, sessão, CSRF, CORS, proxy confiável, OpenAPI e tratamento global de erros.
 - `infra.email` e `infra.storage`: adaptadores SMTP e RustFS/S3. O envio de e-mail é exposto por `shared.email.EmailSender`.
 - `shared`: paginação, filtros, mappers genéricos, persistência comum, erros HTTP, segredos e portas técnicas compartilhadas.
@@ -72,7 +76,7 @@ br.ufla.citogenetica
 
 `config.security` publica `SessaoEncerradaEvent` no logout. O listener interno de `notificacao` fecha apenas os emissores associados à sessão do evento. A requisição de logout não tem transação; o listener usa fallback síncrono e o handler de logout é executado antes de `SecurityContextLogoutHandler` invalidar a sessão. Se houver uma transação ativa, o listener processa após o commit. Revogação de outras sessões também é tratada após o commit. Eventos de criação de notificação seguem publicados somente após o commit.
 
-O `GlobalExceptionHandler` fica em `config.web` para manter um formato HTTP comum. Erros compartilhados ficam em `shared.web.error`; constraints específicas de laboratório são traduzidas dentro de `laboratorio.internal.web` para conflito genérico `409`, sem expor nomes de constraints.
+O `GlobalExceptionHandler` fica em `config.web` para manter um formato HTTP comum. Erros compartilhados ficam em `shared.web.error`; constraints específicas de laboratório e de contagem são traduzidas dentro de `laboratorio.internal.web` e `contagem.internal.web` para conflito genérico `409`, sem expor nomes de constraints.
 
 ## Persistência, configuração e segurança
 
@@ -82,4 +86,4 @@ O `GlobalExceptionHandler` fica em `config.web` para manter um formato HTTP comu
 
 ## Verificação automática
 
-ArchUnit, somente em escopo de teste, verifica que módulos de negócio acessam outros módulos apenas por `api`, que `shared` não depende de módulos/config/infra, que nenhum módulo ou adaptador depende de `config`, que `infra` não depende de negócio, que negócio não depende de `infra`, que `config` usa somente APIs públicas e que não há ciclos. O teste também rejeita novas raízes de pacote fora de `config`, `shared`, `infra`, `usuario`, `notificacao`, `exemplo`, `laboratorio` e da raiz de inicialização. Um teste de integração compara todos os paths publicados em `/v3/api-docs`.
+ArchUnit, somente em escopo de teste, verifica que módulos de negócio acessam outros módulos apenas por `api`, que `shared` não depende de módulos/config/infra, que nenhum módulo ou adaptador depende de `config`, que `infra` não depende de negócio, que negócio não depende de `infra`, que `config` usa somente APIs públicas e que não há ciclos. O teste também rejeita novas raízes de pacote fora de `config`, `shared`, `infra`, `usuario`, `notificacao`, `exemplo`, `laboratorio`, `contagem` e da raiz de inicialização. Um teste de integração compara todos os paths publicados em `/v3/api-docs`.

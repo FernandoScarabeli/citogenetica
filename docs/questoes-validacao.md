@@ -43,9 +43,13 @@ Quando uma resposta mudar, atualize o item e a data, não apague o histórico da
 | Uma célula pode ter mais de uma anormalidade? | decidido (2026-11-03, mantenedor) | Sim. |
 | O que pode ser criado sem internet? | decidido (2026-11-03, mantenedor) | Somente lâminas e contagens. Laboratórios e convites exigem conexão. |
 | Guardar a hora do aparelho? | decidido (2026-11-03, mantenedor) | Sim, como dado separado e apenas informativo; a hora oficial é a do servidor. |
-| Limites do lote, meta configurável, casas decimais | pendente (Etapa 2) | Perguntar ao laboratório. |
-| Alcance do "desfazer" entre aparelhos | pendente (Etapa 2/4) | Perguntar ao laboratório. |
-| Quais eventos geram notificação (convite, comentário, conflito...) | pendente (Etapa 1 em diante) | Definir junto com cada etapa. |
+| Lâmina sem laboratório existe no servidor? | decidido (2026-11-08, mantenedor) | Sim, visível e editável só pelo dono. |
+| Limite de células por registro em lote | decidido (2026-11-08, mantenedor) | 1000 por registro. O valor fica guardado no banco, pois o administrador da plataforma poderá alterá-lo numa futura tela de parâmetros do sistema. |
+| Meta da lâmina | decidido (2026-11-08, mantenedor) | Opcional e por lâmina; número inteiro positivo. |
+| Casas decimais nos percentuais | decidido (2026-11-08, mantenedor) | A API guarda as contagens e devolve o número sem arredondar. A tela mostra 2 casas. |
+| Alcance do "desfazer" entre aparelhos | decidido (2026-11-08, mantenedor) | Desfaz os últimos registros da pessoa naquela lâmina, em qualquer aparelho. |
+| A contagem gera notificação? | decidido (2026-11-08, mantenedor) | Não nesta etapa. |
+| Quais eventos geram notificação (convite, comentário, conflito...) | pendente (Etapa 1 em diante) | Convites já geram. Definir os demais junto com cada etapa. |
 
 ## Dados, exportação e operação
 
