@@ -105,3 +105,47 @@ form label.check-option span{color:inherit;font-weight:inherit}
 .notes-actions{display:flex;justify-content:flex-end;margin-top:10px}
 .fila-aviso{position:sticky;bottom:0;z-index:20;display:flex;align-items:center;gap:10px;margin-top:20px;padding:13px 16px;border:1px solid var(--lab-accent,#395a4c);border-radius:6px;background:var(--lab-ground,#f5f8f5);color:var(--lab-ink,#26342c);font-size:var(--fs-body);line-height:var(--lh-body);font-weight:550;box-shadow:0 -4px 16px #17281e1c}
 .fila-aviso-ponto{flex:none;width:9px;height:9px;border-radius:50%;background:var(--lab-accent,#395a4c)}
+
+/* Anormal com um toque: um botão grande por anormalidade. */
+.type-buttons{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px;max-height:min(46vh,340px);overflow-y:auto;padding:2px}
+.type-button{min-height:52px;padding:10px 14px;border:1px solid var(--lab-line,#d3e3d6);border-radius:5px;background:var(--lab-ground,#f1f7f2);color:var(--lab-ink,#25362b);font-weight:550;text-align:left;transition:background-color 150ms,border-color 150ms}
+.type-button:hover{background:var(--lab-surface,#e2f0e4);border-color:var(--lab-accent,#86a98e)}
+.type-button:active{background:var(--lab-line,#d6e9d9)}
+.type-button:focus-visible{outline:3px solid var(--lab-accent,#527e5e);outline-offset:-3px}
+.type-button-other{border-style:dashed;font-weight:400;color:var(--lab-muted,#52665a)}
+.multi-toggle{margin-top:12px;color:var(--lab-accent,#315b3f);text-decoration:underline;text-underline-offset:3px;font-size:13px}
+@media(prefers-reduced-motion:reduce){.type-button{transition:none}}
+
+/* Remover anormais: combinações existentes na fase. */
+.combo-list{min-width:0;margin:16px 0 0;padding:0;border:0}
+.combo-list legend{padding:0;margin-bottom:8px;font-size:13px;font-weight:550;color:var(--lab-ink,#34483a)}
+.combo-options{display:grid;gap:2px;max-height:220px;overflow-y:auto;border:1px solid var(--lab-line,#dce4dd);border-radius:4px;padding:4px;background:var(--lab-surface,#fff)}
+form label.combo-option{display:flex;align-items:center;gap:10px;min-height:40px;margin:0;padding:0 8px;border-radius:4px;font-weight:400;color:var(--lab-ink,#34433a);cursor:pointer}
+form label.combo-option:hover{background:var(--lab-ground,#f2f5f2)}
+form label.combo-option input{flex:none;width:18px;height:18px;margin:0;padding:0;accent-color:var(--lab-accent,#263d32)}
+
+/* Contagem: resumo numa faixa só, para as fases começarem no alto. */
+.count-strip{display:flex;flex-wrap:wrap;align-items:center;gap:6px 22px;padding:10px 16px;background:var(--lab-surface,#fff);border:1px solid var(--lab-line,#e4eae4);border-radius:6px;font-size:var(--fs-caption);line-height:var(--lh-caption);color:var(--lab-muted,#748077)}
+.count-strip strong{margin-left:4px;color:var(--lab-ink,#25362b);font-size:var(--fs-body);font-weight:600;font-variant-numeric:tabular-nums}
+.count-strip-goal{display:flex;align-items:center;gap:0;flex:1 1 220px;min-width:200px}
+.count-strip-goal .progress-track{flex:1;min-width:60px;margin-left:10px;display:block;height:6px;border-radius:3px;background:var(--lab-line,#e3e9e3);overflow:hidden}
+.count-strip-goal .progress-track>span{display:block;height:100%;background:var(--lab-accent,#355c47)}
+.detail.is-counting .detail-heading{margin:0 0 12px;gap:12px;align-items:center}
+.detail.is-counting .detail-heading p{margin-top:2px}
+.detail.is-counting{padding-top:16px}
+.detail.is-counting .tabs{margin:14px 0 14px}
+.detail.is-counting .tabs button{padding-bottom:9px}
+.detail.is-counting .section-heading.compact{margin-bottom:10px}
+.detail.is-counting .section-heading.compact p{display:none}
+.detail.is-counting .phase-row{min-height:76px;padding:10px 18px}
+.detail.is-counting .workspace{gap:20px}
+/* Número perto do nome da fase em telas largas. */
+@media(min-width:601px){.phase-row{grid-template-columns:minmax(170px,230px) minmax(280px,440px);justify-content:start;column-gap:28px}}
+@media(max-width:600px){
+ .count-strip{gap:4px 14px;padding:8px 12px}
+ .detail.is-counting .detail-heading{margin-bottom:8px}
+ .detail.is-counting .detail-heading p{display:none}
+ .detail.is-counting .tabs{margin:10px 0}
+ .detail.is-counting .section-heading.compact{margin-bottom:6px}
+ .detail.is-counting .phase-row{padding:12px 16px;gap:8px}
+}

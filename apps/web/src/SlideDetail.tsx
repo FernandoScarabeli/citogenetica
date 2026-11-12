@@ -13,7 +13,7 @@ import {
   agruparPorDia, descricaoDesfazer, formatarData, formatarHora, fusoDoAparelho, instanteExibido, mensagemDeErro, normalizarNomeTipo, resumoCsv, rotuloDesfazer,
 } from './contagem-utils';
 import { pct } from './domain';
-import { EntrySelect, Modal, TypeChecklist, type TypeChoice } from './SlideWidgets';
+import { EntrySelect, Modal, TypeButtons, TypeChecklist, type TypeChoice } from './SlideWidgets';
 import { download } from './storage';
 import { useNotesAutosave } from './useNotesAutosave';
 
@@ -26,7 +26,25 @@ const DICA_FILA = 'Disponível depois que as células guardadas neste aparelho f
 type Loaded = { lamina: LaminaDTO; versao: VersaoProtocoloDTO; resumo: ResumoLaminaDTO; tipos: TipoPersonalizadoDTO[] };
 type History = { items: RegistroHistoricoDTO[]; page: number; totalPages: number };
 type Pending = { key: string; faseId: string; status: StatusRegistro };
+type Combo = { key: string; tipoIds: string[]; nome: string; quantidade: number };
 type ModalKind = 'abnormal' | 'edit-record' | 'edit-slide' | 'delete' | 'undo' | null;
+
+const SEM_TIPO = 'Sem tipo informado';
+
+/** Agrupa os registros anormais de uma fase por combinação de tipos, somando as quantidades que restam. */
+function combosDaFase(registros: RegistroHistoricoDTO[], faseId: string): Combo[] {
+  const mapa = new Map<string, Combo>();
+  for (const registro of registros) {
+    if (registro.faseId !== faseId || registro.status !== 'ANORMAL' || registro.quantidade < 1) continue;
+    const tipoIds = [...registro.tipoIds].sort();
+    const key = tipoIds.join('|');
+    const nome = registro.tipos.length ? [...registro.tipos].sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR')).map(tipo => tipo.nome).join(' + ') : SEM_TIPO;
+    const atual = mapa.get(key);
+    if (atual) atual.quantidade += registro.quantidade;
+    else mapa.set(key, { key, tipoIds, nome, quantidade: registro.quantidade });
+  }
+  return [...mapa.values()].sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'));
+}
 
 function historyFrom(page: PageDTO<RegistroHistoricoDTO>): History {
   return { items: page.content, page: page.currentPage, totalPages: page.totalPages };
@@ -85,6 +103,9 @@ export function SlideDetail({ api, laminaId, usuarioId, readOnly, protocolos, on
   const [batchStatus, setBatchStatus] = useState<StatusRegistro>('NORMAL');
   const [batchQuantity, setBatchQuantity] = useState('');
   const [batchError, setBatchError] = useState('');
+  const [comboKey, setComboKey] = useState<string | null>(null);
+  const [comboState, setComboState] = useState<{ status: 'loading' | 'ready' | 'error'; registros: RegistroHistoricoDTO[] }>({ status: 'loading', registros: [] });
+  const [multi, setMulti] = useState(false);
 
   const mounted = useRef(true);
   const loadSeq = useRef(0);
@@ -153,6 +174,28 @@ export function SlideDetail({ api, laminaId, usuarioId, readOnly, protocolos, on
     void load(controller.signal, seq);
     return () => controller.abort();
   }, [load, retry]);
+
+  // Para remover anormais, lista as combinações que existem na fase a partir de todos os registros da lâmina.
+  const removendoAnormais = status === 'ready' && batchPhase !== null && batchAction === 'remove' && batchStatus === 'ANORMAL';
+  useEffect(() => {
+    if (!removendoAnormais) return;
+    const controller = new AbortController();
+    setComboState({ status: 'loading', registros: [] });
+    void (async () => {
+      try {
+        const registros: RegistroHistoricoDTO[] = [];
+        for (let pagina = 0, total = 1; pagina < total; pagina += 1) {
+          const result = await api.listarRegistros(laminaId, { page: pagina, size: 100, signal: controller.signal });
+          registros.push(...result.content);
+          total = result.totalPages;
+        }
+        if (!controller.signal.aborted) setComboState({ status: 'ready', registros });
+      } catch {
+        if (!controller.signal.aborted) setComboState({ status: 'error', registros: [] });
+      }
+    })();
+    return () => controller.abort();
+  }, [removendoAnormais, batchPhase, api, laminaId]);
 
   const refreshRef = useRef<() => Promise<void>>(() => Promise.resolve());
   const phaseNameRef = useRef<(faseId: string) => string>(() => 'uma fase');
@@ -281,7 +324,7 @@ export function SlideDetail({ api, laminaId, usuarioId, readOnly, protocolos, on
   }
 
   function resetTypes() {
-    setSelectedTypes([]); setOtherChecked(false); setOtherText(''); setTypeError('');
+    setSelectedTypes([]); setOtherChecked(false); setOtherText(''); setTypeError(''); setComboKey(null);
   }
 
   function toggleType(id: string) {
@@ -293,8 +336,16 @@ export function SlideDetail({ api, laminaId, usuarioId, readOnly, protocolos, on
 
   function openAbnormal(faseId: string) {
     resetTypes();
+    setMulti(false);
     setPhaseId(faseId);
     setModal('abnormal');
+  }
+
+  /** Um toque: registra a célula com este tipo pelo mesmo caminho da contagem (inclui a fila sem conexão). */
+  function pickAbnormal(tipoId: string) {
+    if (!canEdit) return;
+    count(phaseId, 'ANORMAL', [tipoId]);
+    setModal(null);
   }
 
   async function submitAbnormal(event: FormEvent) {
@@ -338,11 +389,17 @@ export function SlideDetail({ api, laminaId, usuarioId, readOnly, protocolos, on
     if (!canEdit || !batchPhase || busy || guardadas > 0) return;
     const amount = Number(batchQuantity);
     if (!Number.isSafeInteger(amount) || amount < 1) { setBatchError('Informe uma quantidade inteira maior que zero.'); return; }
-    if (batchStatus === 'ANORMAL' && !hasTypeChoice()) { setBatchError('Selecione ao menos uma anormalidade.'); return; }
+    const removeCombo = batchAction === 'remove' && batchStatus === 'ANORMAL';
+    const combo = removeCombo ? combosDaFase(comboState.registros, batchPhase).find(item => item.key === comboKey) : undefined;
+    if (removeCombo) {
+      if (!combo) { setBatchError('Escolha qual anormalidade remover.'); return; }
+      if (amount > combo.quantidade) { setBatchError(`Só há ${num(combo.quantidade)} ${celulas(combo.quantidade)} com essa anormalidade.`); return; }
+    } else if (batchStatus === 'ANORMAL' && !hasTypeChoice()) { setBatchError('Selecione ao menos uma anormalidade.'); return; }
     setBusy(true);
     try {
       let tipoIds: string[] = [];
-      if (batchStatus === 'ANORMAL') {
+      if (combo) tipoIds = combo.tipoIds;
+      else if (batchStatus === 'ANORMAL') {
         const ids = await chosenTypeIds(batchPhase);
         if (!ids) return;
         tipoIds = ids;
@@ -503,7 +560,7 @@ export function SlideDetail({ api, laminaId, usuarioId, readOnly, protocolos, on
   const extraForEdit = editing && editing.faseId === phaseId ? editing.tipos : [];
   const batchOptions = (faseId: string) => optionsFor(faseId);
 
-  return <main className="page-container detail">
+  return <main className={`page-container detail${tab === 'contagem' ? ' is-counting' : ''}`}>
     <div className="detail-heading">
       <div>
         <div className="title-line"><h1 className={typeClass('display')}>{lamina.nome}</h1><span className="protocol-tag">{protocolo?.nome ?? 'Protocolo'}</span></div>
@@ -515,20 +572,27 @@ export function SlideDetail({ api, laminaId, usuarioId, readOnly, protocolos, on
       </div>}
     </div>
     {!readOnly && lamina.donoUsuarioId !== usuarioId && <p className="owner-note">Esta lâmina é de {lamina.donoNome}. Você pode consultar a contagem, mas só quem a criou pode alterá-la.</p>}
-    <div className="detail-summary">
+    {tab === 'contagem' && <div className="count-strip" role="group" aria-label="Resumo da contagem">
+      <span>Total <strong>{num(shown.total)}</strong></span>
+      <span>Normais <strong>{num(normal)}</strong></span>
+      <span>Anormais <strong>{num(shown.anormais)}</strong></span>
+      {isMitosis && <span>IM <strong>{pct(shown.indiceMitotico, 100)}</strong></span>}
+      {goal !== null && <span className="count-strip-goal">Meta <strong>{num(shown.total)} / {num(goal)}</strong><span className="progress-track" role="progressbar" aria-label="Meta de contagem" aria-valuemin={0} aria-valuemax={goal} aria-valuenow={Math.min(shown.total, goal)}><span style={{ width: `${Math.min(shown.total / goal * 100, 100)}%` }} /></span></span>}
+    </div>}
+    {tab !== 'contagem' && <div className="detail-summary">
       <div className="summary-main"><span>Total de células</span><strong>{num(shown.total)}</strong><small>registradas nesta lâmina</small></div>
       <div className="summary-item"><span>Células normais</span><strong>{num(normal)}</strong><small>{pct(normal, shown.total)} do total</small></div>
       <div className="summary-item"><span>Células anormais</span><strong>{num(shown.anormais)}</strong><small>{pct(shown.anormais, shown.total)} do total</small></div>
       {isMitosis && <div className="summary-item"><span>Índice mitótico</span><strong>{pct(shown.indiceMitotico, 100)}</strong><small>células em divisão</small></div>}
-    </div>
-    {goal !== null && <div className="progress-line"><div><span>Meta de contagem</span><strong>{num(shown.total)} <span>/ {num(goal)} células</span></strong></div><div className="progress-track" role="progressbar" aria-label="Meta de contagem" aria-valuemin={0} aria-valuemax={goal} aria-valuenow={Math.min(shown.total, goal)}><span style={{ width: `${Math.min(shown.total / goal * 100, 100)}%` }} /></div></div>}
+    </div>}
+    {tab !== 'contagem' && goal !== null && <div className="progress-line"><div><span>Meta de contagem</span><strong>{num(shown.total)} <span>/ {num(goal)} células</span></strong></div><div className="progress-track" role="progressbar" aria-label="Meta de contagem" aria-valuemin={0} aria-valuemax={goal} aria-valuenow={Math.min(shown.total, goal)}><span style={{ width: `${Math.min(shown.total / goal * 100, 100)}%` }} /></div></div>}
     <div className="tabs" role="tablist" aria-label="Seções da lâmina">{([['contagem', 'Contagem'], ['resumo', 'Resumo'], ['historico', 'Histórico']] as const).map(([value, label]) => <button type="button" role="tab" aria-selected={tab === value} className={tab === value ? 'selected' : ''} onClick={() => setTab(value)} key={value}>{label}</button>)}</div>
 
     {tab === 'contagem' && <div className="workspace"><section className="count-area">
       <div className="section-heading compact"><div><h2 className={typeClass('title')}>Contagem por fase</h2><p>Registre cada célula na fase correspondente.</p></div>
         {canEdit && <div className="count-tools"><button className="text-button" type="button" disabled={!last || pending.length > 0 || guardadas > 0 || busy} title={guardadas > 0 ? DICA_FILA : undefined} onClick={() => (last && last.quantidade > 1 ? setModal('undo') : void undoLast())}><Undo2 size={15} /> {last ? rotuloDesfazer(last, phaseName(last.faseId)) : 'Desfazer último'}</button></div>}
       </div>
-      <div className="phase-list">{shown.fases.map(fase => <div className="phase-row" key={fase.faseId}>
+      <div className="phase-list">{shown.fases.map(fase => { const combos = removendoAnormais && batchPhase === fase.faseId ? combosDaFase(comboState.registros, fase.faseId) : []; const comboAtual = combos.find(item => item.key === comboKey); return <div className="phase-row" key={fase.faseId}>
         <div className="phase-title"><strong>{fase.nome}</strong><small>{num(fase.total)} {fase.total === 1 ? 'célula' : 'células'} no total</small>
           {canEdit && <button className="phase-adjust" type="button" ref={el => { batchTriggers.current[fase.faseId] = el; }} aria-expanded={batchPhase === fase.faseId} disabled={guardadas > 0} title={guardadas > 0 ? DICA_FILA : undefined} onClick={() => (batchPhase === fase.faseId ? closeBatch() : openBatch(fase.faseId))}>Ajustar quantidade<span className="sr-only"> em {fase.nome}</span></button>}
         </div>
@@ -544,11 +608,18 @@ export function SlideDetail({ api, laminaId, usuarioId, readOnly, protocolos, on
             <fieldset><legend>Classificação</legend><div className="batch-choice"><button type="button" aria-pressed={batchStatus === 'NORMAL'} onClick={() => { setBatchError(''); setBatchStatus('NORMAL'); resetTypes(); }}>Normal</button><button type="button" aria-pressed={batchStatus === 'ANORMAL'} onClick={() => { setBatchError(''); setBatchStatus('ANORMAL'); resetTypes(); }}>Anormal</button></div></fieldset>
             <label className="batch-quantity">Quantidade de células<input type="number" min="1" step="1" inputMode="numeric" required value={batchQuantity} onChange={event => { setBatchError(''); setBatchQuantity(event.target.value); }} placeholder="Ex.: 10" /></label>
           </div>
-          {batchStatus === 'ANORMAL' && <TypeChecklist legend={batchAction === 'add' ? 'Anormalidades observadas' : 'Anormalidades do registro a remover'} options={batchOptions(fase.faseId)} selected={selectedTypes} onToggle={id => { setBatchError(''); toggleType(id); }} other={otherChecked} onOther={value => { setBatchError(''); setOtherChecked(value); }} allowOther={batchAction === 'add'} otherText={otherText} onOtherText={value => { setBatchError(''); setOtherText(value); }} />}
+          {removendoAnormais && <fieldset className="combo-list"><legend>Qual anormalidade remover?</legend>
+            {comboState.status === 'loading' && <p className="batch-hint" role="status">Carregando as anormalidades desta fase…</p>}
+            {comboState.status === 'error' && <p className="select-error" role="alert">Não foi possível carregar as anormalidades. Feche e tente de novo.</p>}
+            {comboState.status === 'ready' && (combos.length === 0
+              ? <p className="batch-hint">Não há células anormais para remover nesta fase.</p>
+              : <div className="combo-options">{combos.map(combo => <label className="combo-option" key={combo.key}><input type="radio" name={`combo-${fase.faseId}`} checked={comboKey === combo.key} onChange={() => { setBatchError(''); setComboKey(combo.key); }} /><span>{combo.nome} ({num(combo.quantidade)})</span></label>)}</div>)}
+          </fieldset>}
+          {batchStatus === 'ANORMAL' && !removendoAnormais && <TypeChecklist legend={batchAction === 'add' ? 'Anormalidades observadas' : 'Anormalidades do registro a remover'} options={batchOptions(fase.faseId)} selected={selectedTypes} onToggle={id => { setBatchError(''); toggleType(id); }} other={otherChecked} onOther={value => { setBatchError(''); setOtherChecked(value); }} allowOther={batchAction === 'add'} otherText={otherText} onOtherText={value => { setBatchError(''); setOtherText(value); }} />}
           {batchError && <p className="select-error" role="alert">{batchError}</p>}
-          <div className="batch-footer">{batchAction === 'remove' && batchStatus === 'NORMAL' ? <p>{`Disponível: ${num(fase.normais)} ${celulas(fase.normais)}.`}</p> : <span />}<div><button type="button" className="button secondary" onClick={closeBatch}>Cancelar</button><button disabled={busy} className={`button ${batchAction === 'remove' ? 'danger' : 'primary'}`}>{batchAction === 'remove' ? 'Remover células' : 'Adicionar células'}</button></div></div>
+          <div className="batch-footer">{batchAction === 'remove' && batchStatus === 'NORMAL' ? <p>{`Disponível: ${num(fase.normais)} ${celulas(fase.normais)}.`}</p> : comboAtual ? <p>{`Disponível: ${num(comboAtual.quantidade)} ${celulas(comboAtual.quantidade)}.`}</p> : <span />}<div><button type="button" className="button secondary" onClick={closeBatch}>Cancelar</button><button disabled={busy} className={`button ${batchAction === 'remove' ? 'danger' : 'primary'}`}>{batchAction === 'remove' ? 'Remover células' : 'Adicionar células'}</button></div></div>
         </form>}
-      </div>)}</div>
+      </div>; })}</div>
     </section>
     <section className="side-panel notes-panel" aria-label="Observações da lâmina"><div className="notes"><label htmlFor="notes">Observações</label><p>Anotações desta lâmina</p>
       <textarea id="notes" readOnly={!canEdit} placeholder={canEdit ? 'Adicione suas observações...' : ''} value={notes.text} maxLength={5000} onChange={event => notes.setText(event.target.value)} onBlur={() => void notes.flush()} />
@@ -572,11 +643,19 @@ export function SlideDetail({ api, laminaId, usuarioId, readOnly, protocolos, on
 
     {guardadas > 0 && <div className="fila-aviso" role="status"><span aria-hidden="true" className="fila-aviso-ponto" />{fila.enviando ? mensagemFilaEnviando(guardadas) : mensagemFilaGuardada(guardadas)}</div>}
 
-    {modal === 'abnormal' && <Modal title="Registrar célula anormal" onClose={() => setModal(null)}><form className="entry-form" onSubmit={event => void submitAbnormal(event)}>
-      <p className="modal-description">Selecione a anormalidade observada na célula. Marque mais de uma, se for o caso.</p>
-      <TypeChecklist legend={`Anormalidades em ${phaseName(phaseId)}`} options={optionsFor(phaseId)} selected={selectedTypes} onToggle={toggleType} other={otherChecked} onOther={value => { setTypeError(''); setOtherChecked(value); }} otherText={otherText} onOtherText={value => { setTypeError(''); setOtherText(value); }} error={typeError} firstRef={typeRef} />
-      <div className="modal-actions"><button type="button" className="button secondary" onClick={() => setModal(null)}>Cancelar</button><button className="button primary" disabled={busy}><Check size={16} /> Registrar célula</button></div>
-    </form></Modal>}
+    {modal === 'abnormal' && <Modal title="Registrar célula anormal" onClose={() => setModal(null)}>{multi
+      ? <form className="entry-form" onSubmit={event => void submitAbnormal(event)}>
+        <p className="modal-description">Marque todas as anormalidades observadas na célula.</p>
+        <TypeChecklist legend={`Anormalidades em ${phaseName(phaseId)}`} options={optionsFor(phaseId)} selected={selectedTypes} onToggle={toggleType} other={otherChecked} onOther={value => { setTypeError(''); setOtherChecked(value); }} otherText={otherText} onOtherText={value => { setTypeError(''); setOtherText(value); }} error={typeError} firstRef={typeRef} />
+        <button type="button" className="text-button multi-toggle" onClick={() => { resetTypes(); setMulti(false); }}>Voltar ao toque único</button>
+        <div className="modal-actions"><button type="button" className="button secondary" onClick={() => setModal(null)}>Cancelar</button><button className="button primary" disabled={busy}><Check size={16} /> Registrar célula</button></div>
+      </form>
+      : <form className="entry-form" onSubmit={event => void submitAbnormal(event)}>
+        <p className="modal-description">Toque na anormalidade observada para registrar a célula.</p>
+        <TypeButtons legend={`Anormalidades em ${phaseName(phaseId)}`} options={optionsFor(phaseId)} onPick={pickAbnormal} other={otherChecked} onOther={value => { setTypeError(''); setOtherChecked(value); }} otherText={otherText} onOtherText={value => { setTypeError(''); setOtherText(value); }} error={typeError} />
+        <button type="button" className="text-button multi-toggle" onClick={() => { resetTypes(); setMulti(true); }}>Marcar várias</button>
+        <div className="modal-actions"><button type="button" className="button secondary" onClick={() => setModal(null)}>Cancelar</button>{otherChecked && <button className="button primary" disabled={busy}><Check size={16} /> Registrar célula</button>}</div>
+      </form>}</Modal>}
 
     {modal === 'edit-record' && editing && <Modal title="Editar registro" onClose={() => setModal(null)}><form className="entry-form" onSubmit={event => void submitEditRecord(event)}>
       <p className="modal-description">Corrija a classificação deste lançamento. A data original será mantida.</p>

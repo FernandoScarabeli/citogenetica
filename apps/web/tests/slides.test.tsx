@@ -308,6 +308,7 @@ describe('anormalidades', () => {
     renderSlides();
     await openSlide(user);
     await user.click(abnormalButton());
+    await user.click(screen.getByRole('button', { name: 'Marcar várias' }));
     await user.click(screen.getByRole('checkbox', { name: 'Micronúcleo' }));
     await user.click(screen.getByRole('checkbox', { name: 'Stickiness' }));
     await user.click(screen.getByRole('button', { name: /Registrar célula/ }));
@@ -316,11 +317,50 @@ describe('anormalidades', () => {
     expect(api.criarRegistro).toHaveBeenCalledWith('lamina-1', expect.objectContaining({ faseId: PROFASE, status: 'ANORMAL', tipoIds: [MICRO, STICK], quantidade: 1 }));
   });
 
+  it('um toque no tipo registra a célula e fecha a janela', async () => {
+    const user = userEvent.setup();
+    renderSlides();
+    await openSlide(user);
+    await user.click(abnormalButton());
+    await user.click(screen.getByRole('button', { name: 'Stickiness' }));
+
+    await waitFor(() => expect(api.criarRegistro).toHaveBeenCalledTimes(1));
+    expect(api.criarRegistro).toHaveBeenCalledWith('lamina-1', expect.objectContaining({ faseId: PROFASE, status: 'ANORMAL', tipoIds: [STICK], quantidade: 1 }));
+    expect(screen.queryByRole('dialog')).toBeNull();
+  });
+
+  it('"Outro" no modo de um toque abre o campo e registra com Registrar célula', async () => {
+    const criado: TipoPersonalizadoDTO = { id: 'dddddddd-0000-4000-8000-000000000002', faseId: PROFASE, laboratorioId: null, nome: 'Fragmento' };
+    api.criarTipoPersonalizado.mockResolvedValue(criado);
+    const user = userEvent.setup();
+    renderSlides();
+    await openSlide(user);
+    await user.click(abnormalButton());
+    await user.click(screen.getByRole('button', { name: 'Outro (especificar)' }));
+    await user.type(screen.getByLabelText('Descreva a anormalidade'), 'Fragmento');
+    await user.click(screen.getByRole('button', { name: /Registrar célula/ }));
+
+    await waitFor(() => expect(api.criarRegistro).toHaveBeenCalledTimes(1));
+    expect(api.criarRegistro.mock.calls[0][1].tipoIds).toEqual([criado.id]);
+  });
+
+  it('o toque único sem conexão vai para a fila', async () => {
+    api.criarRegistro.mockRejectedValue(new NetworkError());
+    const user = userEvent.setup();
+    renderSlides();
+    await openSlide(user);
+    await user.click(abnormalButton());
+    await user.click(screen.getByRole('button', { name: 'Micronúcleo' }));
+    expect(await screen.findByText(/Sem internet\. 1 célula guardada/)).toBeTruthy();
+    expect(JSON.parse(localStorage.getItem('citogenetica:fila-registros:v1') ?? '[]')[0].pedido).toEqual(expect.objectContaining({ status: 'ANORMAL', tipoIds: [MICRO] }));
+  });
+
   it('exige ao menos um tipo, com erro acessível', async () => {
     const user = userEvent.setup();
     renderSlides();
     await openSlide(user);
     await user.click(abnormalButton());
+    await user.click(screen.getByRole('button', { name: 'Marcar várias' }));
     await user.click(screen.getByRole('button', { name: /Registrar célula/ }));
 
     const alert = await screen.findByRole('alert');
@@ -336,6 +376,7 @@ describe('anormalidades', () => {
     renderSlides();
     await openSlide(user);
     await user.click(abnormalButton());
+    await user.click(screen.getByRole('button', { name: 'Marcar várias' }));
     await user.click(screen.getByRole('checkbox', { name: 'Outro (especificar)' }));
     await user.type(screen.getByLabelText('Descreva a anormalidade'), '  Ponte   dupla ');
     await user.click(screen.getByRole('button', { name: /Registrar célula/ }));
@@ -350,6 +391,7 @@ describe('anormalidades', () => {
     renderSlides();
     await openSlide(user);
     await user.click(abnormalButton());
+    await user.click(screen.getByRole('button', { name: 'Marcar várias' }));
     await user.click(screen.getByRole('checkbox', { name: 'Outro (especificar)' }));
     await user.type(screen.getByLabelText('Descreva a anormalidade'), 'micronucleo');
     await user.click(screen.getByRole('button', { name: /Registrar célula/ }));
@@ -367,6 +409,7 @@ describe('anormalidades', () => {
     renderSlides();
     await openSlide(user);
     await user.click(abnormalButton());
+    await user.click(screen.getByRole('button', { name: 'Marcar várias' }));
     await user.click(screen.getByRole('checkbox', { name: 'Outro (especificar)' }));
     await user.type(screen.getByLabelText('Descreva a anormalidade'), 'cromossomo anulo');
     await user.click(screen.getByRole('button', { name: /Registrar célula/ }));
@@ -383,6 +426,7 @@ describe('anormalidades', () => {
     renderSlides();
     await openSlide(user);
     await user.click(abnormalButton());
+    await user.click(screen.getByRole('button', { name: 'Marcar várias' }));
     await user.click(screen.getByRole('checkbox', { name: 'Outro (especificar)' }));
     await user.type(screen.getByLabelText('Descreva a anormalidade'), 'ponte dupla');
     await user.click(screen.getByRole('button', { name: /Registrar célula/ }));
@@ -420,18 +464,53 @@ describe('ajuste em lote', () => {
     expect((await screen.findByRole('alert')).textContent).toBe('A quantidade deve ser de no máximo 1000.');
   });
 
-  it('remove com desfazer, usando fase, situação e o conjunto de tipos', async () => {
-    const user = userEvent.setup();
+  const REGISTRO_SO_MICRO: RegistroHistoricoDTO = { ...REGISTRO, id: 'reg-3', tipoIds: [MICRO], quantidade: 4, tipos: [{ id: MICRO, nome: 'Micronúcleo' }] };
+
+  async function openRemoveAbnormal(user: ReturnType<typeof userEvent.setup>) {
+    api.listarRegistros.mockResolvedValue(page([REGISTRO, REGISTRO_SO_MICRO, REGISTRO_ANTIGO]));
     await openBatch(user);
     await user.click(screen.getByRole('button', { name: 'Remover' }));
     await user.click(screen.getByRole('button', { name: 'Anormal' }));
-    await user.click(screen.getByRole('checkbox', { name: 'Micronúcleo' }));
-    await user.click(screen.getByRole('checkbox', { name: 'Stickiness' }));
+  }
+
+  it('remover anormais lista as combinações da fase com a quantidade de cada uma', async () => {
+    const user = userEvent.setup();
+    await openRemoveAbnormal(user);
+    expect(await screen.findByRole('radio', { name: 'Micronúcleo (4)' })).toBeTruthy();
+    expect(screen.getByRole('radio', { name: 'Micronúcleo + Stickiness (3)' })).toBeTruthy();
+    expect(screen.queryByRole('checkbox', { name: 'Stickiness' })).toBeNull();
+  });
+
+  it('remove a combinação escolhida com desfazer', async () => {
+    const user = userEvent.setup();
+    await openRemoveAbnormal(user);
+    await user.click(await screen.findByRole('radio', { name: 'Micronúcleo + Stickiness (3)' }));
     await user.type(screen.getByLabelText('Quantidade de células'), '2');
     await user.click(screen.getByRole('button', { name: 'Remover células' }));
 
     await waitFor(() => expect(api.desfazerRegistros).toHaveBeenCalledTimes(1));
     expect(api.desfazerRegistros).toHaveBeenCalledWith('lamina-1', { id: expect.any(String), faseId: PROFASE, status: 'ANORMAL', tipoIds: [MICRO, STICK], quantidade: 2 });
+  });
+
+  it('não deixa remover mais do que há na combinação', async () => {
+    const user = userEvent.setup();
+    await openRemoveAbnormal(user);
+    await user.click(await screen.findByRole('radio', { name: 'Micronúcleo (4)' }));
+    await user.type(screen.getByLabelText('Quantidade de células'), '5');
+    await user.click(screen.getByRole('button', { name: 'Remover células' }));
+
+    expect((await screen.findByRole('alert')).textContent).toContain('Só há 4 células');
+    expect(api.desfazerRegistros).not.toHaveBeenCalled();
+  });
+
+  it('exige escolher a anormalidade a remover', async () => {
+    const user = userEvent.setup();
+    await openRemoveAbnormal(user);
+    await screen.findByRole('radio', { name: 'Micronúcleo (4)' });
+    await user.type(screen.getByLabelText('Quantidade de células'), '1');
+    await user.click(screen.getByRole('button', { name: 'Remover células' }));
+    expect((await screen.findByRole('alert')).textContent).toContain('Escolha qual anormalidade');
+    expect(api.desfazerRegistros).not.toHaveBeenCalled();
   });
 
   it('mostra a mensagem da API em 409 ao remover', async () => {
@@ -643,8 +722,8 @@ describe('percentuais', () => {
     renderSlides();
     await openSlide(user);
     expect(screen.getByText('66,67%')).toBeTruthy();
-    expect(screen.getByText('33,33% do total')).toBeTruthy();
     await user.click(screen.getByRole('tab', { name: 'Resumo' }));
+    expect(screen.getByText('33,33% do total')).toBeTruthy();
     expect(screen.getByText('Micronúcleo: 1 (50,00%)')).toBeTruthy();
     expect(screen.getAllByText('50,00%').length).toBeGreaterThan(0);
   });
@@ -676,6 +755,7 @@ describe('células guardadas sem conexão', () => {
     renderSlides();
     await openSlide(user);
     await user.click(abnormalButton());
+    await user.click(screen.getByRole('button', { name: 'Marcar várias' }));
     await user.click(screen.getByRole('checkbox', { name: 'Micronúcleo' }));
     await user.click(screen.getByRole('button', { name: /Registrar célula/ }));
 
@@ -702,6 +782,7 @@ describe('células guardadas sem conexão', () => {
     await openSlide(user);
     await user.click(normalButton());
     await user.click(abnormalButton());
+    await user.click(screen.getByRole('button', { name: 'Marcar várias' }));
     await user.click(screen.getByRole('checkbox', { name: 'Micronúcleo' }));
     await user.click(screen.getByRole('button', { name: /Registrar célula/ }));
     await screen.findByText(/2 células guardadas/);

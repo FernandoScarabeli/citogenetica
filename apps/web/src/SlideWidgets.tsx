@@ -56,3 +56,20 @@ export function TypeChecklist({legend,options,selected,onToggle,other,onOther,al
   {error&&<span className="select-error" id={`${id}-error`} role="alert">{error}</span>}
  </fieldset>;
 }
+
+/** Um botão grande por anormalidade da fase: um toque escolhe o tipo. "Outro" abre o campo de texto. */
+export function TypeButtons({legend,options,onPick,other,onOther,otherText,onOtherText,error}: {legend:string; options:TypeChoice[]; onPick:(id:string)=>void; other:boolean; onOther:(value:boolean)=>void; otherText:string; onOtherText:(value:string)=>void; error?:string}) {
+ const id=useId();
+ const first=useRef<HTMLButtonElement>(null);
+ // O diálogo abre depois da montagem; só então o foco inicial vale.
+ useEffect(()=>{const timer=setTimeout(()=>first.current?.focus(),0);return ()=>clearTimeout(timer);},[]);
+ return <fieldset className="type-checklist type-buttons-field" aria-describedby={error?`${id}-error`:undefined} aria-invalid={error?true:undefined}>
+  <legend>{legend}</legend>
+  <div className="type-buttons">
+   {options.map((option,index)=><button type="button" className="type-button" key={option.id} ref={index===0?first:undefined} onClick={()=>onPick(option.id)}>{option.nome}</button>)}
+   <button type="button" className="type-button type-button-other" ref={options.length===0?first:undefined} aria-expanded={other} onClick={()=>onOther(!other)}>Outro (especificar)</button>
+  </div>
+  {other&&<label className="check-other">Descreva a anormalidade<input value={otherText} maxLength={120} onChange={event=>onOtherText(event.target.value)} placeholder="Nome da anormalidade" autoFocus/></label>}
+  {error&&<span className="select-error" id={`${id}-error`} role="alert">{error}</span>}
+ </fieldset>;
+}
