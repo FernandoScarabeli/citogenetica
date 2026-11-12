@@ -92,31 +92,41 @@ Nada é commitado até o fim da sequência.
 - [x] Histórico por dia + edição de registro
 - [x] "Desfazer" sem apagar registros em sequência depois de recarregar (limite e/ou confirmação)
 - [x] Lote como **1 registro com `quantidade`**, e não N registros
-- [ ] Importação mesclando por id de registro (não substituir a lâmina inteira) + prévia de conflitos
+- [x] ~~Importação mesclando por id de registro~~: a importação de backup saiu (2026-11-12); as lâminas antigas do navegador vão sozinhas para o sistema. O importador dos HTMLs antigos fica na Etapa 3
 - [x] Escopo das anormalidades personalizadas: usuário + laboratório + fase
-- [ ] Excluir lâmina: tratar falha do `commit`
-- [ ] CSV: escapar células que começam com `=`, `+`, `-` ou `@`
+- [x] Excluir lâmina: falha tratada (exclusão agora pela API, com aviso de erro e conflito)
+- [x] CSV: escapar células que começam com `=`, `+`, `-` ou `@`
 - [x] "Criada por" com dado real
 
 ### 2.2 Integração com a API
-- [x] Camada `api/` substituindo `storage.ts`, `laboratories.ts` e `demoUser` — `storage.ts` fica só para o backup e o envio das lâminas antigas do navegador
+- [x] Camada `api/` substituindo `storage.ts`, `laboratories.ts` e `demoUser` — `storage.ts` fica só para ler as lâminas antigas do navegador (migração automática) e para o download do CSV
 - [x] Telas de cadastro, login, recuperação de senha e verificação de e-mail (e Minha conta: nome, senha, troca de e-mail)
 - [x] Laboratórios, convites e membros reais (e orientação)
-- [ ] Contagem, lâminas, resumo e IM vindos da API
+- [x] Contagem, lâminas, resumo e IM vindos da API
+- [x] Lâminas antigas do navegador enviadas sozinhas ao abrir "Meus laboratórios", com a data original (sem tela; a lâmina só sai do navegador depois de todas as células confirmadas)
 - [x] Notificações via SSE no sino
 - [x] Painel do admin da plataforma: lista, busca, filtro, desativar e reativar laboratório
 - [ ] Importador dos backups dos HTMLs antigos (meiose e mitose)
 
 ### 2.3 PWA e offline (Etapa 4)
 - [ ] Manifest, service worker, IndexedDB
-- [ ] Fila persistente de operações + indicador de estado ("Salvo neste aparelho: N pendentes")
+- [~] Fila persistente de operações + indicador de estado: feita só para os cliques de contagem (aviso fixo "N células guardadas neste aparelho", reenvio sozinho); faltam lote, edição, desfazer e o resto do sistema
 - [ ] Tela de resolução de conflitos
-- [ ] Sair da conta com pendências (continuar, exportar ou sair mantendo os dados)
+- [~] Sair da conta com pendências: confirmação e fila mantida para os cliques de contagem; falta a opção de exportar
 
 ### 2.4 Etapas 5–7 no front
 - [ ] Projetos e experimentos, editor de protocolos
 - [ ] Fotos e comentários
-- [ ] Comparações, gráficos, atalhos de teclado
+- [ ] Comparações, gráficos, atalhos de teclado na contagem (se o laboratório pedir)
+
+### 2.5 Revisão dos fluxos (2026-11-08 a 2026-11-12)
+- [x] Diagnóstico de todos os fluxos e os 10 itens aprovados pelo dono, mesclados em `dev` (ver `docs/revisao-fluxos.md`)
+- [ ] Aceitar convite direto pelo sino de notificações (fluxo 16)
+- [ ] Hora do clique nas células reenviadas sem internet: hoje o histórico mostra a hora do reenvio
+- [ ] Nota explicando que os percentuais de anormalidades podem somar mais de 100% (célula com mais de um tipo)
+- [ ] Textos menores: confirmação de cadastro (fluxo 2), botão que sobra na recuperação de senha (4), erro que fica na tela em Minha conta (5), confirmação de sair do laboratório (12), frase no cartão de laboratório desativado (15)
+- [ ] Painel do admin geral com o mesmo cabeçalho do resto (sino, modo escuro, menu)
+- [ ] Contador da aba "Membros" não atualiza quando alguém aceita um convite
 
 ---
 
@@ -125,7 +135,7 @@ Nada é commitado até o fim da sequência.
 - [ ] `CONTRIBUTING.md`: setup, padrão de branch e commit, como rodar os testes, fluxo de PR
 - [ ] `CODE_OF_CONDUCT.md`, `SECURITY.md` (como reportar vulnerabilidades)
 - [ ] Templates de issue e PR (`.github/`)
-- [ ] CI (GitHub Actions): build + testes da API e do web, lint
+- [~] CI (GitHub Actions): build + testes da API e do web feitos (`API CI` e `Web CI`) e Dependabot ativo; falta lint
 - [ ] Seção de autoria e mantenedores no README
 - [ ] `CHANGELOG.md` e versionamento (SemVer)
 - [ ] Guia de deploy (⚠️ hospedagem UFLA/DGTI ou serviço externo) + política de backup do banco
@@ -135,9 +145,9 @@ Nada é commitado até o fim da sequência.
 
 ## ⚠️ Pendências com o laboratório (bloqueiam partes acima)
 Ver `docs/questoes-validacao.md`. As principais:
-- [ ] Visibilidade das lâminas entre pesquisadores
-- [ ] Quem cria o vínculo orientador ↔ pesquisador; se pode haver mais de um orientador
-- [ ] Uma célula pode ter mais de uma anormalidade?
+- [x] Visibilidade das lâminas: o próprio pesquisador, seus orientadores e os administradores do laboratório (decidido em 2026-11-03)
+- [x] Vínculo de orientação: o orientador convida e o pesquisador aceita; pode haver mais de um orientador (decidido em 2026-11-03)
+- [x] Uma célula pode ter mais de uma anormalidade: sim (decidido em 2026-11-03)
 - [x] Limites do lote, meta configurável, casas decimais: decididos em 2026-11-08 (ver `docs/questoes-validacao.md`)
 - [x] Alcance do "desfazer" entre aparelhos: vale em qualquer aparelho (decidido em 2026-11-08)
 - [ ] Backups reais (ou fictícios) dos HTMLs antigos para testar a migração
