@@ -4,6 +4,7 @@ import type {
   ConsumirConviteRequestDTO,
   ConviteLaboratorioResponseDTO,
   CriarConviteLaboratorioRequestDTO,
+  PreviaConviteResponseDTO,
 } from './contracts/convite';
 import type { PapelLaboratorio } from './contracts/laboratorio';
 
@@ -32,6 +33,13 @@ export function createConviteApi(client: Pick<HttpClient, 'request'> = httpClien
     revogar(laboratorioId: string, conviteId: string, signal?: AbortSignal): Promise<void> {
       return client.request<void>(`${LABORATORIES_PATH}/${encodeURIComponent(laboratorioId)}/convites/${encodeURIComponent(conviteId)}`, {
         method: 'DELETE', ...(signal ? { signal } : {}),
+      });
+    },
+
+    previa(token: string, signal?: AbortSignal): Promise<PreviaConviteResponseDTO> {
+      const request: ConsumirConviteRequestDTO = { token };
+      return client.request<PreviaConviteResponseDTO>(`${INVITATIONS_PATH}/previa`, {
+        method: 'POST', json: request, ...(signal ? { signal } : {}),
       });
     },
 

@@ -40,6 +40,13 @@ public interface RegistroContagemRepository extends JpaRepository<RegistroContag
         long getContagem();
     }
 
+    /** Total de células de uma lâmina; lâminas sem registro ativo não aparecem no resultado. */
+    interface TotalLamina {
+        UUID getLaminaId();
+
+        long getTotal();
+    }
+
     /**
      * Insere o registro sem abortar a transação quando outra requisição já gravou o mesmo {@code id}.
      *
@@ -151,4 +158,16 @@ public interface RegistroContagemRepository extends JpaRepository<RegistroContag
              ORDER BY r.fase_id, (t.usuario_id IS NOT NULL), t.ordem, t.nome_normalizado, t.id
             """, nativeQuery = true)
     List<TotalTipo> totaisPorTipo(@Param("laminaId") UUID laminaId);
+
+    /**
+     * Total de células (soma de {@code quantidade} dos registros não excluídos) de várias lâminas numa só consulta.
+     * Lâminas sem registro ativo ficam de fora; quem chama assume 0. Não chamar com coleção vazia.
+     */
+    @Query(value = """
+            SELECT r.lamina_id AS "laminaId", SUM(r.quantidade) AS "total"
+              FROM registro_contagem r
+             WHERE r.lamina_id IN (:laminaIds) AND r.excluido_em IS NULL
+             GROUP BY r.lamina_id
+            """, nativeQuery = true)
+    List<TotalLamina> totaisPorLamina(@Param("laminaIds") Collection<UUID> laminaIds);
 }

@@ -233,6 +233,26 @@ public class OrientacaoService {
         }
     }
 
+    /** Pública: quem tem o link vê o nome do laboratório e do orientador, sem precisar entrar. */
+    @Transactional(readOnly = true)
+    public PreviaConvite previa(String token, String enderecoIp, String emailSessao) {
+        rateLimitService.limitarPreviaPorIp(enderecoIp);
+        byte[] hash = tokenService.hash(token);
+        ConviteOrientacao convite = buscarPorToken(hash);
+        if (convite.getEstado() != EstadoConviteOrientacao.PENDENTE
+                || !tokenService.iguais(convite.getTokenHash(), hash)
+                || convite.getLaboratorio().getEstado() != EstadoLaboratorio.ATIVO
+                || !orientadorAindaPodeConvidar(convite)) {
+            throw new BadRequestException(CONVITE_INDISPONIVEL);
+        }
+        String orientador = usuarioRosterQuery.buscarPorIds(List.of(convite.getOrientadorUsuarioId())).stream()
+                .findFirst().map(UsuarioRosterInfo::nome).orElseThrow(() -> new BadRequestException(CONVITE_INDISPONIVEL));
+        PreviaConvite.Estado estado = convite.getExpiraEm().isAfter(clock.instant())
+                ? PreviaConvite.Estado.PENDENTE : PreviaConvite.Estado.EXPIRADO;
+        return new PreviaConvite(convite.getLaboratorio().getNome(), orientador,
+                EmailMascarado.de(convite.getEmailDestino()), List.of(), estado, paraContaAtual(convite.getEmailDestino(), emailSessao));
+    }
+
     @Transactional
     public void aceitar(String token, Long usuarioId, String emailSessao, String enderecoIp) {
         limitarConsumo(usuarioId, enderecoIp);
@@ -297,6 +317,11 @@ public class OrientacaoService {
     private Participacao exigirPapelOrientadorComAcesso(UUID laboratorioId, Long usuarioId) {
         accessPolicy.exigirAcesso(laboratorioId, usuarioId);
         return exigirPapelOrientador(laboratorioId, usuarioId);
+    }
+
+    /** Sem sessão não há como saber: devolve nulo. Usa a mesma normalização do aceite. */
+    private Boolean paraContaAtual(String emailDestino, String emailSessao) {
+        return emailSessao == null ? null : emailDestino.equals(usuarioConviteQuery.normalizarEmail(emailSessao));
     }
 
     private void limitarConsumo(Long usuarioId, String enderecoIp) {

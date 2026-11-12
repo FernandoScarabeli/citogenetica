@@ -44,6 +44,13 @@ public class ConviteLaboratorioRateLimitService {
         limitar("CONSUMO", "IP", chave, properties.rateLimit().acceptPerIp());
     }
 
+    /** Prévia pública do convite: contador próprio, para não gastar as tentativas de aceite. */
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    public void limitarPreviaPorIp(String enderecoIp) {
+        String chave = enderecoIp == null || enderecoIp.isBlank() ? "endereco-indisponivel" : enderecoIp;
+        limitar("PREVIA", "IP", chave, properties.rateLimit().acceptPerIp());
+    }
+
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void limitarAceitePorUsuario(long usuarioId) {
         limitar("CONSUMO", "USUARIO", Long.toString(usuarioId), properties.rateLimit().acceptPerUser());

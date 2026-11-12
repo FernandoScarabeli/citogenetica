@@ -459,6 +459,36 @@ class ContagemLaminasIntegrationTest extends AbstractIntegrationTest {
     }
 
     @Test
+    void criacaoComDataOriginalGuardaEssaDataEOmitidaUsaOMomentoDoEnvio() throws Exception {
+        Usuario dono = criarUsuario();
+        Cookie sessao = sessao(dono);
+        UUID antiga = UUID.randomUUID();
+        Map<String, Object> corpo = corpoPadrao(antiga, null);
+        corpo.put("criadaEm", "2025-03-01T10:00:00Z");
+        postarLamina(sessao, corpo).andExpect(status().isCreated())
+                .andExpect(jsonPath("$.criadaEm").value("2025-03-01T10:00:00Z"));
+        postarLamina(sessao, corpo).andExpect(status().isOk());
+        requisicaoAutenticada(sessao, get(LAMINAS + "/{id}", antiga)).andExpect(status().isOk())
+                .andExpect(jsonPath("$.criadaEm").value("2025-03-01T10:00:00Z"));
+        assertThat(atualizadaEmNoBanco(antiga)).isAfter(Instant.parse("2025-03-02T00:00:00Z"));
+
+        Instant antes = Instant.now().minusSeconds(5);
+        UUID semData = criarLamina(dono, null);
+        String criadaEm = json(requisicaoAutenticada(sessao, get(LAMINAS + "/{id}", semData)).andReturn()).get("criadaEm").asText();
+        assertThat(Instant.parse(criadaEm)).isAfter(antes);
+    }
+
+    @Test
+    void dataDeCriacaoNoFuturoMuitoAntigaOuIlegivelEh400SemGravarNada() throws Exception {
+        Usuario dono = criarUsuario();
+        Cookie sessao = sessao(dono);
+        for (Object invalida : List.of(Instant.now().plusSeconds(3600).toString(), "2019-12-31T23:59:59Z", "ontem", 5, true)) {
+            postarLamina(sessao, com("criadaEm", invalida)).andExpect(status().isBadRequest());
+        }
+        assertThat(contarLaminas(dono)).isZero();
+    }
+
+    @Test
     void camposOpcionaisAusentesViramTextoVazioEMetaFicaNula() throws Exception {
         Usuario dono = criarUsuario();
         UUID id = UUID.randomUUID();

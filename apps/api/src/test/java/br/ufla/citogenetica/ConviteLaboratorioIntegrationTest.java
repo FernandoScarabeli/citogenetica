@@ -395,6 +395,66 @@ class ConviteLaboratorioIntegrationTest extends AbstractIntegrationTest {
     }
 
     @Test
+    void previaPublicaMostraConviteValidoEExpiradoEEscondeInvalidoEJaUsado() throws Exception {
+        Usuario admin = criarUsuario("admin");
+        Usuario destinatario = criarUsuario("destinatario");
+        UUID laboratorioId = criarLaboratorio(admin, "Prévia laboratório");
+        Cookie sessaoAdmin = login(admin);
+        criarConvite(sessaoAdmin, laboratorioId, destinatario.getEmail(), List.of("MEMBRO", "ORIENTADOR"));
+        String token = tokenDoEmail(destinatario.getEmail(), "Convite para participar de um laboratório — Citogenética UFLA");
+        String mascarado = destinatario.getEmail().substring(0, 2) + "***"
+                + destinatario.getEmail().substring(destinatario.getEmail().indexOf('@'));
+
+        previa(token, novoIp()).andExpect(status().isOk())
+                .andExpect(jsonPath("$.laboratorioNome").value("Prévia laboratório"))
+                .andExpect(jsonPath("$.convidadoPorNome").value(admin.getNome()))
+                .andExpect(jsonPath("$.emailMascarado").value(mascarado))
+                .andExpect(jsonPath("$.papeis[0]").value("MEMBRO"))
+                .andExpect(jsonPath("$.papeis[1]").value("ORIENTADOR"))
+                .andExpect(jsonPath("$.estado").value("PENDENTE"));
+        previa("token-inexistente", novoIp()).andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message").value("Convite inválido ou indisponível."));
+
+        jdbcTemplate.update("UPDATE convite_laboratorio SET expires_at = ? WHERE id = ?",
+                java.sql.Timestamp.from(Instant.now().minusSeconds(5)), conviteId(laboratorioId));
+        previa(token, novoIp()).andExpect(status().isOk()).andExpect(jsonPath("$.estado").value("EXPIRADO"));
+
+        requisicaoAutenticada(sessaoAdmin, post("/api/v1/laboratorios/{id}/convites/{convite}/reenviar",
+                laboratorioId, conviteId(laboratorioId))).andExpect(status().isOk());
+        String tokenNovo = tokenDoEmail(destinatario.getEmail(),
+                "Convite para participar de um laboratório — Citogenética UFLA", 2);
+        previa(token, novoIp()).andExpect(status().isBadRequest());
+        consumir(login(destinatario), "/aceitar", tokenNovo, novoIp()).andExpect(status().isNoContent());
+        previa(tokenNovo, novoIp()).andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message").value("Convite inválido ou indisponível."));
+    }
+
+    @Test
+    void previaInformaSeOConviteEParaAContaDaSessao() throws Exception {
+        Usuario admin = criarUsuario("admin");
+        Usuario destinatario = criarUsuario("destinatario");
+        Usuario outra = criarUsuario("outra");
+        UUID laboratorioId = criarLaboratorio(admin, "Prévia conta");
+        criarConvite(login(admin), laboratorioId, destinatario.getEmail(), List.of("MEMBRO"));
+        String token = tokenDoEmail(destinatario.getEmail(), "Convite para participar de um laboratório — Citogenética UFLA");
+
+        previa(token, novoIp()).andExpect(status().isOk()).andExpect(jsonPath("$.paraContaAtual").doesNotExist());
+        previaComSessao(login(destinatario), token).andExpect(status().isOk()).andExpect(jsonPath("$.paraContaAtual").value(true));
+        previaComSessao(login(outra), token).andExpect(status().isOk()).andExpect(jsonPath("$.paraContaAtual").value(false));
+    }
+
+    @Test
+    void previaPublicaTemLimitePorEnderecoERequerCsrf() throws Exception {
+        mockMvc.perform(post("/api/v1/convites/previa")
+                        .contentType(MediaType.APPLICATION_JSON).content(json("token", "x")))
+                .andExpect(status().isForbidden());
+        String ip = novoIp();
+        previa("token-a", ip).andExpect(status().isBadRequest());
+        previa("token-b", ip).andExpect(status().isBadRequest());
+        previa("token-c", ip).andExpect(status().isTooManyRequests()).andExpect(header().exists("Retry-After"));
+    }
+
+    @Test
     void limitesDeEnvioEAceiteRetornam429ComRetryAfter() throws Exception {
         Usuario admin = criarUsuario("admin");
         Usuario destinatario = criarUsuario("destinatario");
@@ -448,6 +508,18 @@ class ConviteLaboratorioIntegrationTest extends AbstractIntegrationTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(json("email", email, "papeis", papeis)))
                 .andExpect(status().isCreated());
+    }
+
+    private ResultActions previa(String token, String ip) throws Exception {
+        return requisicaoComCsrf(post("/api/v1/convites/previa")
+                .with(request -> { request.setRemoteAddr(ip); return request; })
+                .contentType(MediaType.APPLICATION_JSON).content(json("token", token)));
+    }
+
+    private ResultActions previaComSessao(Cookie sessao, String token) throws Exception {
+        return requisicaoAutenticada(sessao, post("/api/v1/convites/previa")
+                .with(request -> { request.setRemoteAddr(novoIp()); return request; })
+                .contentType(MediaType.APPLICATION_JSON).content(json("token", token)));
     }
 
     private ResultActions consumir(Cookie sessao, String acao, String token, String ip) throws Exception {

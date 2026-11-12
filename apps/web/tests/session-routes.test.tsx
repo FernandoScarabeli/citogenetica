@@ -87,6 +87,45 @@ describe('sessão e rotas', () => {
     vi.clearAllMocks();
   });
 
+  it('unifica /app em /laboratorios', async () => {
+    mockApi({ me: async () => response(200, userDto) });
+    setPath('/app');
+    render(<App/>);
+    expect(await screen.findByRole('heading', { name: 'Meus laboratórios' })).toBeTruthy();
+    expect(window.location.pathname).toBe('/laboratorios');
+  });
+
+  it('leva quem já está logado da página inicial e de /entrar para os laboratórios', async () => {
+    mockApi({ me: async () => response(200, userDto) });
+    setPath('/');
+    const { unmount } = render(<App/>);
+    expect(await screen.findByRole('heading', { name: 'Meus laboratórios' })).toBeTruthy();
+    expect(window.location.pathname).toBe('/laboratorios');
+    unmount();
+
+    setPath('/entrar');
+    render(<App/>);
+    expect(await screen.findByRole('heading', { name: 'Meus laboratórios' })).toBeTruthy();
+    expect(window.location.pathname).toBe('/laboratorios');
+  });
+
+  it('na página inicial explica o sistema e não repete o acesso aos laboratórios', async () => {
+    mockApi();
+    setPath('/');
+    render(<App/>);
+    expect(screen.getByRole('heading', { name: 'Registro de lâminas de citogenética' })).toBeTruthy();
+    expect(screen.queryByRole('link', { name: /Acessar laboratórios/ })).toBeNull();
+    expect(screen.getByRole('link', { name: 'Entrar' }).getAttribute('href')).toBe('/entrar');
+  });
+
+  it('em "página não encontrada", quem está logado volta aos laboratórios', async () => {
+    mockApi({ me: async () => response(200, userDto) });
+    setPath('/nao-existe');
+    render(<App/>);
+    const link = await screen.findByRole('link', { name: 'Voltar à página inicial' });
+    await waitFor(() => expect(link.getAttribute('href')).toBe('/laboratorios'));
+  });
+
   it('inicia logada e exibe a identidade devolvida pela API', async () => {
     mockApi({ me: async () => response(200, userDto) });
     setPath('/laboratorios');
@@ -117,6 +156,27 @@ describe('sessão e rotas', () => {
 
     expect(window.location.pathname + window.location.search + window.location.hash)
       .toBe('/laboratorios?filtro=amostra#lista');
+  });
+
+  it('sessão expirada em uma lâmina avisa, e depois do login volta ao mesmo endereço', async () => {
+    let expirou = false;
+    mockApi({
+      me: async () => response(200, userDto),
+      login: async () => response(204),
+      other: async () => {
+        if (expirou) return response(500, { status: 500, error: 'Erro', message: 'Indisponível.', path: '/x' });
+        expirou = true;
+        return unauthorized('/api/v1/laboratorios/lab-1');
+      },
+    });
+    setPath('/laboratorios/lab-1/laminas/lamina-9?x=1');
+
+    render(<App/>);
+    expect(await screen.findByRole('heading', { name: 'Acesse sua pesquisa.' })).toBeTruthy();
+    expect((await screen.findByRole('status')).textContent).toBe('Sua sessão terminou. Entre de novo para continuar.');
+
+    await submitLogin();
+    await waitFor(() => expect(window.location.pathname + window.location.search).toBe('/laboratorios/lab-1/laminas/lamina-9?x=1'));
   });
 
   it('mostra falha de rede ao consultar a sessão e permite tentar de novo', async () => {
@@ -157,7 +217,7 @@ describe('sessão e rotas', () => {
     await submitLogin();
     await screen.findByRole('heading', { name: 'Meus laboratórios' });
 
-    expect(window.location.pathname).toBe('/app');
+    expect(window.location.pathname).toBe('/laboratorios');
     expect(window.location.hostname).toBe('localhost');
   });
 
@@ -213,6 +273,29 @@ describe('sessão e rotas', () => {
     const logoutIndex = calls.findIndex((call) => call.path === '/api/v1/auth/logout');
     expect(logoutIndex).toBeGreaterThanOrEqual(0);
     expect(calls[logoutIndex + 1]).toEqual({ path: '/api/v1/auth/csrf', method: 'GET' });
+  });
+
+  it('pede confirmação ao sair com células não enviadas e mantém a fila guardada', async () => {
+    const pedido = { id: 'aaaaaaaa-0000-4000-8000-000000000001', faseId: 'f1', status: 'NORMAL', quantidade: 1 };
+    localStorage.setItem('citogenetica:fila-registros:v1', JSON.stringify([{ usuarioId: 42, laminaId: 'l1', pedido }]));
+    const { calls } = mockApi({ me: async () => response(200, userDto) });
+    setPath('/app');
+    const confirmar = vi.spyOn(window, 'confirm').mockReturnValueOnce(false).mockReturnValueOnce(true);
+
+    render(<App/>);
+    await screen.findByRole('heading', { name: 'Meus laboratórios' });
+    const user = userEvent.setup();
+    await user.click(screen.getByRole('button', { name: 'Menu do perfil' }));
+    await user.click(screen.getByRole('button', { name: 'Sair' }));
+    expect(confirmar).toHaveBeenCalledWith(expect.stringContaining('Há 1 célula ainda não enviada neste aparelho.'));
+    expect(calls.some((call) => call.path === '/api/v1/auth/logout')).toBe(false);
+
+    await user.click(screen.getByRole('button', { name: 'Menu do perfil' }));
+    await user.click(screen.getByRole('button', { name: 'Sair' }));
+    expect(await screen.findByRole('heading', { name: 'Acesse sua pesquisa.' })).toBeTruthy();
+    expect(localStorage.getItem('citogenetica:fila-registros:v1')).not.toBeNull();
+    confirmar.mockRestore();
+    localStorage.clear();
   });
 
   it('qualquer 401 após login encerra a sessão e guarda o caminho interno atual', async () => {

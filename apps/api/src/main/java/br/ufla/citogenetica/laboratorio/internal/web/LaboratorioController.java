@@ -159,7 +159,7 @@ public class LaboratorioController {
             @ApiResponse(responseCode = "204", description = "Participação removida"),
             @ApiResponse(responseCode = "403", description = "Participante sem papel de administrador"),
             @ApiResponse(responseCode = "404", description = "Laboratório ou participação não encontrado"),
-            @ApiResponse(responseCode = "409", description = "O último administrador não pode ser removido")
+            @ApiResponse(responseCode = "409", description = "O último administrador, ou quem ainda tem orientandos, não pode ser removido")
     })
     public ResponseEntity<Void> remover(
             @PathVariable @CanonicalUuidV4 String laboratorioId,

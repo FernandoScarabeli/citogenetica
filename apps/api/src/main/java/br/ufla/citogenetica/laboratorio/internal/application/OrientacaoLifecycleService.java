@@ -26,6 +26,13 @@ public class OrientacaoLifecycleService {
         }
     }
 
+    /** Remover alguém que ainda orienta pessoas deixaria os orientandos sem orientador: antes encerra-se a orientação. */
+    public void exigirSemOrientandosAtivos(UUID participacaoId, String nome) {
+        if (vinculoRepository.existsByOrientadorParticipacaoIdAndEstado(participacaoId, EstadoVinculoOrientacao.ATIVO)) {
+            throw new ConflictException("Encerre as orientações de " + nome + " antes de removê-lo do laboratório.");
+        }
+    }
+
     public void encerrarDaParticipacao(UUID laboratorioId, UUID participacaoId, Long operadorId, Instant instante) {
         vinculoRepository.findAllByParticipacaoForUpdate(
                         laboratorioId, participacaoId, EstadoVinculoOrientacao.ATIVO)
