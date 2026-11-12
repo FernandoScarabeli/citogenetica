@@ -5,8 +5,6 @@ import { contagemApi, type ContagemApi } from './api/contagem-api';
 import type { LaminaDTO, ProtocoloDTO } from './api/contracts/contagem';
 import type { LaboratorioResponseDTO } from './api/contracts/laboratorio';
 import { formatarData, mensagemDeErro } from './contagem-utils';
-import { LocalSlidesPanel } from './LocalSlidesPanel';
-import type { ResultadoMigracao } from './migracao-laminas';
 import { SlideDetail } from './SlideDetail';
 import { Modal, ProtocolSelect, type ProtocolOption } from './SlideWidgets';
 
@@ -29,17 +27,6 @@ async function loadAllSlides(api: ContagemApi, laboratorioId: string | null, sig
   return slides;
 }
 
-function MigrationReport({ result, onDismiss }: { result: ResultadoMigracao; onDismiss: () => void }) {
-  const sent = result.enviadas.length;
-  return <section className="local-slides-report" aria-label="Resultado do envio" role="status">
-    <p><strong>{sent === 1 ? '1 lâmina enviada' : `${sent} lâminas enviadas`} para o servidor.</strong>{result.falhas.length > 0 && ` ${result.falhas.length === 1 ? '1 lâmina não foi enviada' : `${result.falhas.length} lâminas não foram enviadas`} e continua neste navegador.`}</p>
-    {result.interrupcao && <p>O envio foi interrompido: {result.interrupcao}{result.naoTentadas > 0 && ` ${result.naoTentadas === 1 ? '1 lâmina ainda não foi tentada.' : `${result.naoTentadas} lâminas ainda não foram tentadas.`}`}</p>}
-    {result.falhas.length > 0 && <ul>{result.falhas.map(falha => <li key={falha.id}><strong>{falha.nome}</strong>: {falha.motivo}</li>)}</ul>}
-    {result.avisos.length > 0 && <ul>{result.avisos.map(aviso => <li key={aviso}>{aviso}</li>)}</ul>}
-    <button className="text-button" type="button" onClick={onDismiss}>Dispensar</button>
-  </section>;
-}
-
 export function Slides({ laboratory, onBack, readOnly, usuarioId, api = contagemApi }: {
   laboratory: LaboratorioResponseDTO | null;
   onBack: () => void;
@@ -56,7 +43,6 @@ export function Slides({ laboratory, onBack, readOnly, usuarioId, api = contagem
   const [protocolos, setProtocolos] = useState<ProtocoloDTO[]>([]);
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
-  const [migration, setMigration] = useState<ResultadoMigracao | null>(null);
   const [active, setActive] = useState<string | null>(null);
   const [query, setQuery] = useState('');
   const [creating, setCreating] = useState(false);
@@ -129,11 +115,6 @@ export function Slides({ laboratory, onBack, readOnly, usuarioId, api = contagem
     }
   }
 
-  function migrationFinished(result: ResultadoMigracao) {
-    setMigration(result);
-    setRetry(value => value + 1);
-  }
-
   function leaveDetail(message = '') {
     setActive(null);
     setNotice(message);
@@ -157,8 +138,6 @@ export function Slides({ laboratory, onBack, readOnly, usuarioId, api = contagem
       : status === 'error' ? <main className="page-container home slide-state"><h1 className={typeClass('title')}>Não foi possível carregar as lâminas</h1><p>{loadError}</p><button className="button secondary" type="button" onClick={() => setRetry(value => value + 1)}>Tentar de novo</button></main>
       : !slide ? <main className="page-container home">
         <div className="page-heading"><div><h1 className={typeClass('display')}>Lâminas</h1><p>Organize suas lâminas e acompanhe a contagem de células.</p></div>{canCreate && <button className="button primary" type="button" onClick={openNew}><Plus size={17} /> Nova lâmina</button>}</div>
-        {migration && <MigrationReport result={migration} onDismiss={() => setMigration(null)} />}
-        {canCreate && <LocalSlidesPanel api={api} usuarioId={usuarioId} laboratorioId={laboratoryId} onFinished={migrationFinished} />}
         <section className="overview" aria-label="Visão geral"><div className="overview-intro"><span className="overview-symbol"><FlaskConical size={22} /></span><div><h2 className={typeClass('title')}>Resumo</h2><p>Totais das lâminas e células registradas.</p></div></div><div className="overview-stat"><span>Lâminas registradas</span><strong>{slides.length}</strong></div><div className="overview-stat"><span>Células contadas</span><strong>{totalCells.toLocaleString('pt-BR')}</strong></div></section>
         <section className="list-section"><div className="section-heading"><div><h2 className={typeClass('title')}>Registros</h2></div><label className="search"><Search size={17} /><span className="sr-only">Buscar lâminas</span><input placeholder="Buscar lâmina" value={query} onChange={event => setQuery(event.target.value)} /></label></div>
           {matched.length ? <div className="slide-list"><div className="list-labels"><span>Identificação</span><span>Protocolo</span><span>Células</span><span>Criada por</span><span>Criada em</span><span /></div>{matched.map(item => <button className="slide-row" type="button" key={item.id} onClick={() => { setNotice(''); setActive(item.id); }}><span className="slide-identity"><span><strong>{item.nome}</strong>{(item.especie || item.tratamento) && <small>{[item.especie, item.tratamento].filter(Boolean).join(' · ')}</small>}</span></span><span><span className="protocol-tag">{protocolOf(item)?.nome ?? 'Protocolo'}</span></span><span className="numeric">{item.totalCelulas.toLocaleString('pt-BR')}</span><span className="slide-creator"><span className="creator-label">Criada por: </span>{item.donoNome}</span><span className="date">{formatarData(item.criadaEm)}</span><ChevronRight size={17} className="row-arrow" /></button>)}</div>

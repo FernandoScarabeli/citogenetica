@@ -73,6 +73,8 @@ export interface CriarLaminaRequestDTO {
   tratamento?: string | null;
   observacoes?: string | null;
   meta?: number | null;
+  /** Instante original de criação (ISO 8601); ausente = momento do envio. */
+  criadaEm?: string;
 }
 
 export interface AtualizarLaminaRequestDTO {

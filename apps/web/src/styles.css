@@ -103,25 +103,5 @@ form label.check-option span{color:inherit;font-weight:inherit}
 .history-row .history-edit{flex:none}
 .history-more{display:flex;justify-content:center;margin:16px 0}
 .notes-actions{display:flex;justify-content:flex-end;margin-top:10px}
-.local-slides,.local-slides-report{margin:0 0 28px;padding:20px 24px;border:1px solid var(--lab-line,#dce5dd);border-radius:7px;background:var(--lab-surface,#fff);color:var(--lab-ink,#46544a);font-size:var(--fs-caption);line-height:var(--lh-caption)}
-.local-slides-head{display:flex;align-items:flex-start;gap:14px}
-.local-slides-head h2{margin:0;font-weight:550}
-.local-slides-head p{margin:6px 0 0;color:var(--lab-muted,#68756b);max-width:70ch}
-.local-slides-symbol{flex:none;width:40px;height:40px;display:grid;place-items:center;border:1px solid var(--lab-line,#bdccc0);border-radius:50%;color:var(--lab-accent,#577661)}
-.local-slides-list{list-style:none;margin:16px 0 0;padding:0;max-height:200px;overflow-y:auto;border:1px solid var(--lab-line,#edf0ed);border-radius:5px}
-.local-slides-list li{display:flex;justify-content:space-between;gap:16px;padding:10px 14px;border-bottom:1px solid var(--lab-line,#edf0ed)}
-.local-slides-list li:last-child{border-bottom:0}
-.local-slides-list strong{font-weight:550;overflow-wrap:anywhere}
-.local-slides-list span{flex:none;color:var(--lab-muted,#78837a);font-variant-numeric:tabular-nums}
-.local-slides-actions{display:flex;flex-wrap:wrap;gap:8px;margin-top:16px}
-.local-slides-actions .button{min-height:44px}
-.local-slides-hint,.local-slides-message,.local-slides-error{margin:12px 0 0;color:var(--lab-muted,#596b5e)}
-.local-slides-error{color:#803a31}
-.local-slides-progress{margin-top:14px}
-.local-slides-progress p{margin:0 0 8px}
-.local-slides-report{background:var(--lab-ground,#f5f8f5)}
-.local-slides-report p{margin:0 0 6px}
-.local-slides-report ul{margin:8px 0;padding-left:20px}
-@media(max-width:600px){.local-slides,.local-slides-report{padding:16px}.local-slides-actions .button{flex:1 1 100%}}
 .fila-aviso{position:sticky;bottom:0;z-index:20;display:flex;align-items:center;gap:10px;margin-top:20px;padding:13px 16px;border:1px solid var(--lab-accent,#395a4c);border-radius:6px;background:var(--lab-ground,#f5f8f5);color:var(--lab-ink,#26342c);font-size:var(--fs-body);line-height:var(--lh-body);font-weight:550;box-shadow:0 -4px 16px #17281e1c}
 .fila-aviso-ponto{flex:none;width:9px;height:9px;border-radius:50%;background:var(--lab-accent,#395a4c)}

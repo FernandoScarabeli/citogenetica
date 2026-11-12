@@ -9,12 +9,15 @@ import java.util.function.Function;
 import java.util.stream.Collectors;
 
 import java.time.Clock;
+import java.time.Duration;
+import java.time.Instant;
 
 import br.ufla.citogenetica.contagem.internal.domain.Lamina;
 import br.ufla.citogenetica.contagem.internal.persistence.LaminaRepository;
 import br.ufla.citogenetica.contagem.internal.persistence.RegistroContagemRepository;
 import br.ufla.citogenetica.contagem.internal.persistence.VersaoProtocoloRepository;
 import br.ufla.citogenetica.laboratorio.api.LaboratorioAccessQuery;
+import br.ufla.citogenetica.shared.web.error.BadRequestException;
 import br.ufla.citogenetica.shared.web.error.ConflictException;
 import br.ufla.citogenetica.shared.web.error.NotFoundException;
 import br.ufla.citogenetica.usuario.api.UsuarioRosterInfo;
@@ -39,6 +42,9 @@ public class LaminaService {
     private static final String ID_COM_OUTRO_CONTEUDO = "Este identificador já foi usado em outra lâmina.";
     private static final String VERSAO_DESATUALIZADA =
             "A lâmina foi alterada por outra operação. Atualize os dados e tente novamente.";
+
+    private static final Duration TOLERANCIA_RELOGIO = Duration.ofMinutes(5);
+    private static final Instant CRIACAO_MAIS_ANTIGA = Instant.parse("2020-01-01T00:00:00Z");
 
     private final LaminaRepository laminaRepository;
     private final VersaoProtocoloRepository versaoRepository;
@@ -78,7 +84,9 @@ public class LaminaService {
             acesso.exigirEdicaoNoLaboratorio(laboratorioId, usuarioId, usuarioId);
         }
 
-        int inseridas = laminaRepository.inserirSeAusente(nova.id(), clock.instant(), usuarioId, laboratorioId,
+        Instant agora = clock.instant();
+        Instant criadaEm = criadaEmValida(nova.criadaEm(), agora);
+        int inseridas = laminaRepository.inserirSeAusente(nova.id(), criadaEm, agora, usuarioId, laboratorioId,
                 nova.protocoloVersaoId(), nome, especie, tratamento, observacoes, meta);
         Lamina gravada = laminaRepository.findById(nova.id())
                 .orElseThrow(() -> new ConflictException(ID_COM_OUTRO_CONTEUDO));
@@ -87,6 +95,17 @@ public class LaminaService {
         }
         // Outra requisição venceu a corrida pelo mesmo id.
         return repeticao(gravada, nova, nome, especie, tratamento, observacoes, usuarioId);
+    }
+
+    /** Sem data informada vale o momento do envio; com ela, só dentro de um intervalo plausível. */
+    private static Instant criadaEmValida(Instant informada, Instant agora) {
+        if (informada == null) {
+            return agora;
+        }
+        if (informada.isAfter(agora.plus(TOLERANCIA_RELOGIO)) || informada.isBefore(CRIACAO_MAIS_ANTIGA)) {
+            throw new BadRequestException("A data de criação da lâmina é inválida.");
+        }
+        return informada;
     }
 
     /** Id de outro dono é indistinguível de recurso desconhecido. */

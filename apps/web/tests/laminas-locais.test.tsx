@@ -1,27 +1,35 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { render, screen, waitFor, within } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { StrictMode } from 'react';
 import { MemoryRouter } from 'react-router';
-import type { LaminaDTO, ProtocoloDTO } from '../src/api/contracts/contagem';
-import { ApiError } from '../src/api/errors';
-import type { Entry, Slide, State } from '../src/domain';
-import { Slides } from '../src/Slides';
+import type { ProtocoloDTO } from '../src/api/contracts/contagem';
+import type { LaboratorioResponseDTO } from '../src/api/contracts/laboratorio';
+import type { UsuarioResponseDTO } from '../src/api/contracts/usuario';
+import { ApiError, NetworkError } from '../src/api/errors';
+import type { Entry, Slide } from '../src/domain';
 import { load, save } from '../src/storage';
 
+const labApi = vi.hoisted(() => ({ listarMeus: vi.fn() }));
+vi.mock('../src/api/laboratorio-api', () => ({ laboratorioApi: labApi }));
+vi.mock('../src/api/convite-api', () => ({ conviteApi: {} }));
+vi.mock('../src/api/orientacao-api', () => ({ orientacaoApi: {} }));
+
+import { Laboratories } from '../src/Laboratories';
+
 const VERSAO = 'aaaaaaaa-0000-4000-8000-000000000001';
-const INTERFASE = 'bbbbbbbb-0000-4000-8000-000000000001';
+const LAB_ATIVO = '8d8c8657-599d-4d5e-9f27-f4d62d3a043a';
+const LAB_SAIU = '9d8c8657-599d-4d5e-9f27-f4d62d3a043b';
+const LAB_DESATIVADO = '7d8c8657-599d-4d5e-9f27-f4d62d3a043c';
 const PROTOCOLOS: ProtocoloDTO[] = [
-  { id: 'p-mitose', codigo: 'mitose', nome: 'Mitose', versaoAtual: { id: VERSAO, numero: 1, fases: [{ id: INTERFASE, nome: 'Interfase', ordem: 1, contaComoDivisao: false, tipos: [] }] } },
+  { id: 'p-mitose', codigo: 'mitose', nome: 'Mitose', versaoAtual: { id: VERSAO, numero: 1, fases: [{ id: 'bbbbbbbb-0000-4000-8000-000000000001', nome: 'Interfase', ordem: 1, contaComoDivisao: false, tipos: [] }] } },
 ];
+const USER = { id: 12, nome: 'Ana', email: 'ana@ufla.br', role: { nome: 'USER' } } as UsuarioResponseDTO;
+const lab = (id: string, nome: string, estado: LaboratorioResponseDTO['estado'] = 'ATIVO'): LaboratorioResponseDTO => ({ id, nome, estado, papeis: ['MEMBRO'], versao: 1 });
 const entry = (id: string): Entry => ({ id, phase: 'Interfase', status: 'normal', type: '', createdAt: '2025-03-02T10:00:00.000Z' });
 const slide = (id: string, name: string, cells: number, extra: Partial<Slide> = {}): Slide => ({
   id, name, protocol: 'mitose', species: '', treatment: '', notes: '', createdAt: '2025-03-01T10:00:00.000Z', entries: Array.from({ length: cells }, (_, i) => entry(`${id}-${i}`)), ...extra,
 });
-const page = <T,>(content: T[]) => ({ content, currentPage: 0, totalPages: 1, totalElements: content.length });
-const remote: LaminaDTO = {
-  id: 'r1', versao: 1, donoUsuarioId: 12, donoNome: 'Ana', laboratorioId: null, protocoloVersaoId: VERSAO, nome: 'Já no servidor', especie: '', tratamento: '',
-  observacoes: '', meta: null, totalCelulas: 4, criadaEm: '2026-11-03T12:00:00Z', atualizadaEm: '2026-11-03T12:00:00Z',
-};
 
 const api = {
   listarProtocolos: vi.fn(), buscarVersaoProtocolo: vi.fn(), listarTiposPersonalizados: vi.fn(), criarTipoPersonalizado: vi.fn(),
@@ -29,147 +37,96 @@ const api = {
   criarRegistro: vi.fn(), listarRegistros: vi.fn(), atualizarRegistro: vi.fn(), desfazerRegistros: vi.fn(), buscarResumo: vi.fn(),
 };
 const seed = (slides: Slide[]) => save({ version: 1, slides, customTypes: {} });
-const renderSlides = (readOnly = false) => render(<MemoryRouter><Slides laboratory={null} onBack={vi.fn()} readOnly={readOnly} usuarioId={12} api={api as never} /></MemoryRouter>);
-const stateFile = (state: State, name = 'backup.json') => new File([JSON.stringify(state)], name, { type: 'application/json' });
-let downloads: Blob[];
+const renderLabs = (strict = false) => {
+  const page = <MemoryRouter initialEntries={['/laboratorios']}><Laboratories user={USER} onLogout={vi.fn()} onUserUpdate={vi.fn()} renderSlides={() => <p>Lâminas</p>} api={api as never} /></MemoryRouter>;
+  return render(strict ? <StrictMode>{page}</StrictMode> : page);
+};
+const ids = () => load().state.slides.map(item => item.id);
+let downloads: Blob[] = [];
 
 beforeEach(() => {
   localStorage.clear();
   vi.resetAllMocks();
-  downloads = [];
-  Object.defineProperty(URL, 'createObjectURL', { configurable: true, value: (blob: Blob) => { downloads.push(blob); return 'blob:x'; } });
-  Object.defineProperty(URL, 'revokeObjectURL', { configurable: true, value: () => undefined });
-  vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => undefined);
+  labApi.listarMeus.mockResolvedValue([lab(LAB_ATIVO, 'Citogenética UFLA'), lab(LAB_DESATIVADO, 'Lab parado', 'DESATIVADO')]);
   api.listarProtocolos.mockResolvedValue(PROTOCOLOS);
-  api.listarLaminas.mockResolvedValue(page([remote]));
   api.criarLamina.mockImplementation(async (r: unknown) => r);
   api.criarRegistro.mockImplementation(async (_l: string, r: unknown) => r);
-  api.buscarResumo.mockImplementation(async () => ({ total: api.criarRegistro.mock.calls.length }));
+  api.buscarResumo.mockImplementation(async (id: string) => ({ total: api.criarRegistro.mock.calls.filter(call => call[0] === id).length }));
 });
 
-describe('lâminas guardadas só no navegador', () => {
-  it('não mostra o painel quando não há lâminas locais', async () => {
-    renderSlides();
-    await screen.findByText('Já no servidor');
-    expect(screen.queryByText(/guardadas? só neste navegador/)).toBeNull();
+describe('migração automática das lâminas guardadas só no navegador', () => {
+  it('sem lâminas locais não faz nada nem mostra recado', async () => {
+    renderLabs();
+    await screen.findByText('Citogenética UFLA');
+    await Promise.resolve();
+    expect(api.listarProtocolos).not.toHaveBeenCalled();
+    expect(api.criarLamina).not.toHaveBeenCalled();
+    expect(screen.queryByText(/antiga/)).toBeNull();
   });
 
-  it('não mostra o painel em modo somente leitura', async () => {
-    seed([slide('s1', 'Cebola A', 2)]);
-    renderSlides(true);
-    await screen.findByText('Já no servidor');
-    expect(screen.queryByText(/guardadas? só neste navegador/)).toBeNull();
-    expect(screen.queryByRole('button', { name: 'Enviar para o servidor' })).toBeNull();
+  it('migra sozinha, sem clique nem tela, manda cada lâmina ao destino com a data original e avisa no fim', async () => {
+    seed([slide('s1', 'Cebola A', 2, { labId: LAB_ATIVO }), slide('s2', 'Cebola B', 1, { labId: LAB_SAIU }), slide('s3', 'Cebola C', 1, { labId: LAB_DESATIVADO })]);
+    renderLabs();
+    expect(await screen.findByText('3 lâminas antigas foram guardadas no sistema.')).toBeTruthy();
+    expect(screen.queryByRole('button', { name: /Guardar|cópia|backup/i })).toBeNull();
+    expect(screen.queryByText(/só neste computador/)).toBeNull();
+    const [a, b, c] = api.criarLamina.mock.calls.map(call => call[0]);
+    expect(a.laboratorioId).toBe(LAB_ATIVO);
+    expect(b).not.toHaveProperty('laboratorioId');
+    expect(c).not.toHaveProperty('laboratorioId');
+    expect(a.criadaEm).toBe('2025-03-01T10:00:00.000Z');
+    expect(ids()).toEqual([]);
   });
 
-  it('lista cada lâmina com o número de células e trava o envio até baixar o backup', async () => {
-    seed([slide('s1', 'Cebola A', 2), slide('s2', 'Cebola B', 1)]);
-    const user = userEvent.setup();
-    renderSlides();
-    await screen.findByRole('heading', { name: '2 lâminas guardadas só neste navegador' });
-    expect(within(screen.getByRole('list')).getByText('Cebola A')).toBeTruthy();
-    expect(screen.getByText('2 células')).toBeTruthy();
-    expect(screen.getByText('1 célula')).toBeTruthy();
-    const send = screen.getByRole('button', { name: 'Enviar para o servidor' }) as HTMLButtonElement;
-    expect(send.disabled).toBe(true);
-
-    await user.click(screen.getByRole('button', { name: /Baixar backup/ }));
-    expect(send.disabled).toBe(false);
-    expect(downloads).toHaveLength(1);
-    const backup = JSON.parse(await downloads[0].text()) as State;
-    expect(backup.slides.map(item => item.id)).toEqual(['s1', 's2']);
+  it('recado no singular', async () => {
+    seed([slide('s1', 'Cebola A', 1)]);
+    renderLabs();
+    expect(await screen.findByText('1 lâmina antiga foi guardada no sistema.')).toBeTruthy();
   });
 
-  it('envia, mostra o resultado, recarrega a lista e retira só o que foi confirmado', async () => {
-    seed([slide('s1', 'Cebola A', 2), slide('s2', 'Cebola B', 1)]);
+  it('não espera a lista de laboratórios carregar com sucesso', async () => {
+    seed([slide('s1', 'Cebola A', 1)]);
+    labApi.listarMeus.mockRejectedValue(new Error('falhou'));
+    renderLabs();
+    await screen.findAllByText('falhou');
+    expect(api.criarLamina).not.toHaveBeenCalled();
+    expect(ids()).toEqual(['s1']);
+  });
+
+  it('falha de rede mantém a lâmina, não mostra nada e tenta de novo na próxima abertura', async () => {
+    seed([slide('s1', 'Cebola A', 1)]);
+    api.criarLamina.mockRejectedValue(new NetworkError());
+    const first = renderLabs();
+    await waitFor(() => expect(api.criarLamina).toHaveBeenCalledTimes(1));
+    await screen.findByText('Citogenética UFLA');
+    await waitFor(() => expect(ids()).toEqual(['s1']));
+    expect(screen.queryByText(/antiga|falh|erro/i)).toBeNull();
+    expect(screen.queryByRole('alert')).toBeNull();
+    first.unmount();
+
+    api.criarLamina.mockImplementation(async (r: unknown) => r);
+    renderLabs();
+    expect(await screen.findByText('1 lâmina antiga foi guardada no sistema.')).toBeTruthy();
+    expect(api.criarLamina).toHaveBeenCalledTimes(2);
+    expect(ids()).toEqual([]);
+  });
+
+  it('erro definitivo de uma lâmina não impede as outras, que ficam para a próxima vez', async () => {
+    seed([slide('s1', 'Cebola A', 1), slide('s2', 'Cebola B', 1)]);
     api.criarLamina.mockImplementation(async (r: { nome: string }) => {
-      if (r.nome === 'Cebola B') throw new ApiError({ status: 400, error: 'Erro', message: 'Identificação inválida.', path: '/x' });
+      if (r.nome === 'Cebola A') throw new ApiError({ status: 400, error: 'Erro', message: 'Inválida.', path: '/x' });
       return r;
     });
-    const user = userEvent.setup();
-    renderSlides();
-    await user.click(await screen.findByRole('button', { name: /Baixar backup/ }));
-    await user.click(screen.getByRole('button', { name: 'Enviar para o servidor' }));
-
-    const report = await screen.findByRole('status', { name: 'Resultado do envio' });
-    expect(report.textContent).toContain('1 lâmina enviada');
-    expect(report.textContent).toContain('1 lâmina não foi enviada e continua neste navegador');
-    expect(report.textContent).toContain('Cebola B: Identificação inválida.');
-    expect(api.listarLaminas).toHaveBeenCalledTimes(2);
-    expect(load().state.slides.map(item => item.id)).toEqual(['s2']);
-    expect(await screen.findByRole('heading', { name: '1 lâmina guardada só neste navegador' })).toBeTruthy();
+    renderLabs();
+    expect(await screen.findByText('1 lâmina antiga foi guardada no sistema.')).toBeTruthy();
+    expect(ids()).toEqual(['s1']);
+    expect(screen.queryByRole('alert')).toBeNull();
   });
 
-  it('trava os botões e avisa antes de fechar a página durante o envio', async () => {
+  it('não roda em dobro com StrictMode', async () => {
     seed([slide('s1', 'Cebola A', 1)]);
-    let release: (value: unknown) => void = () => undefined;
-    api.criarLamina.mockImplementation(() => new Promise(resolve => { release = resolve; }));
-    const user = userEvent.setup();
-    renderSlides();
-    await user.click(await screen.findByRole('button', { name: /Baixar backup/ }));
-    await user.click(screen.getByRole('button', { name: 'Enviar para o servidor' }));
-
-    await waitFor(() => expect(screen.getByText('Enviando lâmina 1 de 1: Cebola A.')).toBeTruthy());
-    expect((screen.getByRole('button', { name: 'Enviar para o servidor' }) as HTMLButtonElement).disabled).toBe(true);
-    expect((screen.getByRole('button', { name: /Baixar backup/ }) as HTMLButtonElement).disabled).toBe(true);
-    expect((screen.getByRole('button', { name: /Importar backup/ }) as HTMLButtonElement).disabled).toBe(true);
-    const event = new Event('beforeunload', { cancelable: true });
-    window.dispatchEvent(event);
-    expect(event.defaultPrevented).toBe(true);
-
-    release({});
-    await screen.findByRole('status', { name: 'Resultado do envio' });
-    const after = new Event('beforeunload', { cancelable: true });
-    window.dispatchEvent(after);
-    expect(after.defaultPrevented).toBe(false);
-  });
-
-  it('dado ilegível mostra o erro e não oferece envio nem importação', async () => {
-    localStorage.setItem('citogenetica:workspace:v1', '{"version":1,"slides":"quebrado"}');
-    renderSlides();
-    const alert = await screen.findByText(/Não foi possível ler os dados salvos/);
-    expect(alert).toBeTruthy();
-    expect(screen.queryByRole('button', { name: 'Enviar para o servidor' })).toBeNull();
-    expect(screen.queryByRole('button', { name: /Importar backup/ })).toBeNull();
-    expect(localStorage.getItem('citogenetica:workspace:v1')).toBe('{"version":1,"slides":"quebrado"}');
-  });
-});
-
-describe('importar backup', () => {
-  it('mescla por id sem sobrescrever e informa quantas entraram', async () => {
-    seed([slide('s1', 'Atual', 1)]);
-    const user = userEvent.setup();
-    renderSlides();
-    await screen.findByRole('heading', { name: '1 lâmina guardada só neste navegador' });
-    const backup: State = { version: 1, slides: [slide('s1', 'Antiga', 5), slide('s2', 'Recuperada', 3)], customTypes: {} };
-    await user.upload(screen.getByLabelText('Arquivo de backup'), stateFile(backup));
-
-    expect(await screen.findByText(/1 lâmina voltou para este navegador/)).toBeTruthy();
-    expect(load().state.slides.map(item => `${item.id}:${item.name}`)).toEqual(['s1:Atual', 's2:Recuperada']);
-    expect(await screen.findByRole('heading', { name: '2 lâminas guardadas só neste navegador' })).toBeTruthy();
-  });
-
-  it('recusa arquivo inválido sem alterar nada', async () => {
-    seed([slide('s1', 'Atual', 1)]);
-    const user = userEvent.setup();
-    renderSlides();
-    await screen.findByRole('heading', { name: '1 lâmina guardada só neste navegador' });
-    const before = localStorage.getItem('citogenetica:workspace:v1');
-    await user.upload(screen.getByLabelText('Arquivo de backup'), new File(['{"version":2}'], 'x.json', { type: 'application/json' }));
-    expect(await screen.findByText(/não é um backup válido/)).toBeTruthy();
-    await user.upload(screen.getByLabelText('Arquivo de backup'), new File(['não é json'], 'y.json', { type: 'application/json' }));
-    expect(await screen.findByText(/Não foi possível ler o arquivo/)).toBeTruthy();
-    expect(localStorage.getItem('citogenetica:workspace:v1')).toBe(before);
-  });
-
-  it('falha ao gravar vira mensagem', async () => {
-    seed([slide('s1', 'Atual', 1)]);
-    const user = userEvent.setup();
-    renderSlides();
-    await screen.findByRole('heading', { name: '1 lâmina guardada só neste navegador' });
-    vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => { throw new Error('cheio'); });
-    await user.upload(screen.getByLabelText('Arquivo de backup'), stateFile({ version: 1, slides: [slide('s2', 'Nova', 1)], customTypes: {} }));
-    expect(await screen.findByText(/Não foi possível gravar neste navegador/)).toBeTruthy();
-    expect(load().state.slides.map(item => item.id)).toEqual(['s1']);
+    renderLabs(true);
+    expect(await screen.findByText('1 lâmina antiga foi guardada no sistema.')).toBeTruthy();
+    expect(api.criarLamina).toHaveBeenCalledTimes(1);
   });
 });

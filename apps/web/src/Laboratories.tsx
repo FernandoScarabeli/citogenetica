@@ -1,10 +1,12 @@
-import { useCallback, useEffect, useRef, useState, type FormEvent, type ReactNode } from 'react';
+import { Fragment, useCallback, useEffect, useRef, useState, type FormEvent, type ReactNode } from 'react';
 import { ArrowRight, ChevronDown, ChevronRight, LogOut, Moon, Microscope, Plus, Search, ShieldCheck, UserRound, X } from 'lucide-react';
 import { Link, useLocation, useNavigate } from 'react-router';
 import { isConflict, isForbidden, isNotFound, isUnauthorized } from './api/errors';
 import type { LaboratorioResponseDTO, PapelLaboratorio, ParticipacaoResponseDTO } from './api/contracts/laboratorio';
 import { PAPEL_LABEL } from './api/contracts/laboratorio';
 import { laboratorioApi } from './api/laboratorio-api';
+import { contagemApi, type ContagemApi } from './api/contagem-api';
+import { migrarLaminasLocais } from './migracao-automatica';
 import { LaboratoryInvitations } from './LaboratoryInvitations';
 import { LaboratoryOrientations } from './LaboratoryOrientations';
 import { RoleFields } from './RoleFields';
@@ -150,11 +152,12 @@ function ConfirmationDialog({ confirmation, busy, error, onClose, onConfirm }: {
   </dialog>;
 }
 
-export function Laboratories({ user, onLogout, onUserUpdate, renderSlides }: {
+export function Laboratories({ user, onLogout, onUserUpdate, renderSlides, api = contagemApi }: {
   user: UsuarioResponseDTO;
   onLogout: () => void;
   onUserUpdate: (user: UsuarioResponseDTO) => void;
   renderSlides: (lab: LaboratorioResponseDTO | null, onBack: () => void, readOnly: boolean) => React.ReactNode;
+  api?: ContagemApi;
 }) {
   const [preferences, setPreferences] = useState(initialPreferences.value);
   const [labs, setLabs] = useState<LaboratorioResponseDTO[]>([]);
@@ -169,6 +172,7 @@ export function Laboratories({ user, onLogout, onUserUpdate, renderSlides }: {
   const [slidesLab, setSlidesLab] = useState<LaboratorioResponseDTO | null>(null);
   const [slidesStatus, setSlidesStatus] = useState<'loading' | 'ready' | 'error'>('loading');
   const [slidesRetry, setSlidesRetry] = useState(0);
+  const [migrationTick, setMigrationTick] = useState(0);
   const [section, setSection] = useState<'members' | 'orientation' | 'settings' | 'invites'>('members');
   const [query, setQuery] = useState('');
   const [memberQuery, setMemberQuery] = useState('');
@@ -220,6 +224,16 @@ export function Laboratories({ user, onLogout, onUserUpdate, renderSlides }: {
     void loadLabs(controller.signal);
     return () => controller.abort();
   }, [loadLabs]);
+
+  // Lâminas guardadas só neste navegador sobem sozinhas, sem pedir nada; falhas ficam para a próxima abertura da lista.
+  useEffect(() => {
+    if (listStatus !== 'ready') return;
+    void migrarLaminasLocais({ api, usuarioId: user.id, laboratorios: labs }).then(guardadas => {
+      if (guardadas === 0) return;
+      setNotice(guardadas === 1 ? '1 lâmina antiga foi guardada no sistema.' : `${guardadas} lâminas antigas foram guardadas no sistema.`);
+      setMigrationTick(value => value + 1);
+    });
+  }, [listStatus, labs, api, user.id]);
 
   const returnToListForMissingLab = useCallback((message = 'Este laboratório não está mais disponível para sua participação.') => {
     setSelectedId(null);
@@ -513,7 +527,7 @@ export function Laboratories({ user, onLogout, onUserUpdate, renderSlides }: {
       {pageError && <div className="page-container lab-alert error" role="alert">{pageError}<button type="button" aria-label="Dispensar erro" onClick={() => setPageError('')}><X size={16} aria-hidden="true" /></button></div>}
       {slidesStatus === 'loading' ? <main className="page-container slide-access-state" aria-live="polite"><p>Carregando laboratório…</p></main>
         : slidesStatus === 'error' ? <main className="page-container slide-access-state"><h1>Não foi possível abrir as lâminas</h1><p>{pageError}</p><button className="button secondary" type="button" onClick={() => setSlidesRetry(value => value + 1)}>Tentar de novo</button><button className="text-button" type="button" onClick={goList}>Meus laboratórios</button></main>
-          : renderSlides(slidesLab, goList, slidesLab?.estado === 'DESATIVADO')}
+          : <Fragment key={migrationTick}>{renderSlides(slidesLab, goList, slidesLab?.estado === 'DESATIVADO')}</Fragment>}
     </> : <main className={`page-container labs-main${view === 'manage' ? ' laboratory-management-page' : ''}`}><div className="labs-content">
       {(pageError || (listStatus === 'error' && view === 'list')) && !createOpen && !confirmation && <div className="lab-alert error" role="alert"><span>{pageError || listError}</span><button type="button" aria-label="Dispensar erro" onClick={() => { setPageError(''); setListError(''); }}><X size={16} aria-hidden="true" /></button></div>}
       {view === 'profile' ? <ProfileSettings user={user} photo={preferences.photo} onBack={goList} onUserUpdate={onUserUpdate} onPhotoChange={photo => updatePreferences({ ...preferences, photo })} />

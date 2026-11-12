@@ -71,7 +71,7 @@ public class LaminaController {
         CriacaoLamina criacao = service.criar(new NovaLamina(
                 UUID.fromString(request.id()), UUID.fromString(request.protocoloVersaoId()),
                 uuidOuNulo(request.laboratorioId()), request.nome(), request.especie(), request.tratamento(),
-                request.observacoes(), request.meta()), principal.id());
+                request.observacoes(), request.meta(), request.criadaEm()), principal.id());
         return ResponseEntity.status(criacao.criada() ? HttpStatus.CREATED : HttpStatus.OK)
                 .body(LaminaResponseDTO.de(criacao.lamina()));
     }

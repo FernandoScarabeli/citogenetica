@@ -2,7 +2,7 @@ import type { ContagemApi } from './api/contagem-api';
 import type { FaseProtocoloDTO, ProtocoloDTO, TipoPersonalizadoDTO, VersaoProtocoloDTO } from './api/contracts/contagem';
 import { ApiError, NetworkError, isConflict, isUnauthorized } from './api/errors';
 import { mensagemDeErro, normalizarNomeTipo } from './contagem-utils';
-import { slideGoal, type Entry, type Slide, type State } from './domain';
+import { slideGoal, type Entry, type Slide } from './domain';
 import { load, save } from './storage';
 
 /**
@@ -61,12 +61,25 @@ const interrompe = (error: unknown) => error instanceof NetworkError || isUnauth
 
 function motivoDe(error: unknown): string {
   if (error instanceof FalhaDeEnvio) return error.message;
-  if (error instanceof ApiError && error.status === 401) return 'Sua sessão terminou. Entre de novo para continuar o envio.';
+  if (error instanceof ApiError && error.status === 401) return 'Sua sessão terminou. Entre de novo para continuar.';
   return mensagemDeErro(error, 'Erro inesperado ao enviar.');
 }
 
 function exigirResposta(resposta: unknown, oQue: string): void {
-  if (!resposta || typeof resposta !== 'object') throw new FalhaDeEnvio(`O servidor não confirmou ${oQue}.`);
+  if (!resposta || typeof resposta !== 'object') throw new FalhaDeEnvio(`O sistema não confirmou ${oQue}.`);
+}
+
+/** Laboratório de destino de cada lâmina; `null` envia como avulsa. */
+export type DestinoDaLamina = (slide: Slide) => string | null;
+
+/** Limites que a API aceita para a data de criação; fora deles a data original não é enviada. */
+const CRIACAO_MAIS_ANTIGA = Date.parse('2020-01-01T00:00:00Z');
+
+/** Data de criação original da lâmina, quando legível e plausível; senão `undefined` (vale o dia do envio). */
+function criadaEmOriginal(slide: Slide): string | undefined {
+  const data = new Date(slide.createdAt);
+  const instante = data.getTime();
+  return Number.isNaN(instante) || instante < CRIACAO_MAIS_ANTIGA || instante > Date.now() ? undefined : data.toISOString();
 }
 
 type ContextoLamina = {
@@ -128,28 +141,30 @@ async function enviarCelula(contexto: ContextoLamina, slide: Slide, laminaId: st
 
 function protocoloDe(protocolos: ProtocoloDTO[], slide: Slide): ProtocoloDTO {
   const protocolo = protocolos.find(item => item.codigo === slide.protocol);
-  if (!protocolo) throw new FalhaDeEnvio('O protocolo da lâmina não foi encontrado no servidor.');
+  if (!protocolo) throw new FalhaDeEnvio('O protocolo da lâmina não foi encontrado no sistema.');
   return protocolo;
 }
 
 /** Retira só esta lâmina do navegador, relendo o estado antes (outra aba pode ter mudado). Devolve um aviso se falhar. */
 function removerDoNavegador(slide: Slide): string | null {
   const atual = load();
-  if (atual.error) return `A lâmina "${slide.name}" foi enviada, mas não saiu deste navegador: ${atual.error}`;
+  if (atual.error) return `A lâmina "${slide.name}" foi guardada, mas não saiu deste computador: ${atual.error}`;
   const restantes = atual.state.slides.filter(item => item.id !== slide.id);
   if (restantes.length === atual.state.slides.length) return null;
   if (!save({ ...atual.state, slides: restantes })) {
-    return `A lâmina "${slide.name}" foi enviada, mas não saiu deste navegador. Enviar de novo é seguro: nada será duplicado.`;
+    return `A lâmina "${slide.name}" foi guardada, mas não saiu deste computador. Guardar de novo é seguro: nada será duplicado.`;
   }
   return null;
 }
 
 async function enviarLamina(
-  opcoes: { api: MigracaoApi; usuarioId: number; laboratorioId: string | null; protocolos: ProtocoloDTO[] },
+  opcoes: { api: MigracaoApi; usuarioId: number; destino: DestinoDaLamina; protocolos: ProtocoloDTO[] },
   slide: Slide,
   avisarCelula: (enviadas: number) => void,
 ): Promise<void> {
-  const { api, usuarioId, laboratorioId } = opcoes;
+  const { api, usuarioId } = opcoes;
+  const laboratorioId = opcoes.destino(slide);
+  const criadaEm = criadaEmOriginal(slide);
   const protocolo = protocoloDe(opcoes.protocolos, slide);
   const laminaId = await idEstavel(slide.id, `lamina|${usuarioId}|${slide.id}`);
   const lamina = await api.criarLamina({
@@ -161,6 +176,7 @@ async function enviarLamina(
     tratamento: slide.treatment,
     observacoes: slide.notes,
     meta: slideGoal(slide),
+    ...(criadaEm ? { criadaEm } : {}),
   });
   exigirResposta(lamina, 'a lâmina');
 
@@ -176,18 +192,18 @@ async function enviarLamina(
 
   const resumo = await api.buscarResumo(laminaId);
   if (!resumo || resumo.total !== slide.entries.length) {
-    throw new FalhaDeEnvio(`O servidor confirmou ${resumo?.total ?? 0} de ${slide.entries.length} células. A lâmina continua neste navegador.`);
+    throw new FalhaDeEnvio(`O sistema confirmou ${resumo?.total ?? 0} de ${slide.entries.length} células. A lâmina continua neste computador.`);
   }
 }
 
 export async function migrarLaminas(opcoes: {
   api: MigracaoApi;
   usuarioId: number;
-  laboratorioId: string | null;
+  destino: DestinoDaLamina;
   laminas: Slide[];
   onProgresso?: (progresso: ProgressoMigracao) => void;
 }): Promise<ResultadoMigracao> {
-  const { api, usuarioId, laboratorioId, laminas, onProgresso } = opcoes;
+  const { api, usuarioId, destino, laminas, onProgresso } = opcoes;
   const resultado: ResultadoMigracao = { enviadas: [], falhas: [], naoTentadas: 0, interrupcao: null, avisos: [] };
   if (laminas.length === 0) return resultado;
 
@@ -206,7 +222,7 @@ export async function migrarLaminas(opcoes: {
     });
     onProgresso?.(progresso(0));
     try {
-      await enviarLamina({ api, usuarioId, laboratorioId, protocolos }, slide, enviadas => onProgresso?.(progresso(enviadas)));
+      await enviarLamina({ api, usuarioId, destino, protocolos }, slide, enviadas => onProgresso?.(progresso(enviadas)));
     } catch (error) {
       resultado.falhas.push({ id: slide.id, nome: slide.name, motivo: motivoDe(error) });
       if (interrompe(error)) {
@@ -221,15 +237,4 @@ export async function migrarLaminas(opcoes: {
     if (aviso) resultado.avisos.push(aviso);
   }
   return resultado;
-}
-
-/** Junta um backup ao estado atual por `id`, sem sobrescrever lâmina já presente. */
-export function mesclarBackup(atual: State, backup: State): { state: State; adicionadas: number } {
-  const presentes = new Set(atual.slides.map(slide => slide.id));
-  const novas = backup.slides.filter(slide => !presentes.has(slide.id));
-  const customTypes: Record<string, string[]> = { ...atual.customTypes };
-  for (const [chave, tipos] of Object.entries(backup.customTypes)) {
-    customTypes[chave] = [...new Set([...(customTypes[chave] ?? []), ...tipos])];
-  }
-  return { state: { ...atual, slides: [...atual.slides, ...novas], customTypes }, adicionadas: novas.length };
 }

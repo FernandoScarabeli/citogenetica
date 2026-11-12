@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { ApiError, NetworkError } from '../src/api/errors';
 import type { ProtocoloDTO } from '../src/api/contracts/contagem';
 import type { Entry, Slide, State } from '../src/domain';
-import { idEstavel, mesclarBackup, migrarLaminas, uuidDeterministico } from '../src/migracao-laminas';
+import { idEstavel, migrarLaminas, uuidDeterministico } from '../src/migracao-laminas';
 import { load, save } from '../src/storage';
 
 const V4 = /^[\da-f]{8}-[\da-f]{4}-4[\da-f]{3}-[89ab][\da-f]{3}-[\da-f]{12}$/;
@@ -30,7 +30,7 @@ const api = {
 };
 const apiError = (status: number, message = 'Falha.') => new ApiError({ status, error: 'Erro', message, path: '/x' });
 const run = (laminas: Slide[], extra: { laboratorioId?: string | null; onProgresso?: never } = {}) =>
-  migrarLaminas({ api: api as never, usuarioId: 7, laboratorioId: extra.laboratorioId ?? null, laminas });
+  migrarLaminas({ api: api as never, usuarioId: 7, destino: () => extra.laboratorioId ?? null, laminas });
 const seed = (slides: Slide[], customTypes: State['customTypes'] = {}) => save({ version: 1, slides, customTypes });
 const ids = () => load().state.slides.map(item => item.id);
 
@@ -66,10 +66,31 @@ describe('envio de uma lâmina', () => {
     const result = await run(load().state.slides);
     expect(result.enviadas).toHaveLength(3);
     const [primeira, segunda, terceira] = api.criarLamina.mock.calls.map(call => call[0]);
-    expect(primeira).toEqual({ id: expect.stringMatching(V4), protocoloVersaoId: VERSAO, nome: 'Lâmina s1', especie: 'Allium cepa', tratamento: 'controle', observacoes: 'Nota', meta: 1000 });
+    expect(primeira).toEqual({ id: expect.stringMatching(V4), protocoloVersaoId: VERSAO, nome: 'Lâmina s1', especie: 'Allium cepa', tratamento: 'controle', observacoes: 'Nota', meta: 1000, criadaEm: '2025-03-01T10:00:00.000Z' });
     expect(primeira).not.toHaveProperty('laboratorioId');
     expect(segunda).toMatchObject({ protocoloVersaoId: 'v-meiose', meta: 500 });
     expect(terceira.meta).toBeNull();
+  });
+
+  it('cada lâmina vai para o destino escolhido para ela', async () => {
+    seed([slide('s1', []), slide('s2', [])]);
+    const result = await migrarLaminas({ api: api as never, usuarioId: 7, laminas: load().state.slides, destino: item => (item.id === 's1' ? 'lab-1' : null) });
+    expect(result.enviadas).toHaveLength(2);
+    expect(api.criarLamina.mock.calls[0][0].laboratorioId).toBe('lab-1');
+    expect(api.criarLamina.mock.calls[1][0]).not.toHaveProperty('laboratorioId');
+  });
+
+  it('envia a data de criação original da lâmina', async () => {
+    seed([slide('s1', [])]);
+    await run(load().state.slides);
+    expect(api.criarLamina.mock.calls[0][0].criadaEm).toBe('2025-03-01T10:00:00.000Z');
+  });
+
+  it.each(['data inválida', '2019-12-31T23:59:59.000Z', '2999-01-01T00:00:00.000Z'])('não envia data de criação ilegível ou fora do intervalo (%s)', async createdAt => {
+    seed([slide('s1', [], { createdAt })]);
+    const result = await run(load().state.slides);
+    expect(result.enviadas).toHaveLength(1);
+    expect(api.criarLamina.mock.calls[0][0]).not.toHaveProperty('criadaEm');
   });
 
   it('usa o laboratório atual quando há um', async () => {
@@ -193,7 +214,7 @@ describe('confirmação e remoção', () => {
     vi.mocked(Storage.prototype.setItem).mockRestore();
     expect(Storage.prototype.setItem).toBe(original);
     expect(result.enviadas).toHaveLength(1);
-    expect(result.avisos[0]).toContain('não saiu deste navegador');
+    expect(result.avisos[0]).toContain('não saiu deste computador');
     expect(ids()).toEqual(['s1']);
   });
 
@@ -233,16 +254,5 @@ describe('confirmação e remoção', () => {
     const result = await run(load().state.slides);
     expect(result.falhas).toHaveLength(1);
     expect(ids()).toEqual(['s1']);
-  });
-});
-
-describe('mesclarBackup', () => {
-  it('não sobrescreve lâmina já presente e soma tipos personalizados', () => {
-    const atual: State = { version: 1, slides: [slide('a', [], { name: 'Atual' })], customTypes: { 'mitose:Prófase': ['X'] } };
-    const backup: State = { version: 1, slides: [slide('a', [], { name: 'Antiga' }), slide('b', [])], customTypes: { 'mitose:Prófase': ['X', 'Y'] } };
-    const { state, adicionadas } = mesclarBackup(atual, backup);
-    expect(adicionadas).toBe(1);
-    expect(state.slides.map(item => `${item.id}:${item.name}`)).toEqual(['a:Atual', 'b:Lâmina b']);
-    expect(state.customTypes['mitose:Prófase']).toEqual(['X', 'Y']);
   });
 });

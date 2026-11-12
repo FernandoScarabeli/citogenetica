@@ -4,6 +4,7 @@ import br.ufla.citogenetica.shared.validation.CanonicalUuidV4;
 import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.NotNull;
+import java.time.Instant;
 import jakarta.validation.constraints.Positive;
 
 public record CriarLaminaRequestDTO(
@@ -38,5 +39,10 @@ public record CriarLaminaRequestDTO(
         @Schema(description = "Meta de células da lâmina: inteiro positivo; ausente = sem meta", nullable = true)
         @JsonDeserialize(using = NumeroInteiroEstrito.Inteiro.class)
         @Positive(message = "A meta deve ser um número inteiro positivo.")
-        Integer meta) {
+        Integer meta,
+
+        @Schema(description = "Instante original de criação (ISO 8601), para lâmina que já existia fora do sistema; "
+                + "não pode estar no futuro (tolerância de 5 minutos) nem ser anterior a 2020-01-01. "
+                + "Ausente = momento do envio. Só define a data de criação", nullable = true)
+        Instant criadaEm) {
 }
