@@ -58,7 +58,9 @@ Quando uma resposta mudar, atualize o item e a data, não apague o histórico da
 
 | Questão | Status | Decisão |
 |---|---|---|
-| Backups reais (ou fictícios) dos HTMLs antigos para testar a importação | pendente (Etapa 3) | Pedir ao laboratório. |
-| Formato de CSV e PDF esperado (Excel, R, SISVAR) | pendente (Etapa 3) | Perguntar ao laboratório. |
+| Backups reais (ou fictícios) dos HTMLs antigos para testar a importação | decidido (2026-11-12, mantenedor) | Não há backups reais: os exemplos de teste são gerados usando os próprios HTMLs. |
+| Formato de CSV e PDF esperado (Excel, R, SISVAR) | decidido (2026-11-12, mantenedor) | CSV no padrão do Excel em português: separador `;`, vírgula decimal, UTF-8 com BOM (o R lê com `read.csv2`; o SISVAR importa pelo Excel). PDF gerado pela API com OpenPDF. |
+| Exportar várias lâminas de uma vez | decidido (2026-11-12, mantenedor) | Sim, em JSON e nos dois CSVs (resumo e uma linha por registro). |
+| Destino das lâminas importadas dos HTMLs antigos | decidido (2026-11-12, mantenedor) | A pessoa escolhe um laboratório (ou avulsa) uma vez, e vale para o arquivo inteiro. Importar de novo não duplica células. |
 | Hospedagem e responsável pela manutenção | pendente (antes da produção) | UFLA/DGTI ou serviço externo. |
 | Termo de uso, aviso de privacidade e base legal (LGPD) | pendente (antes da produção) | Definir antes de abrir o cadastro em produção. |
