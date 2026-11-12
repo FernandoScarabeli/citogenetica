@@ -123,3 +123,5 @@ form label.check-option span{color:inherit;font-weight:inherit}
 .local-slides-report p{margin:0 0 6px}
 .local-slides-report ul{margin:8px 0;padding-left:20px}
 @media(max-width:600px){.local-slides,.local-slides-report{padding:16px}.local-slides-actions .button{flex:1 1 100%}}
+.fila-aviso{position:sticky;bottom:0;z-index:20;display:flex;align-items:center;gap:10px;margin-top:20px;padding:13px 16px;border:1px solid var(--lab-accent,#395a4c);border-radius:6px;background:var(--lab-ground,#f5f8f5);color:var(--lab-ink,#26342c);font-size:var(--fs-body);line-height:var(--lh-body);font-weight:550;box-shadow:0 -4px 16px #17281e1c}
+.fila-aviso-ponto{flex:none;width:9px;height:9px;border-radius:50%;background:var(--lab-accent,#395a4c)}

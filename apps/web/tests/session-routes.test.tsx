@@ -254,6 +254,29 @@ describe('sessão e rotas', () => {
     expect(calls[logoutIndex + 1]).toEqual({ path: '/api/v1/auth/csrf', method: 'GET' });
   });
 
+  it('pede confirmação ao sair com células não enviadas e mantém a fila guardada', async () => {
+    const pedido = { id: 'aaaaaaaa-0000-4000-8000-000000000001', faseId: 'f1', status: 'NORMAL', quantidade: 1 };
+    localStorage.setItem('citogenetica:fila-registros:v1', JSON.stringify([{ usuarioId: 42, laminaId: 'l1', pedido }]));
+    const { calls } = mockApi({ me: async () => response(200, userDto) });
+    setPath('/app');
+    const confirmar = vi.spyOn(window, 'confirm').mockReturnValueOnce(false).mockReturnValueOnce(true);
+
+    render(<App/>);
+    await screen.findByRole('heading', { name: 'Meus laboratórios' });
+    const user = userEvent.setup();
+    await user.click(screen.getByRole('button', { name: 'Menu do perfil' }));
+    await user.click(screen.getByRole('button', { name: 'Sair' }));
+    expect(confirmar).toHaveBeenCalledWith(expect.stringContaining('Há 1 célula ainda não enviada neste aparelho.'));
+    expect(calls.some((call) => call.path === '/api/v1/auth/logout')).toBe(false);
+
+    await user.click(screen.getByRole('button', { name: 'Menu do perfil' }));
+    await user.click(screen.getByRole('button', { name: 'Sair' }));
+    expect(await screen.findByRole('heading', { name: 'Acesse sua pesquisa.' })).toBeTruthy();
+    expect(localStorage.getItem('citogenetica:fila-registros:v1')).not.toBeNull();
+    confirmar.mockRestore();
+    localStorage.clear();
+  });
+
   it('qualquer 401 após login encerra a sessão e guarda o caminho interno atual', async () => {
     const { calls } = mockApi({
       me: async () => response(200, userDto),

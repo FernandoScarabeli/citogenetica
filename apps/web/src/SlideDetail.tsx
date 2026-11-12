@@ -7,8 +7,10 @@ import type {
   TipoPersonalizadoDTO, VersaoProtocoloDTO,
 } from './api/contracts/contagem';
 import { NetworkError, isConflict, isNotFound } from './api/errors';
+import { mensagemFilaEnviando, mensagemFilaGuardada } from './contagem/fila-registros';
+import { useFilaRegistros } from './contagem/useFilaRegistros';
 import {
-  MENSAGEM_SEM_CONEXAO, agruparPorDia, descricaoDesfazer, formatarData, formatarHora, fusoDoAparelho, instanteExibido, mensagemDeErro, normalizarNomeTipo, resumoCsv, rotuloDesfazer,
+  agruparPorDia, descricaoDesfazer, formatarData, formatarHora, fusoDoAparelho, instanteExibido, mensagemDeErro, normalizarNomeTipo, resumoCsv, rotuloDesfazer,
 } from './contagem-utils';
 import { pct } from './domain';
 import { EntrySelect, Modal, TypeChecklist, type TypeChoice } from './SlideWidgets';
@@ -19,6 +21,7 @@ const HISTORY_PAGE_SIZE = 20;
 const num = (value: number) => value.toLocaleString('pt-BR');
 const celulas = (value: number) => (value === 1 ? 'célula' : 'células');
 const newId = () => crypto.randomUUID();
+const DICA_FILA = 'Disponível depois que as células guardadas neste aparelho forem enviadas.';
 
 type Loaded = { lamina: LaminaDTO; versao: VersaoProtocoloDTO; resumo: ResumoLaminaDTO; tipos: TipoPersonalizadoDTO[] };
 type History = { items: RegistroHistoricoDTO[]; page: number; totalPages: number };
@@ -100,7 +103,23 @@ export function SlideDetail({ api, laminaId, usuarioId, readOnly, protocolos, on
   const canEdit = !!lamina && !readOnly && lamina.donoUsuarioId === usuarioId;
   const protocolo = lamina ? protocolos.find(item => item.versaoAtual.id === lamina.protocoloVersaoId) : undefined;
   const isMitosis = protocolo?.codigo === 'mitose';
-  const shown = useMemo(() => (loaded ? withPending(loaded.resumo, pending) : null), [loaded, pending]);
+
+  // Células contadas sem conexão e guardadas neste aparelho: continuam contando na tela até serem enviadas.
+  const fila = useFilaRegistros({
+    api, usuarioId, laminaId, ativo: status === 'ready',
+    onRecusado: (item, erro) => callbacks.current.onError(
+      `A célula ${item.pedido.status === 'NORMAL' ? 'normal' : 'anormal'} de ${phaseNameRef.current(item.pedido.faseId)} não entrou na contagem: ${mensagemDeErro(erro, 'ela foi recusada.')}`),
+    onSessaoExpirada: () => callbacks.current.onError('Sua sessão expirou. Entre de novo: as células guardadas neste aparelho serão enviadas depois.'),
+    onConcluido: () => void refreshRef.current(),
+  });
+  const guardadas = fila.itens.length;
+  const filaRef = useRef(fila);
+  filaRef.current = fila;
+  const shown = useMemo(() => {
+    if (!loaded) return null;
+    const naFila = fila.itens.map(({ pedido }) => ({ key: pedido.id, faseId: pedido.faseId, status: pedido.status }));
+    return withPending(loaded.resumo, [...pending, ...naFila]);
+  }, [loaded, pending, fila.itens]);
 
   // Cargas -----------------------------------------------------------------------------------------------------
 
@@ -135,6 +154,10 @@ export function SlideDetail({ api, laminaId, usuarioId, readOnly, protocolos, on
     return () => controller.abort();
   }, [load, retry]);
 
+  const refreshRef = useRef<() => Promise<void>>(() => Promise.resolve());
+  const phaseNameRef = useRef<(faseId: string) => string>(() => 'uma fase');
+  phaseNameRef.current = faseId => loaded?.versao.fases.find(fase => fase.id === faseId)?.nome ?? 'uma fase';
+
   /** Busca de novo lâmina, resumo e primeira página do histórico, e só então descarta as células otimistas. */
   const refresh = useCallback(async () => {
     const seq = ++refreshSeq.current;
@@ -158,6 +181,7 @@ export function SlideDetail({ api, laminaId, usuarioId, readOnly, protocolos, on
       callbacks.current.onError(mensagemDeErro(error, 'Não foi possível atualizar a contagem. Recarregue a página.'));
     }
   }, [api, laminaId]);
+  refreshRef.current = refresh;
 
   async function loadMore() {
     if (loadingMore || history.page + 1 >= history.totalPages) return;
@@ -177,7 +201,7 @@ export function SlideDetail({ api, laminaId, usuarioId, readOnly, protocolos, on
 
   // Contagem rápida --------------------------------------------------------------------------------------------
 
-  // Células já contadas na tela e ainda não enviadas se perderiam ao fechar a página.
+  // Células já contadas na tela e ainda a caminho do servidor se perderiam ao fechar a página.
   useEffect(() => {
     if (!pending.length) return;
     const warn = (event: BeforeUnloadEvent) => event.preventDefault();
@@ -199,8 +223,10 @@ export function SlideDetail({ api, laminaId, usuarioId, readOnly, protocolos, on
         await api.criarRegistro(laminaId, body);
         settled.current.add(key);
       } catch (error) {
+        // Sem conexão a célula não some: fica guardada neste aparelho e continua contando.
+        const guardada = error instanceof NetworkError && filaRef.current.enfileirar(body);
         if (mounted.current) setPending(items => items.filter(item => item.key !== key));
-        callbacks.current.onError(error instanceof NetworkError ? MENSAGEM_SEM_CONEXAO : mensagemDeErro(error, 'Esta célula não foi registrada. Tente de novo.'));
+        if (!guardada) callbacks.current.onError(mensagemDeErro(error, 'Esta célula não foi registrada. Tente de novo.'));
       } finally {
         inFlight.current -= 1;
         if (inFlight.current === 0) void refresh();
@@ -309,7 +335,7 @@ export function SlideDetail({ api, laminaId, usuarioId, readOnly, protocolos, on
 
   async function submitBatch(event: FormEvent) {
     event.preventDefault();
-    if (!canEdit || !batchPhase || busy) return;
+    if (!canEdit || !batchPhase || busy || guardadas > 0) return;
     const amount = Number(batchQuantity);
     if (!Number.isSafeInteger(amount) || amount < 1) { setBatchError('Informe uma quantidade inteira maior que zero.'); return; }
     if (batchStatus === 'ANORMAL' && !hasTypeChoice()) { setBatchError('Selecione ao menos uma anormalidade.'); return; }
@@ -346,7 +372,7 @@ export function SlideDetail({ api, laminaId, usuarioId, readOnly, protocolos, on
   const last = history.items[0];
 
   async function undoLast() {
-    if (!canEdit || !last || busy) return;
+    if (!canEdit || !last || busy || guardadas > 0) return;
     setModal(null);
     setBusy(true);
     try {
@@ -445,7 +471,7 @@ export function SlideDetail({ api, laminaId, usuarioId, readOnly, protocolos, on
   }
 
   async function removeSlide() {
-    if (!canEdit || !lamina || busy) return;
+    if (!canEdit || !lamina || busy || guardadas > 0) return;
     setBusy(true);
     try {
       await api.excluirLamina(lamina.id, lamina.versao);
@@ -484,8 +510,8 @@ export function SlideDetail({ api, laminaId, usuarioId, readOnly, protocolos, on
         <p>{(lamina.especie || lamina.tratamento) && <>{[lamina.especie, lamina.tratamento].filter(Boolean).join(' · ')} <span className="dot-separator">·</span> </>}Criada em {formatarData(lamina.criadaEm)}</p>
       </div>
       {canEdit && <div className="detail-actions">
-        <button className="button secondary" type="button" onClick={openEditSlide}><Pencil size={15} /> Editar lâmina</button>
-        <button className="button icon-only secondary" type="button" title="Excluir lâmina" aria-label="Excluir lâmina" onClick={() => setModal('delete')}><Trash2 size={17} /></button>
+        <button className="button secondary" type="button" disabled={guardadas > 0} title={guardadas > 0 ? DICA_FILA : undefined} onClick={openEditSlide}><Pencil size={15} /> Editar lâmina</button>
+        <button className="button icon-only secondary" type="button" title={guardadas > 0 ? DICA_FILA : 'Excluir lâmina'} disabled={guardadas > 0} aria-label="Excluir lâmina" onClick={() => setModal('delete')}><Trash2 size={17} /></button>
       </div>}
     </div>
     {!readOnly && lamina.donoUsuarioId !== usuarioId && <p className="owner-note">Esta lâmina é de {lamina.donoNome}. Você pode consultar a contagem, mas só quem a criou pode alterá-la.</p>}
@@ -500,11 +526,11 @@ export function SlideDetail({ api, laminaId, usuarioId, readOnly, protocolos, on
 
     {tab === 'contagem' && <div className="workspace"><section className="count-area">
       <div className="section-heading compact"><div><h2 className={typeClass('title')}>Contagem por fase</h2><p>Registre cada célula na fase correspondente.</p></div>
-        {canEdit && <div className="count-tools"><button className="text-button" type="button" disabled={!last || pending.length > 0 || busy} onClick={() => (last && last.quantidade > 1 ? setModal('undo') : void undoLast())}><Undo2 size={15} /> {last ? rotuloDesfazer(last, phaseName(last.faseId)) : 'Desfazer último'}</button></div>}
+        {canEdit && <div className="count-tools"><button className="text-button" type="button" disabled={!last || pending.length > 0 || guardadas > 0 || busy} title={guardadas > 0 ? DICA_FILA : undefined} onClick={() => (last && last.quantidade > 1 ? setModal('undo') : void undoLast())}><Undo2 size={15} /> {last ? rotuloDesfazer(last, phaseName(last.faseId)) : 'Desfazer último'}</button></div>}
       </div>
       <div className="phase-list">{shown.fases.map(fase => <div className="phase-row" key={fase.faseId}>
         <div className="phase-title"><strong>{fase.nome}</strong><small>{num(fase.total)} {fase.total === 1 ? 'célula' : 'células'} no total</small>
-          {canEdit && <button className="phase-adjust" type="button" ref={el => { batchTriggers.current[fase.faseId] = el; }} aria-expanded={batchPhase === fase.faseId} onClick={() => (batchPhase === fase.faseId ? closeBatch() : openBatch(fase.faseId))}>Ajustar quantidade<span className="sr-only"> em {fase.nome}</span></button>}
+          {canEdit && <button className="phase-adjust" type="button" ref={el => { batchTriggers.current[fase.faseId] = el; }} aria-expanded={batchPhase === fase.faseId} disabled={guardadas > 0} title={guardadas > 0 ? DICA_FILA : undefined} onClick={() => (batchPhase === fase.faseId ? closeBatch() : openBatch(fase.faseId))}>Ajustar quantidade<span className="sr-only"> em {fase.nome}</span></button>}
         </div>
         {canEdit && <div className="phase-actions">
           <button className="count-button" type="button" aria-label={`Registrar ${fase.nome} normal; ${fase.normais} ${fase.normais === 1 ? 'célula normal' : 'células normais'}`} onClick={() => count(fase.faseId, 'NORMAL')}><span className="count-number">{num(fase.normais)}</span><span className="count-label"><Plus size={16} aria-hidden="true" /> Normal</span></button>
@@ -538,11 +564,13 @@ export function SlideDetail({ api, laminaId, usuarioId, readOnly, protocolos, on
         {agruparPorDia(history.items).map(group => <div key={group.dia}><h3 className="history-date">{group.dia}</h3>{group.registros.map(record => <div className="history-row" key={record.id}>
           <div><strong>{phaseName(record.faseId)} · {record.status === 'NORMAL' ? 'Normal' : 'Anormal'}</strong><p>{num(record.quantidade)} {celulas(record.quantidade)}{record.tipos.length > 0 && <> · {record.tipos.map(tipo => tipo.nome).join(', ')}</>}</p></div>
           <time dateTime={instanteExibido(record)}>{formatarHora(instanteExibido(record))}</time>
-          {canEdit && <button className="text-button history-edit" type="button" onClick={() => openEditRecord(record)}><Pencil size={14} aria-hidden="true" /> Editar<span className="sr-only"> registro de {phaseName(record.faseId)} às {formatarHora(instanteExibido(record))}</span></button>}
+          {canEdit && <button className="text-button history-edit" type="button" disabled={guardadas > 0} title={guardadas > 0 ? DICA_FILA : undefined} onClick={() => openEditRecord(record)}><Pencil size={14} aria-hidden="true" /> Editar<span className="sr-only"> registro de {phaseName(record.faseId)} às {formatarHora(instanteExibido(record))}</span></button>}
         </div>)}</div>)}
       </div>}
       {history.page + 1 < history.totalPages && <div className="history-more"><button className="button secondary" type="button" disabled={loadingMore} onClick={() => void loadMore()}>{loadingMore ? 'Carregando…' : 'Carregar mais'}</button></div>}
     </section>}
+
+    {guardadas > 0 && <div className="fila-aviso" role="status"><span aria-hidden="true" className="fila-aviso-ponto" />{fila.enviando ? mensagemFilaEnviando(guardadas) : mensagemFilaGuardada(guardadas)}</div>}
 
     {modal === 'abnormal' && <Modal title="Registrar célula anormal" onClose={() => setModal(null)}><form className="entry-form" onSubmit={event => void submitAbnormal(event)}>
       <p className="modal-description">Selecione a anormalidade observada na célula. Marque mais de uma, se for o caso.</p>

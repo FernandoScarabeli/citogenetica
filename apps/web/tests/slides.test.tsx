@@ -88,6 +88,7 @@ const normalButton = () => screen.getByRole('button', { name: /Registrar Prófas
 const abnormalButton = () => screen.getByRole('button', { name: /Registrar Prófase anormal/ });
 
 beforeEach(() => {
+  localStorage.clear();
   vi.resetAllMocks();
   Object.defineProperty(HTMLDialogElement.prototype, 'showModal', { configurable: true, value(this: HTMLDialogElement) { this.setAttribute('open', ''); } });
   Object.defineProperty(HTMLDialogElement.prototype, 'close', { configurable: true, value(this: HTMLDialogElement) { this.removeAttribute('open'); } });
@@ -280,19 +281,6 @@ describe('contagem rápida', () => {
     await waitFor(() => expect(api.buscarResumo).toHaveBeenCalledTimes(2));
     await waitFor(() => expect(normalButton().textContent).toContain('4'));
     expect(api.buscarLamina).toHaveBeenCalledTimes(2);
-  });
-
-  it('avisa sem conexão, volta ao valor real e não reenvia sozinho', async () => {
-    api.criarRegistro.mockRejectedValue(new NetworkError());
-    const user = userEvent.setup();
-    renderSlides();
-    await openSlide(user);
-    await user.click(normalButton());
-
-    expect((await screen.findByRole('alert')).textContent).toContain('Esta célula não foi registrada. Verifique a internet');
-    await waitFor(() => expect(api.buscarResumo).toHaveBeenCalledTimes(2));
-    await waitFor(() => expect(normalButton().textContent).toContain('1'));
-    expect(api.criarRegistro).toHaveBeenCalledTimes(1);
   });
 
   it('não grava nada no armazenamento do navegador', async () => {
@@ -659,5 +647,143 @@ describe('percentuais', () => {
     await user.click(screen.getByRole('tab', { name: 'Resumo' }));
     expect(screen.getByText('Micronúcleo: 1 (50,00%)')).toBeTruthy();
     expect(screen.getAllByText('50,00%').length).toBeGreaterThan(0);
+  });
+});
+
+describe('células guardadas sem conexão', () => {
+  const FILA = 'citogenetica:fila-registros:v1';
+  const guardadas = () => JSON.parse(localStorage.getItem(FILA) ?? '[]') as { usuarioId: number; laminaId: string; pedido: { id: string } }[];
+
+  it('falha de rede guarda a célula, mantém a contagem e mostra o aviso fixo', async () => {
+    api.criarRegistro.mockRejectedValue(new NetworkError());
+    const user = userEvent.setup();
+    renderSlides();
+    await openSlide(user);
+    await user.click(normalButton());
+    await user.click(normalButton());
+
+    expect(await screen.findByText(/Sem internet\. 2 células guardadas neste aparelho/)).toBeTruthy();
+    expect(normalButton().textContent).toContain('3');
+    expect(screen.queryByRole('alert')).toBeNull();
+    const salvas = guardadas();
+    expect(salvas.map(item => [item.usuarioId, item.laminaId])).toEqual([[ME, 'lamina-1'], [ME, 'lamina-1']]);
+    expect(salvas[0].pedido).toEqual(expect.objectContaining({ faseId: PROFASE, status: 'NORMAL', quantidade: 1, horaAparelho: expect.stringMatching(/Z$/), fusoAparelho: expect.any(String) }));
+  });
+
+  it('anormal pela janela também é guardada', async () => {
+    api.criarRegistro.mockRejectedValue(new NetworkError());
+    const user = userEvent.setup();
+    renderSlides();
+    await openSlide(user);
+    await user.click(abnormalButton());
+    await user.click(screen.getByRole('checkbox', { name: 'Micronúcleo' }));
+    await user.click(screen.getByRole('button', { name: /Registrar célula/ }));
+
+    expect(await screen.findByText(/Sem internet\. 1 célula guardada/)).toBeTruthy();
+    expect(guardadas()[0].pedido).toEqual(expect.objectContaining({ status: 'ANORMAL', tipoIds: [MICRO] }));
+  });
+
+  it('erro que não é de rede segue descartando a célula e avisando', async () => {
+    api.criarRegistro.mockRejectedValue(apiError(400, 'Fase inválida.'));
+    const user = userEvent.setup();
+    renderSlides();
+    await openSlide(user);
+    await user.click(normalButton());
+
+    expect((await screen.findByRole('alert')).textContent).toContain('Fase inválida.');
+    expect(guardadas()).toEqual([]);
+    await waitFor(() => expect(normalButton().textContent).toContain('1'));
+  });
+
+  it('reenvia em ordem, um por vez, ao voltar a conexão e limpa a fila', async () => {
+    api.criarRegistro.mockRejectedValue(new NetworkError());
+    const user = userEvent.setup();
+    renderSlides();
+    await openSlide(user);
+    await user.click(normalButton());
+    await user.click(abnormalButton());
+    await user.click(screen.getByRole('checkbox', { name: 'Micronúcleo' }));
+    await user.click(screen.getByRole('button', { name: /Registrar célula/ }));
+    await screen.findByText(/2 células guardadas/);
+    const ordem = guardadas().map(item => item.pedido.id);
+
+    api.criarRegistro.mockReset();
+    api.criarRegistro.mockResolvedValue({});
+    api.buscarResumo.mockClear();
+    window.dispatchEvent(new Event('online'));
+
+    await waitFor(() => expect(guardadas()).toEqual([]));
+    expect(api.criarRegistro.mock.calls.map(call => call[1].id)).toEqual(ordem);
+    await waitFor(() => expect(api.buscarResumo).toHaveBeenCalledTimes(1));
+    expect(screen.queryByText(/guardadas? neste aparelho/)).toBeNull();
+  });
+
+  it('a fila sobrevive a fechar a lâmina e é enviada ao abri-la de novo', async () => {
+    api.criarRegistro.mockRejectedValue(new NetworkError());
+    const user = userEvent.setup();
+    const primeira = renderSlides();
+    await openSlide(user);
+    await user.click(normalButton());
+    await screen.findByText(/1 célula guardada/);
+    primeira.unmount();
+
+    api.criarRegistro.mockReset();
+    api.criarRegistro.mockResolvedValue({});
+    renderSlides();
+    await openSlide(user);
+    await waitFor(() => expect(api.criarRegistro).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(guardadas()).toEqual([]));
+  });
+
+  it('resposta idempotente (200) também limpa a fila', async () => {
+    localStorage.setItem(FILA, JSON.stringify([{ usuarioId: ME, laminaId: 'lamina-1', pedido: { id: 'aaaaaaaa-0000-4000-8000-000000000009', faseId: PROFASE, status: 'NORMAL', quantidade: 1 } }]));
+    api.criarRegistro.mockResolvedValue(REGISTRO);
+    const user = userEvent.setup();
+    renderSlides();
+    await openSlide(user);
+    await waitFor(() => expect(guardadas()).toEqual([]));
+    expect(api.criarRegistro).toHaveBeenCalledWith('lamina-1', expect.objectContaining({ id: 'aaaaaaaa-0000-4000-8000-000000000009' }));
+  });
+
+  it('recusa definitiva avisa qual célula não entrou e a remove da fila', async () => {
+    localStorage.setItem(FILA, JSON.stringify([{ usuarioId: ME, laminaId: 'lamina-1', pedido: { id: 'aaaaaaaa-0000-4000-8000-000000000009', faseId: PROFASE, status: 'ANORMAL', tipoIds: [MICRO], quantidade: 1 } }]));
+    api.criarRegistro.mockRejectedValue(apiError(400, 'Tipo inválido.'));
+    const user = userEvent.setup();
+    renderSlides();
+    await openSlide(user);
+
+    expect((await screen.findByRole('alert')).textContent).toContain('A célula anormal de Prófase não entrou na contagem: Tipo inválido.');
+    expect(guardadas()).toEqual([]);
+  });
+
+  it('401 mantém a fila guardada', async () => {
+    localStorage.setItem(FILA, JSON.stringify([{ usuarioId: ME, laminaId: 'lamina-1', pedido: { id: 'aaaaaaaa-0000-4000-8000-000000000009', faseId: PROFASE, status: 'NORMAL', quantidade: 1 } }]));
+    api.criarRegistro.mockRejectedValue(apiError(401, 'Sessão expirada.'));
+    const user = userEvent.setup();
+    renderSlides();
+    await openSlide(user);
+
+    expect((await screen.findByRole('alert')).textContent).toContain('Sua sessão expirou');
+    expect(guardadas()).toHaveLength(1);
+    expect(screen.getByText(/1 célula guardada/)).toBeTruthy();
+  });
+
+  it('trava desfazer, ajuste, edição e exclusão enquanto houver fila, mas a contagem segue liberada', async () => {
+    localStorage.setItem(FILA, JSON.stringify([{ usuarioId: ME, laminaId: 'lamina-1', pedido: { id: 'aaaaaaaa-0000-4000-8000-000000000009', faseId: PROFASE, status: 'NORMAL', quantidade: 1 } }]));
+    api.criarRegistro.mockRejectedValue(new NetworkError());
+    const user = userEvent.setup();
+    renderSlides();
+    await openSlide(user);
+    await screen.findByText(/1 célula guardada/);
+
+    const travado = (el: HTMLElement) => (el as HTMLButtonElement).disabled;
+    expect(travado(screen.getByRole('button', { name: /Desfazer/ }))).toBe(true);
+    expect(travado(screen.getByRole('button', { name: 'Excluir lâmina' }) ?? screen.getByTitle(/Disponível depois/))).toBe(true);
+    expect(travado(screen.getByRole('button', { name: /Editar lâmina/ }))).toBe(true);
+    expect(travado(screen.getAllByRole('button', { name: /Ajustar quantidade/ })[0])).toBe(true);
+    expect(travado(normalButton())).toBe(false);
+    expect(travado(abnormalButton())).toBe(false);
+    await user.click(screen.getByRole('tab', { name: 'Histórico' }));
+    expect(travado(screen.getAllByRole('button', { name: /Editar/ })[0])).toBe(true);
   });
 });

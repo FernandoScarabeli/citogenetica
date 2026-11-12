@@ -9,6 +9,7 @@ import { SizeProvider } from '../lib/size-context';
 import { Landing } from '../Landing';
 import { Laboratories } from '../Laboratories';
 import { Slides } from '../Slides';
+import { contarGuardados, mensagemConfirmarSaida } from '../contagem/fila-registros';
 import { AdminLaboratoriesPage } from './AdminLaboratoriesPage';
 import { LoginPage } from './LoginPage';
 import { CreateAccountPage } from './CreateAccountPage';
@@ -78,7 +79,12 @@ function AuthenticatedApp() {
   if (!user) return null;
   return <Laboratories
     user={user}
-    onLogout={logout}
+    onLogout={() => {
+      // As células guardadas ficam no aparelho; só avisa para a pessoa não achar que foram enviadas.
+      const guardadas = contarGuardados(user.id);
+      if (guardadas > 0 && !window.confirm(mensagemConfirmarSaida(guardadas))) return;
+      void logout();
+    }}
     onUserUpdate={updateUser}
     renderSlides={(laboratory, onBack, readOnly) => <Slides key={laboratory?.id ?? 'avulsas'} laboratory={laboratory} onBack={onBack} readOnly={readOnly} usuarioId={user.id}/>}
   />;
