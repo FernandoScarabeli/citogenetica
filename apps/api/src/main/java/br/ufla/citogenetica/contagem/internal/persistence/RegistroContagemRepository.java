@@ -6,6 +6,7 @@ import java.util.List;
 import java.util.UUID;
 
 import br.ufla.citogenetica.contagem.internal.domain.RegistroContagem;
+import br.ufla.citogenetica.contagem.internal.domain.StatusRegistro;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
 import org.springframework.data.jpa.repository.Modifying;
@@ -170,4 +171,61 @@ public interface RegistroContagemRepository extends JpaRepository<RegistroContag
              GROUP BY r.lamina_id
             """, nativeQuery = true)
     List<TotalLamina> totaisPorLamina(@Param("laminaIds") Collection<UUID> laminaIds);
+
+    /** Registro ativo com o nome da fase, para a exportação. */
+    interface RegistroExportado {
+        UUID getId();
+
+        Long getVersion();
+
+        UUID getLaminaId();
+
+        String getFaseNome();
+
+        StatusRegistro getStatus();
+
+        int getQuantidade();
+
+        Instant getRegistradoEm();
+
+        Instant getHoraAparelho();
+
+        String getFusoAparelho();
+    }
+
+    /**
+     * Registros não excluídos de várias lâminas numa só consulta, por lâmina, em ordem de registro e depois id.
+     * Quem chama limita o tamanho da lista (e não passa coleção vazia).
+     */
+    @Query("""
+            select r.id as id, r.version as version, r.laminaId as laminaId, f.nome as faseNome,
+                   r.status as status, r.quantidade as quantidade, r.registradoEm as registradoEm,
+                   r.horaAparelho as horaAparelho, r.fusoAparelho as fusoAparelho
+            from RegistroContagem r, FaseProtocolo f
+            where f.id = r.faseId and r.laminaId in :laminaIds and r.excluidoEm is null
+            order by r.laminaId, r.registradoEm, r.id
+            """)
+    List<RegistroExportado> findAtivosParaExportacao(@Param("laminaIds") Collection<UUID> laminaIds);
+
+    /** Nome de um tipo de um registro, para a exportação. */
+    interface NomeTipoDoRegistro {
+        UUID getRegistroId();
+
+        String getNome();
+    }
+
+    /**
+     * Tipos dos registros não excluídos de várias lâminas numa só consulta. Ordem estável dentro de cada registro:
+     * tipos fixos na ordem do protocolo e depois os personalizados por nome normalizado, com o id como desempate.
+     * Quem chama limita o tamanho da lista (e não passa coleção vazia).
+     */
+    @Query(value = """
+            SELECT rt.registro_id AS "registroId", t.nome AS "nome"
+              FROM registro_contagem_tipo rt
+              JOIN registro_contagem r ON r.id = rt.registro_id
+              JOIN tipo_anormalidade t ON t.id = rt.tipo_id
+             WHERE r.lamina_id IN (:laminaIds) AND r.excluido_em IS NULL
+             ORDER BY rt.registro_id, (t.usuario_id IS NOT NULL), t.ordem, t.nome_normalizado, t.id
+            """, nativeQuery = true)
+    List<NomeTipoDoRegistro> findNomesTiposParaExportacao(@Param("laminaIds") Collection<UUID> laminaIds);
 }
