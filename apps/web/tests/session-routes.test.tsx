@@ -158,6 +158,27 @@ describe('sessão e rotas', () => {
       .toBe('/laboratorios?filtro=amostra#lista');
   });
 
+  it('sessão expirada em uma lâmina avisa, e depois do login volta ao mesmo endereço', async () => {
+    let expirou = false;
+    mockApi({
+      me: async () => response(200, userDto),
+      login: async () => response(204),
+      other: async () => {
+        if (expirou) return response(500, { status: 500, error: 'Erro', message: 'Indisponível.', path: '/x' });
+        expirou = true;
+        return unauthorized('/api/v1/laboratorios/lab-1');
+      },
+    });
+    setPath('/laboratorios/lab-1/laminas/lamina-9?x=1');
+
+    render(<App/>);
+    expect(await screen.findByRole('heading', { name: 'Acesse sua pesquisa.' })).toBeTruthy();
+    expect((await screen.findByRole('status')).textContent).toBe('Sua sessão terminou. Entre de novo para continuar.');
+
+    await submitLogin();
+    await waitFor(() => expect(window.location.pathname + window.location.search).toBe('/laboratorios/lab-1/laminas/lamina-9?x=1'));
+  });
+
   it('mostra falha de rede ao consultar a sessão e permite tentar de novo', async () => {
     let attempts = 0;
     mockApi({

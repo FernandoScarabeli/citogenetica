@@ -19,7 +19,7 @@ import { RecoverPasswordPage } from './RecoverPasswordPage';
 import { InvitationAcceptancePage } from './InvitationAcceptancePage';
 import { prepareInitialRouteToken, takeInvitationToken } from './confirmation-token';
 import { InvitationTokenProvider, useInvitationToken } from './invitation-token-context';
-import { SessionProvider, isSessionNetworkError, useSession } from './SessionProvider';
+import { SESSION_EXPIRED_NOTICE, SessionProvider, isSessionNetworkError, useSession } from './SessionProvider';
 import { currentInternalPath } from './return-path';
 
 function PrepareConfirmationToken({ children }: { children: ReactNode }) {
@@ -38,7 +38,7 @@ function PrepareConfirmationToken({ children }: { children: ReactNode }) {
 }
 
 function ProtectedRoutes() {
-  const { status, loadError, retry } = useSession();
+  const { status, loadError, expired, retry } = useSession();
   const location = useLocation();
 
   if (status === 'loading') {
@@ -57,7 +57,7 @@ function ProtectedRoutes() {
 
   if (status === 'unauthenticated') {
     const returnTo = currentInternalPath(location.pathname, location.search, location.hash);
-    return <Navigate to="/entrar" replace state={{ returnTo }} />;
+    return <Navigate to="/entrar" replace state={{ returnTo, notice: expired ? SESSION_EXPIRED_NOTICE : undefined }} />;
   }
 
   return <Outlet />;
@@ -102,8 +102,17 @@ function RouteTable() {
     <Route path="/orientacoes/convites/aceitar" element={<InvitationAcceptancePage kind="orientation"/>}/>
     <Route path="/recuperar-senha" element={<RecoverPasswordPage/>}/>
     <Route element={<ProtectedRoutes/>}>
-      <Route path="/laboratorios" element={<AuthenticatedApp/>}/>
-      <Route path="/perfil" element={<AuthenticatedApp/>}/>
+      {/* Uma única tela autenticada (layout sem caminho) atende os endereços abaixo e escolhe o conteúdo pelo caminho;
+          assim ela não é recriada ao navegar entre eles. */}
+      <Route element={<AuthenticatedApp/>}>
+        <Route path="/laboratorios" element={null}/>
+        <Route path="/laboratorios/:laboratorioId/laminas" element={null}/>
+        <Route path="/laboratorios/:laboratorioId/laminas/:laminaId" element={null}/>
+        <Route path="/laboratorios/:laboratorioId/gerenciar" element={null}/>
+        <Route path="/laminas-avulsas" element={null}/>
+        <Route path="/laminas-avulsas/:laminaId" element={null}/>
+        <Route path="/perfil" element={null}/>
+      </Route>
       <Route path="/admin/laboratorios" element={<AdminLaboratoriesPage/>}/>
     </Route>
     <Route path="*" element={<NotFoundPage/>}/>

@@ -436,7 +436,7 @@ describe('gestão de laboratórios reais', () => {
     await user.click(screen.getByRole('button', { name: 'Gerenciar' }));
 
     expect((await screen.findByRole('status')).textContent).toContain('Este laboratório não está mais disponível');
-    expect(screen.getByRole('heading', { name: 'Meus laboratórios' })).toBeTruthy();
+    expect(await screen.findByRole('heading', { name: 'Meus laboratórios' })).toBeTruthy();
   });
 
   it('mantém o laboratório desativado em consulta e encaminha as lâminas como somente leitura', async () => {

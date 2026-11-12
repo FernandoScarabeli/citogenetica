@@ -7,6 +7,7 @@ import { PAPEL_LABEL } from './api/contracts/laboratorio';
 import { laboratorioApi } from './api/laboratorio-api';
 import { contagemApi, type ContagemApi } from './api/contagem-api';
 import { migrarLaminasLocais } from './migracao-automatica';
+import { abaDaBusca, caminhoGerenciar, caminhoLaminas, CAMINHO_LABORATORIOS, CAMINHO_PERFIL, telaDaRota, type AbaGerenciar } from './app/rotas';
 import { LaboratoryInvitations } from './LaboratoryInvitations';
 import { LaboratoryOrientations } from './LaboratoryOrientations';
 import { RoleFields } from './RoleFields';
@@ -21,7 +22,6 @@ import { ProfileSettings } from './app/ProfileSettings';
 import { NotificationCenter } from './NotificationCenter';
 
 const initialPreferences = loadPreferences();
-type View = 'list' | 'manage' | 'slides' | 'profile';
 type Confirmation = { kind: 'leave' } | { kind: 'remove'; participation: ParticipacaoResponseDTO };
 
 function errorMessage(error: unknown, fallback: string): string {
@@ -163,8 +163,6 @@ export function Laboratories({ user, onLogout, onUserUpdate, renderSlides, api =
   const [labs, setLabs] = useState<LaboratorioResponseDTO[]>([]);
   const [listStatus, setListStatus] = useState<'loading' | 'ready' | 'error'>('loading');
   const [listError, setListError] = useState('');
-  const [view, setView] = useState<View>(() => window.location.pathname === '/perfil' ? 'profile' : 'list');
-  const [selectedId, setSelectedId] = useState<string | null>(null);
   const [currentLab, setCurrentLab] = useState<LaboratorioResponseDTO | null>(null);
   const [members, setMembers] = useState<ParticipacaoResponseDTO[]>([]);
   const [detailStatus, setDetailStatus] = useState<'loading' | 'ready' | 'error'>('loading');
@@ -173,7 +171,6 @@ export function Laboratories({ user, onLogout, onUserUpdate, renderSlides, api =
   const [slidesStatus, setSlidesStatus] = useState<'loading' | 'ready' | 'error'>('loading');
   const [slidesRetry, setSlidesRetry] = useState(0);
   const [migrationTick, setMigrationTick] = useState(0);
-  const [section, setSection] = useState<'members' | 'orientation' | 'settings' | 'invites'>('members');
   const [query, setQuery] = useState('');
   const [memberQuery, setMemberQuery] = useState('');
   const [pageError, setPageError] = useState('');
@@ -190,6 +187,12 @@ export function Laboratories({ user, onLogout, onUserUpdate, renderSlides, api =
   const [confirming, setConfirming] = useState(false);
   const location = useLocation();
   const navigate = useNavigate();
+  // A tela e o laboratório vêm do endereço: recarregar a página ou usar o Voltar do navegador mantém a pessoa no lugar certo.
+  const route = telaDaRota(location.pathname);
+  const view = route.tela === 'perfil' ? 'profile' : route.tela === 'gerenciar' ? 'manage' : route.tela === 'laminas' ? 'slides' : 'list';
+  const selectedId = route.tela === 'gerenciar' || route.tela === 'laminas' ? route.laboratorioId : null;
+  const navigateRef = useRef(navigate);
+  navigateRef.current = navigate;
 
   useEffect(() => {
     document.documentElement.dataset.appearance = preferences.dark ? 'dark' : 'light';
@@ -197,7 +200,6 @@ export function Laboratories({ user, onLogout, onUserUpdate, renderSlides, api =
   }, [preferences.dark]);
 
   useEffect(() => {
-    setView(location.pathname === '/perfil' ? 'profile' : 'list');
     setPageError('');
     const navigationState = location.state as { notice?: unknown } | null;
     setNotice(typeof navigationState?.notice === 'string' ? navigationState.notice : '');
@@ -236,12 +238,11 @@ export function Laboratories({ user, onLogout, onUserUpdate, renderSlides, api =
   }, [listStatus, labs, api, user.id]);
 
   const returnToListForMissingLab = useCallback((message = 'Este laboratório não está mais disponível para sua participação.') => {
-    setSelectedId(null);
     setCurrentLab(null);
     setSlidesLab(null);
-    setView('list');
     setPageError('');
     setNotice(message);
+    navigateRef.current(CAMINHO_LABORATORIOS, { replace: true, state: { notice: message } });
     void loadLabs();
   }, [loadLabs]);
 
@@ -250,6 +251,9 @@ export function Laboratories({ user, onLogout, onUserUpdate, renderSlides, api =
     let active = true;
     setDetailStatus('loading');
     setPageError('');
+    setMembers([]);
+    setMemberQuery('');
+    setEditingParticipation(null);
     const controller = new AbortController();
     Promise.all([laboratorioApi.buscar(selectedId, controller.signal), laboratorioApi.listarParticipacoes(selectedId, controller.signal)])
       .then(([lab, participations]) => {
@@ -262,7 +266,7 @@ export function Laboratories({ user, onLogout, onUserUpdate, renderSlides, api =
       })
       .catch(error => {
         if (!active || isUnauthorized(error)) return;
-        if (isNotFound(error)) {
+        if (isNotFound(error) || isForbidden(error)) {
           returnToListForMissingLab();
           return;
         }
@@ -292,7 +296,7 @@ export function Laboratories({ user, onLogout, onUserUpdate, renderSlides, api =
       })
       .catch(error => {
         if (!active || isUnauthorized(error)) return;
-        if (isNotFound(error)) {
+        if (isNotFound(error) || isForbidden(error)) {
           returnToListForMissingLab();
           return;
         }
@@ -303,11 +307,7 @@ export function Laboratories({ user, onLogout, onUserUpdate, renderSlides, api =
   }, [view, selectedId, slidesRetry, returnToListForMissingLab]);
 
   function goList() {
-    if (location.pathname === '/perfil') navigate('/laboratorios');
-    setView('list');
-    setSelectedId(null);
-    setCurrentLab(null);
-    setSlidesLab(null);
+    if (location.pathname !== CAMINHO_LABORATORIOS) navigate(CAMINHO_LABORATORIOS);
     setConfirmation(null);
     setEditingParticipation(null);
     setQuery('');
@@ -315,22 +315,19 @@ export function Laboratories({ user, onLogout, onUserUpdate, renderSlides, api =
   }
 
   function openManage(lab: LaboratorioResponseDTO) {
-    setSelectedId(lab.id);
-    setCurrentLab(null);
-    setMembers([]);
-    setSection('members');
-    setMemberQuery('');
     setPageError('');
-    setNotice('');
-    setView('manage');
+    navigate(caminhoGerenciar(lab.id));
   }
 
   function openSlides(lab: LaboratorioResponseDTO | null) {
-    setSelectedId(lab?.id ?? null);
-    setSlidesLab(null);
     setPageError('');
-    setNotice('');
-    setView('slides');
+    navigate(caminhoLaminas(lab?.id ?? null));
+  }
+
+  /** Troca de aba sem empilhar histórico: o Voltar leva à tela anterior, não à aba anterior. */
+  function openSection(aba: AbaGerenciar) {
+    setEditingParticipation(null);
+    navigate({ search: aba === 'membros' ? '' : `?aba=${aba}` }, { replace: true });
   }
 
   function updatePreferences(next: typeof preferences): boolean {
@@ -360,8 +357,8 @@ export function Laboratories({ user, onLogout, onUserUpdate, renderSlides, api =
       setLabs(current => [lab, ...current.filter(item => item.id !== lab.id)]);
       setCreateOpen(false);
       setCreateName('');
-      openManage(lab);
-      setNotice('Laboratório criado. Você recebeu os papéis Membro e Administrador.');
+      setPageError('');
+      navigate(caminhoGerenciar(lab.id), { state: { notice: 'Laboratório criado. Você recebeu os papéis Membro e Administrador.' } });
     } catch (error) {
       if (!isUnauthorized(error)) setPageError(errorMessage(error, 'Não foi possível criar o laboratório.'));
     } finally {
@@ -472,8 +469,8 @@ export function Laboratories({ user, onLogout, onUserUpdate, renderSlides, api =
         await laboratorioApi.sair(currentLab.id);
         setLabs(current => current.filter(item => item.id !== currentLab.id));
         setConfirmation(null);
-        goList();
-        setNotice(`Você saiu de ${currentLab.nome}.`);
+        setEditingParticipation(null);
+        navigate(CAMINHO_LABORATORIOS, { state: { notice: `Você saiu de ${currentLab.nome}.` } });
         return;
       }
       await laboratorioApi.removerParticipacao(currentLab.id, target.participation.id);
@@ -513,6 +510,9 @@ export function Laboratories({ user, onLogout, onUserUpdate, renderSlides, api =
     }
   }
 
+  const requestedSection = abaDaBusca(location.search);
+  const section = requestedSection === 'convites' && !(currentLab?.estado === 'ATIVO' && hasRole(currentLab.papeis, 'ADMIN')) ? 'membros' : requestedSection;
+  const slidesReady = slidesStatus === 'ready' && (selectedId === null || slidesLab?.id === selectedId);
   const admin = currentLab?.estado === 'ATIVO' && hasRole(currentLab.papeis, 'ADMIN');
   const visibleLabs = labs.filter(lab => lab.nome.toLocaleLowerCase('pt-BR').includes(query.trim().toLocaleLowerCase('pt-BR')));
   const visibleMembers = members.filter(participation => `${participation.nome} ${participation.email ?? ''}`
@@ -522,7 +522,7 @@ export function Laboratories({ user, onLogout, onUserUpdate, renderSlides, api =
     <header className="topbar"><div className="topbar-inner">
       <Link className="brand" to="/laboratorios"><span className="brand-mark"><Microscope size={21} aria-hidden="true" /></span><span>citogenética<small>Laboratório de Citogenética · UFLA</small></span></Link>
       <div className="lab-account"><NotificationCenter/><AccountMenu name={user.nome} email={user.email} photo={preferences.photo} dark={preferences.dark} platformAdmin={user.role.nome === 'ADMIN'}
-        onProfile={() => { if (location.pathname !== '/perfil') navigate('/perfil'); setView('profile'); setPageError(''); setNotice(''); }}
+        onProfile={() => { if (location.pathname !== CAMINHO_PERFIL) navigate(CAMINHO_PERFIL); setPageError(''); setNotice(''); }}
         onAppearance={() => updatePreferences({ ...preferences, dark: !preferences.dark })}
         onLogout={onLogout} /></div>
     </div></header>
@@ -531,8 +531,8 @@ export function Laboratories({ user, onLogout, onUserUpdate, renderSlides, api =
 
     {view === 'slides' ? <>
       {pageError && <div className="page-container lab-alert error" role="alert">{pageError}<button type="button" aria-label="Dispensar erro" onClick={() => setPageError('')}><X size={16} aria-hidden="true" /></button></div>}
-      {slidesStatus === 'loading' ? <main className="page-container slide-access-state" aria-live="polite"><p>Carregando laboratório…</p></main>
-        : slidesStatus === 'error' ? <main className="page-container slide-access-state"><h1>Não foi possível abrir as lâminas</h1><p>{pageError}</p><button className="button secondary" type="button" onClick={() => setSlidesRetry(value => value + 1)}>Tentar de novo</button><button className="text-button" type="button" onClick={goList}>Meus laboratórios</button></main>
+      {slidesStatus === 'error' ? <main className="page-container slide-access-state"><h1>Não foi possível abrir as lâminas</h1><p>{pageError}</p><button className="button secondary" type="button" onClick={() => setSlidesRetry(value => value + 1)}>Tentar de novo</button><button className="text-button" type="button" onClick={goList}>Meus laboratórios</button></main>
+        : !slidesReady ? <main className="page-container slide-access-state" aria-live="polite"><p>Carregando laboratório…</p></main>
           : <Fragment key={migrationTick}>{renderSlides(slidesLab, goList, slidesLab?.estado === 'DESATIVADO')}</Fragment>}
     </> : <main className={`page-container labs-main${view === 'manage' ? ' laboratory-management-page' : ''}`}><div className="labs-content">
       {(pageError || (listStatus === 'error' && view === 'list')) && !createOpen && !confirmation && <div className="lab-alert error" role="alert"><span>{pageError || listError}</span><button type="button" aria-label="Dispensar erro" onClick={() => { setPageError(''); setListError(''); }}><X size={16} aria-hidden="true" /></button></div>}
@@ -553,25 +553,25 @@ export function Laboratories({ user, onLogout, onUserUpdate, renderSlides, api =
           <section className="loose-slides"><div><h2>Lâminas avulsas</h2><p>Lâminas que não pertencem a nenhum laboratório.</p></div><button className="text-button" type="button" onClick={() => openSlides(null)}>Abrir lâminas avulsas <ArrowRight size={16} aria-hidden="true" /></button></section>
         </> : <>
           <div className="breadcrumb"><button type="button" onClick={goList}>Meus laboratórios</button><ChevronRight size={14} aria-hidden="true" /><span>Gerenciar laboratório</span></div>
-          {detailStatus === 'loading' ? <div className="laboratory-loading" aria-live="polite"><p>Carregando laboratório e membros…</p><span /><span /></div>
-              : detailStatus === 'error' ? <div className="laboratory-empty"><p>{pageError || 'Não foi possível carregar os dados do laboratório.'}</p><button className="button secondary" type="button" onClick={() => setDetailRetry(value => value + 1)}>Tentar novamente</button></div>
+          {detailStatus === 'error' ? <div className="laboratory-empty"><p>{pageError || 'Não foi possível carregar os dados do laboratório.'}</p><button className="button secondary" type="button" onClick={() => setDetailRetry(value => value + 1)}>Tentar novamente</button></div>
+              : detailStatus === 'loading' || currentLab?.id !== selectedId ? <div className="laboratory-loading" aria-live="polite"><p>Carregando laboratório e membros…</p><span /><span /></div>
               : currentLab && <>
                 <div className="page-heading laboratory-detail-heading"><div><h1>{currentLab.nome}</h1><div className="laboratory-detail-meta"><span className={`laboratory-state ${currentLab.estado === 'ATIVO' ? 'is-active' : 'is-disabled'}`}>{currentLab.estado === 'ATIVO' ? 'Ativo' : 'Desativado'}</span>{currentLab.estado === 'DESATIVADO' && <span>Somente leitura</span>}</div></div><button className="button primary" type="button" onClick={() => openSlides(currentLab)}>Acessar lâminas <ArrowRight size={16} aria-hidden="true" /></button></div>
-                <div className="laboratory-management-panel"><nav className="tabs laboratory-tabs" aria-label="Gestão do laboratório"><button type="button" className={section === 'members' ? 'selected' : ''} aria-current={section === 'members' ? 'page' : undefined} onClick={() => { setSection('members'); setEditingParticipation(null); }}>Membros <span>{members.length}</span></button><button type="button" className={section === 'orientation' ? 'selected' : ''} aria-current={section === 'orientation' ? 'page' : undefined} onClick={() => { setSection('orientation'); setEditingParticipation(null); }}>Orientação</button>{admin && <button type="button" className={section === 'invites' ? 'selected' : ''} aria-current={section === 'invites' ? 'page' : undefined} onClick={() => { setSection('invites'); setEditingParticipation(null); }}>Convites</button>}<button type="button" className={section === 'settings' ? 'selected' : ''} aria-current={section === 'settings' ? 'page' : undefined} onClick={() => { setSection('settings'); setEditingParticipation(null); }}>Configurações</button></nav>
+                <div className="laboratory-management-panel"><nav className="tabs laboratory-tabs" aria-label="Gestão do laboratório"><button type="button" className={section === 'membros' ? 'selected' : ''} aria-current={section === 'membros' ? 'page' : undefined} onClick={() => openSection('membros')}>Membros <span>{members.length}</span></button><button type="button" className={section === 'orientacao' ? 'selected' : ''} aria-current={section === 'orientacao' ? 'page' : undefined} onClick={() => openSection('orientacao')}>Orientação</button>{admin && <button type="button" className={section === 'convites' ? 'selected' : ''} aria-current={section === 'convites' ? 'page' : undefined} onClick={() => openSection('convites')}>Convites</button>}<button type="button" className={section === 'configuracoes' ? 'selected' : ''} aria-current={section === 'configuracoes' ? 'page' : undefined} onClick={() => openSection('configuracoes')}>Configurações</button></nav>
                 <TabTransition tab={section}>
-                {section === 'members' ? <section className="members-section" aria-labelledby="members-title">
+                {section === 'membros' ? <section className="members-section" aria-labelledby="members-title">
                   <div className="members-toolbar"><div><h2 id="members-title">Equipe do laboratório</h2></div><label className="members-search"><Search size={16} aria-hidden="true" /><span className="sr-only">Buscar membro por nome ou e-mail</span><input type="search" value={memberQuery} onChange={event => setMemberQuery(event.target.value)} placeholder="Buscar membro" /></label></div>
                   <div className="members-table-wrap"><table className="members-table"><thead><tr><th scope="col">Pessoa</th><th scope="col">Papéis</th>{admin && <th scope="col"><span className="sr-only">Ações</span></th>}</tr></thead><tbody>
                     {visibleMembers.map(participation => <MemberRows key={participation.id} participation={participation} isMe={isCurrentUser(participation, user.email)} admin={!!admin} readOnly={currentLab.estado === 'DESATIVADO'} editing={editingParticipation === participation.id} roles={rolesDraft} saving={savingRoles} onEdit={() => beginRoleEdit(participation)} onRoles={setRolesDraft} onSave={event => void saveRoles(event, participation)} onCancel={() => setEditingParticipation(null)} onRemove={() => openConfirmation({ kind: 'remove', participation })} />)}
                   </tbody></table>
                     {!visibleMembers.length && <div className="members-empty"><p>{memberQuery ? 'Nenhum membro encontrado.' : 'Não há membros ativos neste laboratório.'}</p>{memberQuery && <button className="text-button" type="button" onClick={() => setMemberQuery('')}>Limpar busca</button>}</div>}
                   </div>
-                </section> : section === 'orientation' ? <LaboratoryOrientations onNotice={setNotice} laboratorioId={currentLab.id} userId={user.id} isOrientador={hasRole(currentLab.papeis, 'ORIENTADOR')} isAdmin={!!admin} laboratorioAtivo={currentLab.estado === 'ATIVO'} /> : section === 'invites' && admin ? <LaboratoryInvitations laboratorioId={currentLab.id} onNotice={setNotice} /> : <section className="laboratory-settings" aria-labelledby="laboratory-settings-title">
+                </section> : section === 'orientacao' ? <LaboratoryOrientations onNotice={setNotice} laboratorioId={currentLab.id} userId={user.id} isOrientador={hasRole(currentLab.papeis, 'ORIENTADOR')} isAdmin={!!admin} laboratorioAtivo={currentLab.estado === 'ATIVO'} /> : section === 'convites' && admin ? <LaboratoryInvitations laboratorioId={currentLab.id} onNotice={setNotice} /> : <section className="laboratory-settings" aria-labelledby="laboratory-settings-title">
                   <div><h2 id="laboratory-settings-title">Dados do laboratório</h2><p>O laboratório faz parte da UFLA.</p></div>
                   {admin ? <form className="laboratory-name-form" onSubmit={event => void saveLaboratoryName(event)}><label htmlFor="laboratory-name">Nome do laboratório</label><input id="laboratory-name" required maxLength={120} value={nameDraft} onChange={event => setNameDraft(event.target.value)} /><button className="button primary" type="submit" disabled={!nameDraft.trim() || savingName}>{savingName ? 'Salvando…' : 'Salvar nome'}</button></form>
                     : <div className="laboratory-read-only-name"><span>Nome do laboratório</span><strong>{currentLab.nome}</strong>{currentLab.estado === 'DESATIVADO' && <p>Este laboratório está desativado e disponível somente para consulta.</p>}</div>}
                 </section>}
-                {section === 'settings' && currentLab.estado === 'ATIVO' && <section className="leave-laboratory" aria-labelledby="leave-title"><div><h2 id="leave-title">Sair do laboratório</h2><p>Você perderá o acesso a este laboratório.</p></div><button className="button secondary" type="button" onClick={() => openConfirmation({ kind: 'leave' })}><LogOut size={16} aria-hidden="true" />Sair do laboratório</button></section>}
+                {section === 'configuracoes' && currentLab.estado === 'ATIVO' && <section className="leave-laboratory" aria-labelledby="leave-title"><div><h2 id="leave-title">Sair do laboratório</h2><p>Você perderá o acesso a este laboratório.</p></div><button className="button secondary" type="button" onClick={() => openConfirmation({ kind: 'leave' })}><LogOut size={16} aria-hidden="true" />Sair do laboratório</button></section>}
                 </TabTransition>
                 </div>
               </>}
