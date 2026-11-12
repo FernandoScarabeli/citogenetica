@@ -9,11 +9,15 @@ import java.util.function.Function;
 import java.util.stream.Collectors;
 
 import java.time.Clock;
+import java.time.Duration;
+import java.time.Instant;
 
 import br.ufla.citogenetica.contagem.internal.domain.Lamina;
 import br.ufla.citogenetica.contagem.internal.persistence.LaminaRepository;
+import br.ufla.citogenetica.contagem.internal.persistence.RegistroContagemRepository;
 import br.ufla.citogenetica.contagem.internal.persistence.VersaoProtocoloRepository;
 import br.ufla.citogenetica.laboratorio.api.LaboratorioAccessQuery;
+import br.ufla.citogenetica.shared.web.error.BadRequestException;
 import br.ufla.citogenetica.shared.web.error.ConflictException;
 import br.ufla.citogenetica.shared.web.error.NotFoundException;
 import br.ufla.citogenetica.usuario.api.UsuarioRosterInfo;
@@ -39,8 +43,12 @@ public class LaminaService {
     private static final String VERSAO_DESATUALIZADA =
             "A lâmina foi alterada por outra operação. Atualize os dados e tente novamente.";
 
+    private static final Duration TOLERANCIA_RELOGIO = Duration.ofMinutes(5);
+    private static final Instant CRIACAO_MAIS_ANTIGA = Instant.parse("2020-01-01T00:00:00Z");
+
     private final LaminaRepository laminaRepository;
     private final VersaoProtocoloRepository versaoRepository;
+    private final RegistroContagemRepository registroRepository;
     private final AcessoLamina acesso;
     private final LaboratorioAccessQuery laboratorioAccessQuery;
     private final UsuarioRosterQuery usuarioRosterQuery;
@@ -76,7 +84,9 @@ public class LaminaService {
             acesso.exigirEdicaoNoLaboratorio(laboratorioId, usuarioId, usuarioId);
         }
 
-        int inseridas = laminaRepository.inserirSeAusente(nova.id(), clock.instant(), usuarioId, laboratorioId,
+        Instant agora = clock.instant();
+        Instant criadaEm = criadaEmValida(nova.criadaEm(), agora);
+        int inseridas = laminaRepository.inserirSeAusente(nova.id(), criadaEm, agora, usuarioId, laboratorioId,
                 nova.protocoloVersaoId(), nome, especie, tratamento, observacoes, meta);
         Lamina gravada = laminaRepository.findById(nova.id())
                 .orElseThrow(() -> new ConflictException(ID_COM_OUTRO_CONTEUDO));
@@ -85,6 +95,17 @@ public class LaminaService {
         }
         // Outra requisição venceu a corrida pelo mesmo id.
         return repeticao(gravada, nova, nome, especie, tratamento, observacoes, usuarioId);
+    }
+
+    /** Sem data informada vale o momento do envio; com ela, só dentro de um intervalo plausível. */
+    private static Instant criadaEmValida(Instant informada, Instant agora) {
+        if (informada == null) {
+            return agora;
+        }
+        if (informada.isAfter(agora.plus(TOLERANCIA_RELOGIO)) || informada.isBefore(CRIACAO_MAIS_ANTIGA)) {
+            throw new BadRequestException("A data de criação da lâmina é inválida.");
+        }
+        return informada;
     }
 
     /** Id de outro dono é indistinguível de recurso desconhecido. */
@@ -185,11 +206,18 @@ public class LaminaService {
         return new PageImpl<>(resumos, pagina.getPageable(), pagina.getTotalElements());
     }
 
-    /** Resolve os nomes dos donos numa única consulta, sem N+1. */
+    /** Resolve os nomes dos donos e o total de células numa consulta cada, sem N+1. */
     private List<LaminaResumo> resumir(Collection<Lamina> laminas) {
+        if (laminas.isEmpty()) {
+            return List.of();
+        }
         List<Long> donoIds = laminas.stream().map(Lamina::getDonoUsuarioId).distinct().toList();
         Map<Long, UsuarioRosterInfo> donos = usuarioRosterQuery.buscarPorIds(donoIds).stream()
                 .collect(Collectors.toMap(UsuarioRosterInfo::usuarioId, Function.identity()));
+        Map<UUID, Long> totais = registroRepository
+                .totaisPorLamina(laminas.stream().map(Lamina::getId).toList()).stream()
+                .collect(Collectors.toMap(RegistroContagemRepository.TotalLamina::getLaminaId,
+                        RegistroContagemRepository.TotalLamina::getTotal));
         return laminas.stream().map(lamina -> {
             UsuarioRosterInfo dono = donos.get(lamina.getDonoUsuarioId());
             if (dono == null) {
@@ -198,6 +226,7 @@ public class LaminaService {
             return new LaminaResumo(lamina.getId(), lamina.getVersion(), lamina.getDonoUsuarioId(), dono.nome(),
                     lamina.getLaboratorioId(), lamina.getProtocoloVersaoId(), lamina.getNome(), lamina.getEspecie(),
                     lamina.getTratamento(), lamina.getObservacoes(), lamina.getMeta(),
+                    totais.getOrDefault(lamina.getId(), 0L),
                     lamina.getCreatedAt(), lamina.getLastModifiedAt());
         }).toList();
     }

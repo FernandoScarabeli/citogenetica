@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { cleanup, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { App } from '../src/app/App';
 
@@ -13,6 +13,16 @@ const userDto = {
   status: 'ATIVO',
   role: { id: 1, version: 0, createdDate: '2026-11-03T12:00:00', lastModifiedDate: null, nome: 'USER' },
 };
+
+const labPreview = {
+  laboratorioNome: 'Citogenética Vegetal',
+  convidadoPorNome: 'Prof. Bruno',
+  emailMascarado: 'an***@ufla.br',
+  papeis: ['MEMBRO', 'ORIENTADOR'],
+  estado: 'PENDENTE',
+  paraContaAtual: null,
+};
+const orientationPreview = { ...labPreview, papeis: [] };
 
 function response(status: number, body?: unknown, headers: Record<string, string> = {}) {
   return new Response(body === undefined ? null : JSON.stringify(body), {
@@ -31,6 +41,9 @@ function mockApi(options: {
   refuse?: () => Response | Promise<Response>;
   orientationAccept?: () => Response | Promise<Response>;
   orientationRefuse?: () => Response | Promise<Response>;
+  preview?: () => Response | Promise<Response>;
+  orientationPreview?: () => Response | Promise<Response>;
+  logout?: () => void;
 } = {}) {
   let authenticated = options.authenticated ?? false;
   let csrfCount = 0;
@@ -50,11 +63,18 @@ function mockApi(options: {
     if (path === '/api/v1/usuarios/me') {
       return authenticated ? response(200, userDto) : apiError(401, path, 'Falha na autenticação.');
     }
+    if (path === '/api/v1/auth/logout') {
+      authenticated = false;
+      options.logout?.();
+      return response(204);
+    }
     if (path === '/api/v1/auth/login') {
       authenticated = true;
       return response(204);
     }
     if (path === '/api/v1/laboratorios' && method === 'GET') return response(200, []);
+    if (path === '/api/v1/convites/previa') return options.preview ? options.preview() : response(200, { ...labPreview, paraContaAtual: authenticated ? true : null });
+    if (path === '/api/v1/orientacoes/convites/previa') return options.orientationPreview ? options.orientationPreview() : response(200, { ...orientationPreview, paraContaAtual: authenticated ? true : null });
     if (path === '/api/v1/convites/aceitar') return options.accept ? options.accept() : response(204);
     if (path === '/api/v1/convites/recusar') return options.refuse ? options.refuse() : response(204);
     if (path === '/api/v1/orientacoes/convites/aceitar') return options.orientationAccept ? options.orientationAccept() : response(204);
@@ -74,6 +94,7 @@ function openInvitation(token = 'abc%2B123', kind: 'laboratory' | 'orientation' 
 beforeEach(() => {
   document.cookie = 'XSRF-TOKEN=; Max-Age=0; Path=/';
   window.history.replaceState(null, '', '/');
+  window.localStorage.clear();
 });
 
 afterEach(() => {
@@ -88,7 +109,7 @@ describe('aceite de convites', () => {
 
     expect(await screen.findByRole('link', { name: 'Entrar' })).toBeTruthy();
     expect(screen.getByRole('link', { name: 'Criar conta' })).toBeTruthy();
-    expect(screen.getByText(/abra novamente o link do convite depois da confirmação/)).toBeTruthy();
+    expect(screen.queryByText(/abra novamente o link do convite/)).toBeNull();
     expect(window.location.hash).toBe('');
 
     const user = userEvent.setup();
@@ -170,7 +191,7 @@ describe('aceite de convites', () => {
     render(<App/>);
 
     expect(await screen.findByRole('link', { name: 'Entrar' })).toBeTruthy();
-    expect(screen.getByText(/Ao aceitar, você passará a ser orientado/)).toBeTruthy();
+    expect(await screen.findByText(/Ao aceitar, você passará a ser orientado/)).toBeTruthy();
     expect(screen.getByText(/entrará no laboratório como Membro caso ainda não participe/)).toBeTruthy();
     expect(window.location.hash).toBe('');
 
@@ -222,5 +243,115 @@ describe('aceite de convites', () => {
     expect(await screen.findByRole('heading', { name: 'Convite indisponível' })).toBeTruthy();
     expect(screen.getByRole('alert').textContent).toContain('Convite inválido ou indisponível. Ele pode ter expirado, sido cancelado ou ser para outro e-mail.');
     expect(screen.queryByText('Detalhe interno do token.')).toBeNull();
+  });
+  it('mostra quem convidou, o laboratório e o e-mail mascarado antes do login', async () => {
+    mockApi({ authenticated: false });
+    openInvitation('token-previa');
+    render(<App/>);
+
+    expect(await screen.findByText('Prof. Bruno')).toBeTruthy();
+    expect(document.querySelector('.access-intro p')?.textContent).toBe('Prof. Bruno convidou você para o laboratório Citogenética Vegetal.');
+    expect(screen.getByText('an***@ufla.br')).toBeTruthy();
+    expect(screen.getByText(/Você entraria como: Participante, Orientador\./)).toBeTruthy();
+    expect(screen.getByRole('link', { name: 'Criar conta' })).toBeTruthy();
+  });
+
+  it('mostra o orientador na prévia de orientação', async () => {
+    mockApi({ authenticated: false });
+    openInvitation('token-previa', 'orientation');
+    render(<App/>);
+
+    await screen.findByText('Prof. Bruno');
+    expect(document.querySelector('.access-intro p')?.textContent).toBe('Prof. Bruno quer orientar você no laboratório Citogenética Vegetal.');
+  });
+
+  it('com a conta certa, mostra "Você entrou como" e libera aceitar e recusar', async () => {
+    mockApi({ authenticated: true });
+    openInvitation('token-certo');
+    render(<App/>);
+
+    expect((await screen.findByText(/Você entrou como/)).textContent).toContain('ana@ufla.br');
+    expect(screen.queryByText(/Conta autenticada/)).toBeNull();
+    await waitFor(() => expect((screen.getByRole('button', { name: 'Aceitar convite' }) as HTMLButtonElement).disabled).toBe(false));
+  });
+
+  it('com outro e-mail, avisa antes de aceitar e sai para entrar com outra conta', async () => {
+    const { calls } = mockApi({ authenticated: true, preview: async () => response(200, { ...labPreview, emailMascarado: 'jo***@ufla.br', paraContaAtual: false }) });
+    openInvitation('token-outra-conta');
+    render(<App/>);
+
+    expect((await screen.findByRole('alert')).textContent).toBe('Este convite é para jo***@ufla.br. Você entrou como ana@ufla.br.');
+    expect(screen.queryByRole('button', { name: 'Aceitar convite' })).toBeNull();
+    await userEvent.setup().click(screen.getByRole('button', { name: 'Entrar com outra conta' }));
+
+    expect(await screen.findByRole('heading', { name: 'Acesse sua pesquisa.' })).toBeTruthy();
+    expect(calls.some(call => call.path === '/api/v1/auth/logout')).toBe(true);
+    const user = userEvent.setup();
+    await user.type(screen.getByRole('textbox', { name: 'E-mail' }), 'jose@ufla.br');
+    await user.type(screen.getByLabelText('Senha'), 'senha-correta');
+    await user.click(screen.getByRole('button', { name: 'Entrar' }));
+    expect(await screen.findByRole('heading', { name: 'Responder ao convite' })).toBeTruthy();
+    expect(window.location.pathname).toBe('/convites/aceitar');
+  });
+
+  it('convite expirado ou inválido oferece um botão para seguir', async () => {
+    mockApi({ authenticated: false, preview: async () => response(200, { ...labPreview, estado: 'EXPIRADO' }) });
+    openInvitation('token-expirado');
+    render(<App/>);
+
+    expect(await screen.findByRole('heading', { name: 'Convite indisponível' })).toBeTruthy();
+    expect(screen.getByRole('alert').textContent).toContain('expirou');
+    expect(screen.getByRole('link', { name: /Ir para o início/ })).toBeTruthy();
+  });
+
+  it('prévia inválida (400) mostra convite indisponível com botão para meus laboratórios', async () => {
+    mockApi({ authenticated: true, preview: async () => apiError(400, '/api/v1/convites/previa', 'Convite inválido ou indisponível.') });
+    openInvitation('token-ruim');
+    render(<App/>);
+
+    expect(await screen.findByRole('heading', { name: 'Convite indisponível' })).toBeTruthy();
+    expect(screen.getByRole('link', { name: /Ir para meus laboratórios/ })).toBeTruthy();
+  });
+
+  it('convite recusado tem botão para seguir', async () => {
+    mockApi({ authenticated: true });
+    openInvitation('token-recusa-botao');
+    render(<App/>);
+    await userEvent.setup().click(await screen.findByRole('button', { name: 'Recusar' }));
+
+    expect(await screen.findByRole('heading', { name: 'Convite recusado' })).toBeTruthy();
+    expect(screen.getByRole('link', { name: /Ir para meus laboratórios/ })).toBeTruthy();
+  });
+
+  it('guarda o convite ao criar a conta e volta a ele ao entrar, sem reabrir o e-mail', async () => {
+    const { calls } = mockApi({ authenticated: false });
+    openInvitation('token-cadastro');
+    render(<App/>);
+    const user = userEvent.setup();
+    await user.click(await screen.findByRole('link', { name: 'Criar conta' }));
+    expect(window.localStorage.getItem('citogenetica.convite-pendente')).toContain('token-cadastro');
+    cleanup();
+
+    // Outra aba: memória vazia, e-mail confirmado, entra sem endereço de retorno.
+    window.history.replaceState(null, '', '/entrar');
+    render(<App/>);
+    await user.type(await screen.findByRole('textbox', { name: 'E-mail' }), 'ana@ufla.br');
+    await user.type(screen.getByLabelText('Senha'), 'senha-correta');
+    await user.click(screen.getByRole('button', { name: 'Entrar' }));
+
+    expect(await screen.findByRole('button', { name: 'Aceitar convite' })).toBeTruthy();
+    expect(window.location.pathname).toBe('/convites/aceitar');
+    await user.click(screen.getByRole('button', { name: 'Aceitar convite' }));
+    await screen.findByRole('heading', { name: 'Nenhum laboratório ainda' });
+    expect(calls.find(call => call.path === '/api/v1/convites/aceitar')?.body).toEqual({ token: 'token-cadastro' });
+    expect(window.localStorage.getItem('citogenetica.convite-pendente')).toBeNull();
+  });
+
+  it('convite guardado depois do prazo é descartado', async () => {
+    const { savePendingInvitation, readPendingInvitation, PENDING_INVITATION_TTL_MS } = await import('../src/app/pending-invitation');
+    savePendingInvitation({ token: 'velho', kind: 'laboratory' }, 1000);
+    expect(readPendingInvitation(1000 + PENDING_INVITATION_TTL_MS - 1)).toEqual({ token: 'velho', kind: 'laboratory' });
+    expect(readPendingInvitation(1000 + PENDING_INVITATION_TTL_MS)).toBeNull();
+    expect(window.localStorage.getItem('citogenetica.convite-pendente')).toBeNull();
   });
 });

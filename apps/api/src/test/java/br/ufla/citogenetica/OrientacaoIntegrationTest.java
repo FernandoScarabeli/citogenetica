@@ -272,6 +272,64 @@ class OrientacaoIntegrationTest extends AbstractIntegrationTest {
     }
 
     @Test
+    void previaPublicaMostraLaboratorioOrientadorEEmailMascaradoEEscondeDemaisEstados() throws Exception {
+        Usuario orientador = criarUsuario("orientador");
+        UUID laboratorioId = criarLaboratorio(orientador, "Prévia orientação");
+        adicionarParticipacao(laboratorioId, orientador.getId(), Set.of(PapelLaboratorio.ORIENTADOR));
+        String email = "ana.silva-" + UUID.randomUUID() + "@exemplo.org";
+        Cookie sessao = login(orientador);
+        convidar(sessao, laboratorioId, email).andExpect(status().isCreated());
+        String token = tokenDoEmail(email, 1);
+
+        previa(token, novoIp()).andExpect(status().isOk())
+                .andExpect(jsonPath("$.laboratorioNome").value("Prévia orientação"))
+                .andExpect(jsonPath("$.convidadoPorNome").value(orientador.getNome()))
+                .andExpect(jsonPath("$.emailMascarado").value("an***@exemplo.org"))
+                .andExpect(jsonPath("$.estado").value("PENDENTE"));
+        previa("token-inexistente", novoIp()).andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message").value("Convite inválido ou indisponível."));
+
+        jdbcTemplate.update("UPDATE convite_orientacao SET expires_at = ? WHERE id = ?",
+                java.sql.Timestamp.from(Instant.now().minusSeconds(5)), conviteIdPorEmail(email));
+        previa(token, novoIp()).andExpect(status().isOk()).andExpect(jsonPath("$.estado").value("EXPIRADO"));
+
+        requisicaoAutenticada(sessao, post("/api/v1/laboratorios/{id}/orientacoes/convites/{convite}/reenviar",
+                laboratorioId, conviteIdPorEmail(email))).andExpect(status().isOk());
+        String tokenNovo = tokenDoEmail(email, 2);
+        previa(token, novoIp()).andExpect(status().isBadRequest());
+
+        requisicaoAutenticada(sessao, delete("/api/v1/laboratorios/{id}/orientacoes/convites/{convite}",
+                laboratorioId, conviteIdPorEmail(email))).andExpect(status().isNoContent());
+        previa(tokenNovo, novoIp()).andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void previaInformaSeOConviteEParaAContaDaSessao() throws Exception {
+        Usuario orientador = criarUsuario("orientador");
+        Usuario destinatario = criarUsuario("destinatario");
+        Usuario outra = criarUsuario("outra");
+        UUID laboratorioId = criarLaboratorio(orientador, "Prévia conta orientação");
+        adicionarParticipacao(laboratorioId, orientador.getId(), Set.of(PapelLaboratorio.ORIENTADOR));
+        convidar(login(orientador), laboratorioId, destinatario.getEmail()).andExpect(status().isCreated());
+        String token = tokenDoEmail(destinatario.getEmail(), 1);
+
+        previa(token, novoIp()).andExpect(status().isOk()).andExpect(jsonPath("$.paraContaAtual").doesNotExist());
+        previaComSessao(login(destinatario), token).andExpect(status().isOk()).andExpect(jsonPath("$.paraContaAtual").value(true));
+        previaComSessao(login(outra), token).andExpect(status().isOk()).andExpect(jsonPath("$.paraContaAtual").value(false));
+    }
+
+    @Test
+    void previaPublicaTemLimitePorEnderecoERequerCsrf() throws Exception {
+        mockMvc.perform(post("/api/v1/orientacoes/convites/previa")
+                        .contentType(MediaType.APPLICATION_JSON).content(json("token", "x")))
+                .andExpect(status().isForbidden());
+        String ip = novoIp();
+        previa("token-a", ip).andExpect(status().isBadRequest());
+        previa("token-b", ip).andExpect(status().isBadRequest());
+        previa("token-c", ip).andExpect(status().isTooManyRequests()).andExpect(header().exists("Retry-After"));
+    }
+
+    @Test
     void recusaNaoCriaParticipacaoNemVinculo() throws Exception {
         Usuario orientador = criarUsuario("orientador");
         Usuario pesquisador = criarUsuario("pesquisador");
@@ -348,7 +406,7 @@ class OrientacaoIntegrationTest extends AbstractIntegrationTest {
     }
 
     @Test
-    void saidaERemocaoDoPesquisadorOuOrientadorEncerramVinculos() throws Exception {
+    void saidaERemocaoDoPesquisadorEncerramVinculosEOrientadorComOrientandoNaoPodeSerRemovido() throws Exception {
         Usuario admin = criarUsuario("admin");
         List<Usuario> pesquisadores = List.of(criarUsuario("p-sai"), criarUsuario("p-rem"),
                 criarUsuario("p-sai-orientador"), criarUsuario("p-rem-orientador"));
@@ -360,6 +418,7 @@ class OrientacaoIntegrationTest extends AbstractIntegrationTest {
         pesquisadores.forEach(pesquisador -> adicionarParticipacao(
                 laboratorioId, pesquisador.getId(), Set.of(PapelLaboratorio.MEMBRO)));
 
+        Cookie sessaoAdmin = login(admin);
         for (int indice = 0; indice < orientadores.size(); indice++) {
             Usuario orientador = orientadores.get(indice);
             Usuario pesquisador = pesquisadores.get(indice);
@@ -375,7 +434,7 @@ class OrientacaoIntegrationTest extends AbstractIntegrationTest {
         UUID participacaoPesquisadorRemovido = participacaoRepository
                 .findByLaboratorioIdAndUsuarioIdAndEstado(laboratorioId, pesquisadores.get(1).getId(), EstadoParticipacao.ATIVA)
                 .orElseThrow().getId();
-        requisicaoAutenticada(login(admin), delete("/api/v1/laboratorios/{id}/participacoes/{participacao}",
+        requisicaoAutenticada(sessaoAdmin, delete("/api/v1/laboratorios/{id}/participacoes/{participacao}",
                         laboratorioId, participacaoPesquisadorRemovido))
                 .andExpect(status().isNoContent());
 
@@ -384,7 +443,16 @@ class OrientacaoIntegrationTest extends AbstractIntegrationTest {
         UUID participacaoOrientadorRemovido = participacaoRepository
                 .findByLaboratorioIdAndUsuarioIdAndEstado(laboratorioId, orientadores.get(3).getId(), EstadoParticipacao.ATIVA)
                 .orElseThrow().getId();
-        requisicaoAutenticada(login(admin), delete("/api/v1/laboratorios/{id}/participacoes/{participacao}",
+        // Quem ainda orienta alguém não pode ser removido: primeiro encerra-se a orientação.
+        requisicaoAutenticada(sessaoAdmin, delete("/api/v1/laboratorios/{id}/participacoes/{participacao}",
+                        laboratorioId, participacaoOrientadorRemovido))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.message").value("Encerre as orientações de "
+                        + orientadores.get(3).getNome() + " antes de removê-lo do laboratório."));
+        requisicaoAutenticada(sessaoAdmin, delete("/api/v1/laboratorios/{id}/orientacoes/{vinculo}", laboratorioId,
+                        vinculoId(laboratorioId, orientadores.get(3).getId(), pesquisadores.get(3).getId())))
+                .andExpect(status().isNoContent());
+        requisicaoAutenticada(sessaoAdmin, delete("/api/v1/laboratorios/{id}/participacoes/{participacao}",
                         laboratorioId, participacaoOrientadorRemovido))
                 .andExpect(status().isNoContent());
 
@@ -593,6 +661,18 @@ class OrientacaoIntegrationTest extends AbstractIntegrationTest {
                 .contentType(MediaType.APPLICATION_JSON).content(json("email", email)));
     }
 
+    private ResultActions previa(String token, String ip) throws Exception {
+        return requisicaoComCsrf(post("/api/v1/orientacoes/convites/previa")
+                .with(request -> { request.setRemoteAddr(ip); return request; })
+                .contentType(MediaType.APPLICATION_JSON).content(json("token", token)));
+    }
+
+    private ResultActions previaComSessao(Cookie sessao, String token) throws Exception {
+        return requisicaoAutenticada(sessao, post("/api/v1/orientacoes/convites/previa")
+                .with(request -> { request.setRemoteAddr(novoIp()); return request; })
+                .contentType(MediaType.APPLICATION_JSON).content(json("token", token)));
+    }
+
     private ResultActions consumir(Cookie sessao, String acao, String token, String ip) throws Exception {
         return requisicaoAutenticada(sessao, post("/api/v1/orientacoes/convites" + acao)
                 .with(request -> { request.setRemoteAddr(ip); return request; })
@@ -708,6 +788,7 @@ class OrientacaoIntegrationTest extends AbstractIntegrationTest {
     private Cookie login(Usuario usuario) throws Exception {
         Cookie csrf = csrfCookie();
         MvcResult resultado = mockMvc.perform(post("/api/v1/auth/login")
+                        .with(request -> { request.setRemoteAddr(novoIp()); return request; })
                         .cookie(csrf).header("X-XSRF-TOKEN", csrf.getValue())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(json("email", usuario.getEmail(), "senha", SENHA)))

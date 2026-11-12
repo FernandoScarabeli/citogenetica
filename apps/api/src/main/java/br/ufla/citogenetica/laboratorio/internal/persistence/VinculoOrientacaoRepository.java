@@ -33,6 +33,8 @@ public interface VinculoOrientacaoRepository extends JpaRepository<VinculoOrient
             @Param("participacaoId") UUID participacaoId,
             @Param("estado") EstadoVinculoOrientacao estado);
 
+    boolean existsByOrientadorParticipacaoIdAndEstado(UUID orientadorParticipacaoId, EstadoVinculoOrientacao estado);
+
     @Query("select case when count(vinculo) > 0 then true else false end from VinculoOrientacao vinculo "
             + "where (vinculo.orientadorParticipacao.id = :participacaoId "
             + "or vinculo.pesquisadorParticipacao.id = :participacaoId) and vinculo.estado = :estado")

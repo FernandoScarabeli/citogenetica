@@ -294,13 +294,13 @@ describe('cadastro e confirmação de e-mail', () => {
     expect(screen.getByRole('link', { name: 'Criar conta' }).getAttribute('href')).toBe('/criar-conta');
   });
 
-  it('redireciona para /app quando uma pessoa autenticada abre /criar-conta', async () => {
+  it('redireciona para /laboratorios quando uma pessoa autenticada abre /criar-conta', async () => {
     mockApi({ me: async () => response(200, userDto) });
     setPath('/criar-conta');
     render(<App/>);
 
     expect(await screen.findByRole('heading', { name: 'Meus laboratórios' })).toBeTruthy();
-    expect(window.location.pathname).toBe('/app');
+    expect(window.location.pathname).toBe('/laboratorios');
     expect(screen.queryByRole('heading', { name: 'Crie sua conta.' })).toBeNull();
   });
 });

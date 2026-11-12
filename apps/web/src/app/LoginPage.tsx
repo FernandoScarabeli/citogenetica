@@ -1,9 +1,10 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { ArrowRight } from 'lucide-react';
-import { Link, useLocation, useNavigate } from 'react-router';
+import { Link, Navigate, useLocation } from 'react-router';
 import { isRateLimited, isUnauthorized, NetworkError } from '../api/errors';
 import { useSession } from './SessionProvider';
 import { safeInternalPath } from './return-path';
+import { invitationPath, readPendingInvitation } from './pending-invitation';
 import { AuthLayout } from './AuthLayout';
 
 interface LoginLocationState {
@@ -16,9 +17,8 @@ function loginNotice(value: unknown): string | undefined {
 }
 
 export function LoginPage() {
-  const { login } = useSession();
+  const { login, status } = useSession();
   const location = useLocation();
-  const navigate = useNavigate();
   const [email, setEmail] = useState('');
   const [senha, setSenha] = useState('');
   const [submitting, setSubmitting] = useState(false);
@@ -65,8 +65,6 @@ export function LoginPage() {
     setRetryReady(false);
     try {
       await login(email, senha);
-      const returnTo = safeInternalPath(locationState?.returnTo);
-      navigate(returnTo ?? '/app', { replace: true });
     } catch (error) {
       if (isUnauthorized(error)) {
         setCredentialsInvalid(true);
@@ -83,6 +81,14 @@ export function LoginPage() {
     } finally {
       setSubmitting(false);
     }
+  }
+
+  // Com a sessão aberta (agora ou de antes), segue para onde a pessoa queria ir ou para os laboratórios.
+  // Quem criou a conta a partir de um convite volta a ele, mesmo depois de confirmar o e-mail em outra aba.
+  if (status === 'authenticated') {
+    const pending = readPendingInvitation();
+    const destination = safeInternalPath(locationState?.returnTo) ?? (pending ? invitationPath(pending.kind) : '/laboratorios');
+    return <Navigate to={destination} replace/>;
   }
 
   const descriptionId = message ? 'login-error' : undefined;

@@ -27,7 +27,6 @@ vi.mock('../src/api/convite-api', () => ({ conviteApi: invitationsApi }));
 vi.mock('../src/api/orientacao-api', () => ({ orientacaoApi: orientationApi }));
 
 import { Laboratories } from '../src/Laboratories';
-import { Slides } from '../src/Slides';
 
 const USER: UsuarioResponseDTO = {
   id: 12,
@@ -276,6 +275,9 @@ describe('gestão de laboratórios reais', () => {
 
     renderPage();
     await screen.findByRole('heading', { name: 'Nenhum laboratório ainda' });
+    expect(screen.getByText(/Você ainda não participa de nenhum laboratório\. Se alguém vai te convidar, o convite chega por e-mail/)).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Abrir lâminas avulsas' })).toBeTruthy();
+    expect(screen.getByText('Lâminas que não pertencem a nenhum laboratório.')).toBeTruthy();
     await user.click(screen.getByRole('button', { name: 'Criar laboratório' }));
     await user.type(screen.getByLabelText('Nome do laboratório'), 'Citogenética vegetal');
     await user.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Criar laboratório' }));
@@ -398,6 +400,22 @@ describe('gestão de laboratórios reais', () => {
     expect(await screen.findByText(/É necessário manter ao menos um Administrador ativo/)).toBeTruthy();
   });
 
+  it('mostra a mensagem de orientandos ativos ao remover e não a repete ao abrir a janela de novo', async () => {
+    const user = userEvent.setup();
+    const mensagem = 'Encerre as orientações de Bruna Almeida antes de removê-lo do laboratório.';
+    api.removerParticipacao.mockRejectedValueOnce(apiError(409, mensagem));
+    renderPage();
+    await openLaboratoryManagement(user);
+    await user.click(screen.getByRole('button', { name: 'Remover Bruna Almeida do laboratório' }));
+    await user.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Remover participação' }));
+    expect(await screen.findByText(mensagem)).toBeTruthy();
+
+    await user.click(screen.getByRole('button', { name: 'Remover Bruna Almeida do laboratório' }));
+    const dialog = screen.getByRole('dialog');
+    expect(within(dialog).queryByText(mensagem)).toBeNull();
+    expect(screen.queryByText(mensagem)).toBeNull();
+  });
+
   it('mostra o motivo de permissão 403 ao renomear', async () => {
     const user = userEvent.setup();
     api.atualizarNome.mockRejectedValueOnce(apiError(403, 'Acesso negado.'));
@@ -418,7 +436,7 @@ describe('gestão de laboratórios reais', () => {
     await user.click(screen.getByRole('button', { name: 'Gerenciar' }));
 
     expect((await screen.findByRole('status')).textContent).toContain('Este laboratório não está mais disponível');
-    expect(screen.getByRole('heading', { name: 'Meus laboratórios' })).toBeTruthy();
+    expect(await screen.findByRole('heading', { name: 'Meus laboratórios' })).toBeTruthy();
   });
 
   it('mantém o laboratório desativado em consulta e encaminha as lâminas como somente leitura', async () => {
@@ -441,33 +459,5 @@ describe('gestão de laboratórios reais', () => {
 
     expect(await screen.findByText('Consulta somente leitura')).toBeTruthy();
     expect(renderSlides).toHaveBeenCalledWith(disabled, expect.any(Function), true);
-  });
-});
-
-describe('lâminas em laboratório desativado', () => {
-  it('esconde criação e importação e impede editar observações', async () => {
-    window.localStorage.setItem('citogenetica:workspace:v1', JSON.stringify({
-      version: 1,
-      customTypes: {},
-      slides: [{
-        id: 'slide-desativada',
-        labId: ACTIVE_LAB.id,
-        name: 'Lâmina em consulta',
-        protocol: 'mitose',
-        species: '',
-        treatment: '',
-        notes: 'Anotação preservada',
-        createdAt: '2026-11-03T12:00:00.000Z',
-        entries: [],
-      }],
-    }));
-    const user = userEvent.setup();
-    const { container } = render(<MemoryRouter><Slides laboratory={{ ...ACTIVE_LAB, estado: 'DESATIVADO' }} onBack={vi.fn()} readOnly /></MemoryRouter>);
-    await user.click(await screen.findByRole('button', { name: /Lâmina em consulta/ }));
-    await screen.findByRole('heading', { name: 'Lâmina em consulta' });
-
-    expect(screen.queryByRole('button', { name: 'Nova lâmina' })).toBeNull();
-    expect(screen.queryByRole('button', { name: 'Importar' })).toBeNull();
-    expect((container.querySelector('textarea[readonly]') as HTMLTextAreaElement | null)?.value).toBe('Anotação preservada');
   });
 });

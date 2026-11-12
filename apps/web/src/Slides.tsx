@@ -1,106 +1,166 @@
-import { useEffect, useId, useRef, useState, type FormEvent, type KeyboardEvent, type ReactNode } from 'react';
-import { ArrowRight, Plus, Search, Microscope, Undo2, Download, Upload, FileText, X, Pencil, Trash2, Check, FlaskConical, ChevronDown, ChevronRight } from 'lucide-react';
-import { protocols, summary, pct, keyFor, normalize, isState, slideGoal, removeMatching, slideCsv, slidesForLaboratory, type Entry, type Protocol, type Slide, type State } from './domain';
-import { load, save, download } from './storage';
+import { useCallback, useEffect, useRef, useState, type FormEvent } from 'react';
+import { Link, useLocation, useNavigate } from 'react-router';
+import { ArrowRight, ChevronRight, FlaskConical, Microscope, Plus, Search, X } from 'lucide-react';
 import { typeClass } from '@/lib/type-scale';
+import { contagemApi, type ContagemApi } from './api/contagem-api';
+import type { LaminaDTO, ProtocoloDTO } from './api/contracts/contagem';
 import type { LaboratorioResponseDTO } from './api/contracts/laboratorio';
+import { caminhoLamina, caminhoLaminas, telaDaRota } from './app/rotas';
+import { formatarData, mensagemDeErro } from './contagem-utils';
+import { SlideDetail } from './SlideDetail';
+import { Modal, ProtocolSelect, type ProtocolOption } from './SlideWidgets';
 
-const id = () => crypto.randomUUID();
-const date = (s:string) => new Intl.DateTimeFormat('pt-BR',{day:'2-digit',month:'short',year:'numeric'}).format(new Date(s)).replace('.', '');
-const initial = load();
-const protocolOptions: {value: Protocol; label: string}[] = [{value:'mitose',label:'Mitose · ciclo celular'},{value:'meiose',label:'Meiose'}];
-function ProtocolSelect({value,onChange}: {value: Protocol; onChange: (value: Protocol)=>void}) {
- const [open,setOpen]=useState(false); const [active,setActive]=useState(0); const root=useRef<HTMLDivElement>(null); const trigger=useRef<HTMLButtonElement>(null); const id=useId();
- useEffect(()=>{if(!open)return;function outside(event: PointerEvent){if(!root.current?.contains(event.target as Node))setOpen(false);}document.addEventListener('pointerdown',outside);return ()=>document.removeEventListener('pointerdown',outside);},[open]);
- function show(){setActive(protocolOptions.findIndex(option=>option.value===value));setOpen(true);}
- function choose(index:number){onChange(protocolOptions[index].value);setOpen(false);trigger.current?.focus();}
- function onKeyDown(event:KeyboardEvent<HTMLButtonElement>){
-  if(event.key==='Escape'&&open){event.preventDefault();event.stopPropagation();setOpen(false);return;}
-  if(event.key==='Tab'){setOpen(false);return;}
-  if(event.key==='ArrowDown'||event.key==='ArrowUp'){event.preventDefault();if(!open){show();return;}setActive(current=>(current+(event.key==='ArrowDown'?1:-1)+protocolOptions.length)%protocolOptions.length);return;}
-  if(open&&(event.key==='Home'||event.key==='End')){event.preventDefault();setActive(event.key==='Home'?0:protocolOptions.length-1);return;}
-  if(open&&(event.key==='Enter'||event.key===' ')){event.preventDefault();choose(active);}
- }
- return <div className="protocol-field"><span className="protocol-label" id={`${id}-label`}>Protocolo</span><div className="protocol-select" ref={root}><button ref={trigger} type="button" className="protocol-trigger" role="combobox" aria-labelledby={`${id}-label ${id}-value`} aria-expanded={open} aria-controls={`${id}-options`} aria-activedescendant={open?`${id}-option-${active}`:undefined} aria-haspopup="listbox" onClick={()=>open?setOpen(false):show()} onKeyDown={onKeyDown}><span id={`${id}-value`}>{protocolOptions.find(option=>option.value===value)?.label}</span><ChevronDown size={16} aria-hidden="true"/></button>{open&&<div className={`protocol-options${value==='meiose'?' opens-up':''}`} id={`${id}-options`} role="listbox" aria-labelledby={`${id}-label`}>{protocolOptions.map((option,index)=><div id={`${id}-option-${index}`} key={option.value} role="option" aria-selected={option.value===value} className={`protocol-option${active===index?' is-active':''}`} onMouseEnter={()=>setActive(index)} onMouseDown={event=>event.preventDefault()} onClick={()=>choose(index)}><span>{option.label}</span>{option.value===value&&<Check size={16} aria-hidden="true"/>}</div>)}</div>}</div></div>;
-}
-type SelectOption = { value: string; label: string };
-function EntrySelect({label,value,options,onChange,placeholder,invalid,controlRef}: {label:string; value:string; options:SelectOption[]; onChange:(value:string)=>void; placeholder?:string; invalid?:boolean; controlRef?:React.RefObject<HTMLButtonElement|null>}) {
- const [open,setOpen]=useState(false); const [active,setActive]=useState(0); const [opensUp,setOpensUp]=useState(false);
- const root=useRef<HTMLDivElement>(null); const localTrigger=useRef<HTMLButtonElement>(null); const trigger=controlRef||localTrigger; const id=useId();
- useEffect(()=>{if(!open)return;function outside(event:PointerEvent){if(!root.current?.contains(event.target as Node))setOpen(false);}document.addEventListener('pointerdown',outside);return ()=>document.removeEventListener('pointerdown',outside);},[open]);
- useEffect(()=>{if(open)document.getElementById(`${id}-option-${active}`)?.scrollIntoView({block:'nearest'});},[active,open,id]);
- function show(){const rect=trigger.current?.getBoundingClientRect();setOpensUp(!!rect && window.innerHeight-rect.bottom<Math.min(options.length*44+20,240) && rect.top>window.innerHeight-rect.bottom);setActive(Math.max(0,options.findIndex(option=>option.value===value)));setOpen(true);}
- function choose(index:number){const option=options[index];if(!option)return;onChange(option.value);setOpen(false);trigger.current?.focus();}
- function onKeyDown(event:KeyboardEvent<HTMLButtonElement>){
-  if(event.key==='Escape'&&open){event.preventDefault();event.stopPropagation();setOpen(false);return;}
-  if(event.key==='Tab'){setOpen(false);return;}
-  if(event.key==='ArrowDown'||event.key==='ArrowUp'){event.preventDefault();if(!open){show();return;}setActive(current=>(current+(event.key==='ArrowDown'?1:-1)+options.length)%options.length);return;}
-  if(open&&(event.key==='Home'||event.key==='End')){event.preventDefault();setActive(event.key==='Home'?0:options.length-1);return;}
-  if(open&&(event.key==='Enter'||event.key===' ')){event.preventDefault();choose(active);return;}
-  if(open&&event.key.length===1&&!event.ctrlKey&&!event.metaKey&&!event.altKey){const index=options.findIndex(option=>option.label.toLocaleLowerCase('pt-BR').startsWith(event.key.toLocaleLowerCase('pt-BR')));if(index>=0){event.preventDefault();setActive(index);}}
- }
- return <div className="protocol-field entry-select-field"><span className="protocol-label" id={`${id}-label`}>{label}</span><div className="protocol-select" ref={root}><button ref={trigger} type="button" className="protocol-trigger" role="combobox" aria-labelledby={`${id}-label ${id}-value`} aria-expanded={open} aria-controls={open?`${id}-options`:undefined} aria-activedescendant={open?`${id}-option-${active}`:undefined} aria-haspopup="listbox" aria-invalid={invalid||undefined} aria-describedby={invalid?`${id}-error`:undefined} onClick={()=>open?setOpen(false):show()} onKeyDown={onKeyDown}><span id={`${id}-value`} className={!value?'select-placeholder':undefined}>{options.find(option=>option.value===value)?.label||placeholder}</span><ChevronDown size={16} aria-hidden="true"/></button>{open&&<div className={`protocol-options entry-options${opensUp?' opens-up':''}`} id={`${id}-options`} role="listbox" aria-labelledby={`${id}-label`}>{options.map((option,index)=><div id={`${id}-option-${index}`} key={option.value} role="option" aria-selected={option.value===value} className={`protocol-option${active===index?' is-active':''}`} onMouseEnter={()=>setActive(index)} onMouseDown={event=>event.preventDefault()} onClick={()=>choose(index)}><span>{option.label}</span>{option.value===value&&<Check size={16} aria-hidden="true"/>}</div>)}</div>}</div>{invalid&&<span className="select-error" id={`${id}-error`} role="alert">Selecione uma anormalidade.</span>}</div>;
-}
-function Modal({title,children,onClose}: {title:string;children:ReactNode;onClose:()=>void}) {
-  const ref=useRef<HTMLDialogElement>(null);
-  useEffect(()=>{ref.current?.showModal();},[]);
-  return <dialog ref={ref} onClose={onClose} onClick={e=>{if(e.target===ref.current) onClose()}}><div className="modal-head"><h2 className={typeClass("title")}>{title}</h2><button className="icon-button" aria-label="Fechar" onClick={onClose}><X size={19}/></button></div>{children}</dialog>;
-}
-export function Slides({laboratory,onBack,readOnly}: {laboratory: LaboratorioResponseDTO|null;onBack:()=>void;readOnly:boolean}){
- const scopedLabId=laboratory?.id;
- const canResearch=!readOnly;
- const [state,setState]=useState<State>(()=>load().state); const [error,setError]=useState(initial.error || '');
- const [active,setActive]=useState<string|null>(null); const [tab,setTab]=useState<'contagem'|'resumo'>('contagem');
- const [query,setQuery]=useState(''); const [modal,setModal]=useState<'new'|'abnormal'|'edit'|'delete'|'backup'|'rename'|null>(null);
- const [phase,setPhase]=useState(''); const [editing,setEditing]=useState<Entry|null>(null); const [imported,setImported]=useState<State|null>(null);
- const [form,setForm]=useState({name:'',protocol:'mitose' as Protocol,species:'',treatment:'',status:'anormal' as Entry['status'],type:'',custom:''});
- const batchTriggers=useRef<Record<string,HTMLButtonElement|null>>({}); const [batchPhase,setBatchPhase]=useState<string|null>(null); const [goalInput,setGoalInput]=useState(''); const [batchQuantity,setBatchQuantity]=useState(''); const [batchAction,setBatchAction]=useState<'add'|'remove'>('add'); const [batchError,setBatchError]=useState(''); const undoRef=useRef<{slideId:string;entries:Entry[]}|null>(null); const inputFile=useRef<HTMLInputElement>(null); const abnormalTypeRef=useRef<HTMLButtonElement>(null); const [typeError,setTypeError]=useState(false);
- const visibleSlides=slidesForLaboratory(state.slides,scopedLabId||null);
- const slide=visibleSlides.find(s=>s.id===active); const stats=slide ? summary(slide):null;
- const batchKnownTypes=slide?[...new Set([...(protocols[slide.protocol].phases.find(p=>p.name===phase)?.types||[]),...(state.customTypes[keyFor(slide.protocol,phase)]||[]),...slide.entries.filter(e=>e.phase===phase&&e.status==='anormal').map(e=>e.type)])]:[];
- const batchRecordedTypes=slide?[...new Set(slide.entries.filter(e=>e.phase===phase&&e.status==='anormal').map(e=>e.type))]:[];
- const batchNeedsDescription=form.status==='anormal'&&batchAction==='add'&&batchKnownTypes.length===0;
- useEffect(()=>{if(readOnly){setModal(null);setBatchPhase(null);}},[readOnly]);
- function commit(next:State):boolean{ if(readOnly)return false;if(initial.error){setError('Os dados existentes não puderam ser lidos. Exporte ou recupere-os antes de continuar.');return false;} if(!save(next)){setError('Não foi possível salvar neste navegador. Verifique o espaço disponível.');return false;} setState(next);setError(''); return true; }
- function updateSlide(fn:(s:Slide)=>Slide):boolean{if(readOnly||!slide)return false; const updated=fn(slide);const saved=commit({...state,slides:state.slides.map(s=>s.id===slide.id?updated:s)});if(saved && updated.entries!==slide.entries)undoRef.current={slideId:slide.id,entries:slide.entries};return saved;}
- function openNew(){if(!canResearch)return;setGoalInput('1000');setForm({name:'',protocol:'mitose',species:'',treatment:'',status:'anormal',type:'',custom:''});setModal('new');}
- function create(e:FormEvent){e.preventDefault();if(readOnly||!form.name.trim())return;const s:Slide={labId:scopedLabId,id:id(),name:form.name.trim(),protocol:form.protocol,species:form.species.trim(),treatment:form.treatment.trim(),notes:'',goal:goalInput ? Number(goalInput) : null,createdAt:new Date().toISOString(),entries:[]};if(commit({...state,slides:[s,...state.slides]})){setActive(s.id);setTab('contagem');setModal(null);}}
- function addNormal(p:string){updateSlide(s=>({...s,entries:[...s.entries,{id:id(),phase:p,status:'normal',type:'',createdAt:new Date().toISOString()}]}));}
- function openAbnormal(p:string){setTypeError(false);setPhase(p);setForm(f=>({...f,status:'anormal',type:'',custom:''}));setEditing(null);setModal('abnormal');}
- function saveEntry(e:FormEvent){e.preventDefault();if(readOnly||!slide)return; const chosen=form.type==='__other' ? form.custom.trim().replace(/\s+/g,' ') : form.type; if(form.status==='anormal'&&!chosen){setTypeError(true);abnormalTypeRef.current?.focus();return;}
-  let customTypes=state.customTypes; let type=chosen; if(form.status==='anormal') {const k=keyFor(slide.protocol,phase);const fixed=protocols[slide.protocol].phases.find(p=>p.name===phase)?.types||[]; const existing=[...fixed,...(customTypes[k]||[])].find(t=>normalize(t)===normalize(chosen));type=existing||chosen;if(!existing)customTypes={...customTypes,[k]:[...(customTypes[k]||[]),type]};}
-  const entry:Entry=editing?{...editing,phase,status:form.status,type:form.status==='normal'?'':type,editedAt:new Date().toISOString()}:{id:id(),phase,status:'anormal',type,createdAt:new Date().toISOString()};
-  const entries=editing?slide.entries.map(item=>item.id===editing.id?entry:item):[...slide.entries,entry];if(commit({...state,customTypes,slides:state.slides.map(s=>s.id===slide.id?{...s,entries}:s)})){undoRef.current={slideId:slide.id,entries:slide.entries};setModal(null);}
- }
- function undoLast(){if(readOnly||!slide)return;const previous=undoRef.current?.slideId===slide.id?undoRef.current.entries:slide.entries.slice(0,-1);if(commit({...state,slides:state.slides.map(s=>s.id===slide.id?{...s,entries:previous}:s)}))undoRef.current=null;}
- function closeBatch(){const closingPhase=batchPhase;setBatchPhase(null);if(closingPhase)requestAnimationFrame(()=>batchTriggers.current[closingPhase]?.focus());}
- function openBatch(selectedPhase:string){if(readOnly||!slide)return;setBatchPhase(selectedPhase);setPhase(selectedPhase);setForm(f=>({...f,status:'normal',type:'',custom:''}));setBatchAction('add');setBatchQuantity('');setBatchError('');}
- function saveBatch(e:FormEvent){e.preventDefault();if(readOnly||!slide)return;const quantity=Number(batchQuantity);const type=form.status==='anormal'?(form.type==='__other'||batchNeedsDescription?form.custom.trim().replace(/\s+/g,' '):form.type):'';if(!Number.isSafeInteger(quantity)||quantity<1||quantity>10000){setBatchError('Informe uma quantidade inteira entre 1 e 10.000.');return;}if(form.status==='anormal'&&!type){setBatchError('Selecione o tipo de anormalidade.');return;}if(batchAction==='remove'){try{const entries=removeMatching(slide.entries,phase,form.status,type,quantity);if(updateSlide(s=>({...s,entries})))closeBatch();}catch{setBatchError('A quantidade informada é maior que a quantidade registrada nessa classificação.');}return;}const fixed=protocols[slide.protocol].phases.find(p=>p.name===phase)?.types||[];const existing=[...fixed,...(state.customTypes[keyFor(slide.protocol,phase)]||[])].find(t=>normalize(t)===normalize(type));const finalType=form.status==='anormal'?(existing||type):'';const customTypes=form.status==='anormal'&&!existing?{...state.customTypes,[keyFor(slide.protocol,phase)]:[...(state.customTypes[keyFor(slide.protocol,phase)]||[]),finalType]}:state.customTypes;const createdAt=new Date().toISOString();const entries=Array.from({length:quantity},()=>({id:id(),phase,status:form.status,type:finalType,createdAt}));if(commit({...state,customTypes,slides:state.slides.map(s=>s.id===slide.id?{...s,entries:[...s.entries,...entries]}:s)})){undoRef.current={slideId:slide.id,entries:slide.entries};closeBatch();}}
- function exportCsv(){if(slide)download(`${slide.name}.csv`,slideCsv(slide),'text/csv;charset=utf-8');}
- function readBackup(file:File){if(!canResearch)return;file.text().then(text=>{try{const data:unknown=JSON.parse(text);if(!isState(data))throw Error();if(data.slides.some(s=>state.slides.some(old=>old.id===s.id&&old.labId!==scopedLabId))) {setError('Este backup contém lâminas de outro espaço. Abra o laboratório de origem para importá-lo.');return;}setImported({...data,slides:data.slides.map(s=>({...s,labId:scopedLabId}))});setModal('backup');}catch{setError('Arquivo inválido. Selecione um backup compatível.');}}).catch(()=>setError('Não foi possível abrir o arquivo.'));}
- function mergeBackup(){if(readOnly||!imported)return;const existing=new Set(state.slides.map(s=>s.id));const collisions=imported.slides.filter(s=>existing.has(s.id)).length;const slides=[...imported.slides,...state.slides.filter(s=>!imported.slides.some(i=>i.id===s.id))];const customTypes={...state.customTypes};Object.entries(imported.customTypes).forEach(([k,types])=>{customTypes[k]=[...(customTypes[k]||[])];types.forEach(t=>{if(!customTypes[k].some(x=>normalize(x)===normalize(t)))customTypes[k].push(t)});});commit({...state,slides,customTypes});setImported(null);setModal(null);if(collisions&&active&&!slides.some(s=>s.id===active))setActive(null);}
- const matched=visibleSlides.filter(s=>`${s.name} ${s.species} ${s.treatment}`.toLocaleLowerCase('pt-BR').includes(query.toLocaleLowerCase('pt-BR')));
- const allEntries=visibleSlides.reduce((a,s)=>a+s.entries.length,0);
- return <><div className={`container slide-navigation${readOnly ? ' labs-read-only' : ''}`}><nav className="lab-scope-nav" aria-label="Caminho de navegação"><button className="text-button" onClick={onBack}>Meus laboratórios</button><ChevronRight size={14} aria-hidden="true"/>{slide ? <><span>{laboratory?.nome||'Lâminas avulsas'}</span><ChevronRight size={14} aria-hidden="true"/><button className="text-button" onClick={()=>setActive(null)}>Lâminas</button><ChevronRight size={14} aria-hidden="true"/><strong aria-current="page">{slide.name}</strong></> : <strong aria-current="page">{laboratory?.nome||'Lâminas avulsas'}</strong>}</nav><div className="slide-toolbar-actions"><button className="header-link" onClick={()=>download('citogenetica-backup.json',JSON.stringify({...state,slides:visibleSlides},null,2),'application/json')}><Download size={16}/> Backup</button><button hidden={readOnly} className="header-link" onClick={()=>inputFile.current?.click()}><Upload size={16}/> Importar</button><input ref={inputFile} hidden type="file" accept="application/json,.json" onChange={e=>{const f=e.target.files?.[0];if(f)readBackup(f);e.target.value=''}}/></div></div>
- {!canResearch&&<p className="container lab-muted">Este laboratório está desativado. Os registros estão disponíveis somente para leitura.</p>}
- {error&&<div className="error-banner" role="alert">{error}<button onClick={()=>setError('')} aria-label="Dispensar"><X size={16}/></button></div>}
- {!slide ? <main className="container home"><div className="page-heading"><div><h1 className={typeClass("display")}>Lâminas</h1><p>Organize suas lâminas e acompanhe a contagem de células.</p></div><button hidden={readOnly} className="button primary" onClick={openNew} disabled={!canResearch}><Plus size={17}/> Nova lâmina</button></div>
- <section className="overview" aria-label="Visão geral"><div className="overview-intro"><span className="overview-symbol"><FlaskConical size={22}/></span><div><h2 className={typeClass("title")}>Resumo</h2><p>Totais das lâminas e células registradas.</p></div></div><div className="overview-stat"><span>Lâminas registradas</span><strong>{visibleSlides.length}</strong></div><div className="overview-stat"><span>Células contadas</span><strong>{allEntries.toLocaleString('pt-BR')}</strong></div></section>
- <section className="list-section"><div className="section-heading"><div><h2 className={typeClass("title")}>Registros</h2></div><label className="search"><Search size={17}/><span className="sr-only">Buscar lâminas</span><input placeholder="Buscar lâmina" value={query} onChange={e=>setQuery(e.target.value)}/></label></div>
- {matched.length ? <div className="slide-list"><div className="list-labels"><span>Identificação</span><span>Protocolo</span><span>Células</span><span>Criada por</span><span>Criada em</span><span/></div>{matched.map(s=><button className="slide-row" key={s.id} onClick={()=>{setActive(s.id);setTab('contagem')}}><span className="slide-identity"><span><strong>{s.name}</strong>{(s.species || s.treatment) && <small>{[s.species, s.treatment].filter(Boolean).join(' · ')}</small>}</span></span><span><span className="protocol-tag">{protocols[s.protocol].name}</span></span><span className="numeric">{s.entries.length}</span><span className="slide-creator"><span className="creator-label">Criada por: </span>Não informada</span><span className="date">{date(s.createdAt)}</span><ChevronRight size={17} className="row-arrow"/></button>)}</div>:<div className="empty-state"><span className="empty-symbol"><Microscope size={25}/></span><h3>{query?'Nenhuma lâmina encontrada':'Comece pela primeira lâmina'}</h3><p>{query?'Tente buscar por outra identificação, espécie ou tratamento.':'Crie uma lâmina para registrar suas observações e acompanhar a contagem de células.'}</p>{!query&&<button hidden={readOnly} className="button secondary" onClick={openNew} disabled={!canResearch}><Plus size={16}/> Nova lâmina</button>}</div>}</section>
- </main> : <main className="container detail"><div className="detail-heading"><div><div className="title-line"><h1 className={typeClass("display")}>{slide.name}</h1><span className="protocol-tag">{protocols[slide.protocol].name}</span></div><p>{(slide.species || slide.treatment) && <>{[slide.species, slide.treatment].filter(Boolean).join(' · ')} <span className="dot-separator">·</span> </>}Criada em {date(slide.createdAt)}</p></div><div className="detail-actions" hidden={readOnly}><button className="button secondary" onClick={()=>{setForm(f=>({...f,name:slide.name,species:slide.species,treatment:slide.treatment}));setGoalInput(slideGoal(slide)?.toString()||'');setModal('rename')}}><Pencil size={15}/> Editar lâmina</button><button className="button icon-only secondary" title="Excluir lâmina" aria-label="Excluir lâmina" onClick={()=>setModal('delete')}><Trash2 size={17}/></button></div></div>
- <div className="detail-summary"><div className="summary-main"><span>Total de células</span><strong>{stats!.total.toLocaleString('pt-BR')}</strong><small>registradas nesta lâmina</small></div><div className="summary-item"><span>Células normais</span><strong>{stats!.total-stats!.abnormal}</strong><small>{pct(stats!.total-stats!.abnormal,stats!.total)} do total</small></div><div className="summary-item"><span>Células anormais</span><strong>{stats!.abnormal}</strong><small>{pct(stats!.abnormal,stats!.total)} do total</small></div>{slide.protocol==='mitose'&&<div className="summary-item"><span>Índice mitótico</span><strong>{pct(stats!.im,100)}</strong><small>células em divisão</small></div>}</div>
- {slideGoal(slide)!==null&&<div className="progress-line"><div><span>Meta de contagem</span><strong>{stats!.total.toLocaleString('pt-BR')} <span>/ {slideGoal(slide)!.toLocaleString('pt-BR')} células</span></strong></div><div className="progress-track" role="progressbar" aria-label="Meta de contagem" aria-valuemin={0} aria-valuemax={slideGoal(slide)!} aria-valuenow={Math.min(stats!.total,slideGoal(slide)!)}><span style={{width:`${Math.min(stats!.total/slideGoal(slide)!*100,100)}%`}}/></div></div>}
- <div className="tabs" role="tablist" aria-label="Seções da lâmina">{(['contagem','resumo'] as const).map(t=><button role="tab" aria-selected={tab===t} className={tab===t?'selected':''} onClick={()=>setTab(t)} key={t}>{t==='resumo'?'Resumo':'Contagem'}</button>)}</div>
- {tab==='contagem'&&<div className="workspace"><section className="count-area"><div className="section-heading compact"><div><h2 className={typeClass("title")}>Contagem por fase</h2><p>Registre cada célula na fase correspondente.</p></div><div className="count-tools" hidden={readOnly}><button className="text-button" disabled={!slide.entries.length && undoRef.current?.slideId!==slide.id} onClick={undoLast}><Undo2 size={15}/> Desfazer último</button></div></div><div className="phase-list">{stats!.phases.map(p=><div className="phase-row" key={p.name}><div className="phase-title"><strong>{p.name}</strong><small>{p.total.toLocaleString('pt-BR')} {p.total===1?'célula':'células'} no total</small><button hidden={readOnly} className="phase-adjust" type="button" ref={el=>{batchTriggers.current[p.name]=el}} aria-expanded={batchPhase===p.name} onClick={()=>batchPhase===p.name?closeBatch():openBatch(p.name)}>Ajustar quantidade<span className="sr-only"> em {p.name}</span></button></div><div className="phase-actions" hidden={readOnly}><button className="count-button" aria-label={`Registrar ${p.name} normal; ${p.normal} ${p.normal===1?'célula normal':'células normais'}`} onClick={()=>addNormal(p.name)}><span className="count-number">{p.normal.toLocaleString('pt-BR')}</span><span className="count-label"><Plus size={16} aria-hidden="true"/> Normal</span></button><button className="count-button abnormal-button" aria-label={`Registrar ${p.name} anormal; ${p.abnormal} ${p.abnormal===1?'célula anormal':'células anormais'}`} onClick={()=>openAbnormal(p.name)}><span className="count-number">{p.abnormal.toLocaleString('pt-BR')}</span><span className="count-label"><Plus size={16} aria-hidden="true"/> Anormal</span></button></div>{batchPhase===p.name&&<form className="batch-editor" onSubmit={saveBatch}><div className="batch-header"><div><h3>Ajustar {p.name}</h3><p>Adicione ou remova células desta fase.</p></div><button type="button" className="icon-button" aria-label="Fechar ajuste" onClick={closeBatch}><X size={18}/></button></div><div className="batch-fields"><fieldset><legend>O que deseja fazer?</legend><div className="batch-choice"><button type="button" aria-pressed={batchAction==='add'} onClick={()=>{setBatchError('');setBatchAction('add');setForm(f=>({...f,type:'',custom:''}))}}>Adicionar</button><button type="button" aria-pressed={batchAction==='remove'} onClick={()=>{setBatchError('');setBatchAction('remove');setForm(f=>({...f,type:'',custom:''}))}}>Remover</button></div></fieldset><fieldset><legend>Classificação</legend><div className="batch-choice"><button type="button" aria-pressed={form.status==='normal'} onClick={()=>{setBatchError('');setForm({...form,status:'normal',type:'',custom:''})}}>Normal</button><button type="button" aria-pressed={form.status==='anormal'} onClick={()=>{setBatchError('');setForm({...form,status:'anormal',type:'',custom:''})}}>Anormal</button></div></fieldset><label className="batch-quantity">Quantidade de células<input type="number" min="1" max="10000" step="1" inputMode="numeric" required value={batchQuantity} onChange={e=>{setBatchError('');setBatchQuantity(e.target.value)}} placeholder="Ex.: 10"/></label></div>{form.status==='anormal'&&batchAction==='remove'&&batchRecordedTypes.length===0?<p className="batch-empty">Ainda não há células anormais registradas nesta fase para remover.</p>:form.status==='anormal'&&!batchNeedsDescription&&<EntrySelect label="Tipo de anormalidade" value={form.type} placeholder="Selecione uma anormalidade" options={(batchAction==='remove'?batchRecordedTypes:batchKnownTypes).map(t=>({value:t,label:t})).concat(batchAction==='add'?[{value:'__other',label:'Outro (especificar)'}]:[])} onChange={value=>{setBatchError('');setForm({...form,type:value,custom:''})}}/>}{form.status==='anormal'&&(form.type==='__other'||batchNeedsDescription)&&<label>Descreva a anormalidade<input required value={form.custom} onChange={e=>{setBatchError('');setForm({...form,custom:e.target.value})}} placeholder="Ex.: descreva o que foi observado"/>{batchNeedsDescription&&<small className="batch-hint">Essa descrição ficará disponível para os próximos registros desta fase.</small>}</label>}{batchError&&<p className="select-error" role="alert">{batchError}</p>}<div className="batch-footer">{batchAction==='remove'&&<p>{`Disponível: ${(form.status==='normal'?p.normal:(form.type&&form.type!=='__other'?(p.types[form.type]||0):p.abnormal)).toLocaleString('pt-BR')} ${(form.status==='normal'?p.normal:(form.type&&form.type!=='__other'?(p.types[form.type]||0):p.abnormal))===1?'célula':'células'}${form.status==='anormal'&&!form.type?(p.abnormal===1?' anormal na fase':' anormais na fase'):''}.`}</p>}<div><button type="button" className="button secondary" onClick={closeBatch}>Cancelar</button><button disabled={batchAction==='remove'&&form.status==='anormal'&&batchRecordedTypes.length===0} className={`button ${batchAction==='remove'?'danger':'primary'}`}>{batchAction==='remove'?'Remover células':'Adicionar células'}</button></div></div></form>}</div>)}</div></section><section className="side-panel notes-panel" aria-label="Observações da lâmina"><div className="notes"><label htmlFor="notes">Observações</label><p>Anotações desta lâmina</p><textarea id="notes" readOnly={readOnly} placeholder="Adicione suas observações..." value={slide.notes} onChange={e=>updateSlide(s=>({...s,notes:e.target.value}))}/></div></section></div>}
- {tab==='resumo'&&<section className="tab-content"><div className="section-heading"><div><h2 className={typeClass("title")}>Resumo da análise</h2><p>Distribuição das células e anormalidades por fase.</p></div><div className="action-group"><button className="button secondary" onClick={exportCsv}><Download size={16}/> Exportar CSV</button><button className="button secondary" onClick={()=>window.print()}><FileText size={16}/> Imprimir / PDF</button></div></div><div className="table-wrap"><table><thead><tr><th>Fase</th><th>Normais</th><th>Anormais</th><th>Total</th><th>% anormais</th></tr></thead><tbody>{stats!.phases.map(p=><tr key={p.name}><td><strong>{p.name}</strong>{Object.entries(p.types).map(([t,n])=><small key={t}>{t}: {n} ({pct(n,p.total)})</small>)}</td><td>{p.normal}</td><td>{p.abnormal}</td><td>{p.total}</td><td>{pct(p.abnormal,p.total)}</td></tr>)}</tbody></table></div>{slide.notes&&<div className="report-notes typeset"><h3>Observações</h3><p>{slide.notes}</p></div>}</section>}
+const LIST_PAGE_SIZE = 100;
+const DEFAULT_MITOSIS_GOAL = '1000';
 
- </main>}
- <footer className="footer container"><span>Laboratório de Citogenética · UFLA</span></footer>
- {modal==='new'&&<Modal title="Nova lâmina" onClose={()=>setModal(null)}><form onSubmit={create}><p className="modal-description">Identifique a lâmina e escolha o protocolo da análise.</p><label>Identificação da lâmina<input autoFocus required maxLength={100} placeholder="Ex.: L1 – planta A" value={form.name} onChange={e=>setForm({...form,name:e.target.value})}/></label><ProtocolSelect value={form.protocol} onChange={protocol=>{setGoalInput(protocol==='mitose'?'1000':'');setForm({...form,protocol})}}/><label>Meta de contagem <span>Opcional</span><input type="number" min="1" step="1" max="10000000" value={goalInput} onChange={e=>setGoalInput(e.target.value)} placeholder="Quantidade de células"/></label>{form.protocol==='mitose'&&<div className="form-grid"><label>Espécie <span>Opcional</span><input value={form.species} onChange={e=>setForm({...form,species:e.target.value})} placeholder="Nome da espécie"/></label><label>Tratamento <span>Opcional</span><input value={form.treatment} onChange={e=>setForm({...form,treatment:e.target.value})} placeholder="Ex.: controle"/></label></div>}<div className="modal-actions"><button type="button" className="button secondary" onClick={()=>setModal(null)}>Cancelar</button><button className="button primary">Criar lâmina <ArrowRight size={16}/></button></div></form></Modal>}
- {(modal==='abnormal'||modal==='edit')&&slide&&<Modal title={modal==='edit'?'Editar registro':'Registrar célula anormal'} onClose={()=>setModal(null)}><form className="entry-form" onSubmit={saveEntry}><p className="modal-description">{modal==='edit'?'Corrija a classificação deste lançamento. A data original será mantida.':'Selecione a anormalidade observada na célula.'}</p><EntrySelect label="Fase" value={phase} options={protocols[slide.protocol].phases.map(p=>({value:p.name,label:p.name}))} onChange={value=>{setPhase(value);setTypeError(false);setForm({...form,type:'',custom:''})}}/>{modal==='edit'&&<EntrySelect label="Classificação" value={form.status} options={[{value:'normal',label:'Normal'},{value:'anormal',label:'Anormal'}]} onChange={value=>{setTypeError(false);setForm({...form,status:value as Entry['status'],type:'',custom:''})}}/>}{form.status==='anormal'&&<><EntrySelect label="Tipo de anormalidade" value={form.type} placeholder="Selecione uma anormalidade" controlRef={abnormalTypeRef} invalid={typeError} options={[...new Set([...(protocols[slide.protocol].phases.find(p=>p.name===phase)?.types||[]),...(state.customTypes[keyFor(slide.protocol,phase)]||[]),...(editing?.phase===phase&&editing.type?[editing.type]:[])])].map(t=>({value:t,label:t})).concat([{value:'__other',label:'Outro (especificar)'}])} onChange={value=>{setTypeError(false);setForm({...form,type:value})}}/>{form.type==='__other'&&<label>Descreva a anormalidade<input autoFocus required value={form.custom} onChange={e=>setForm({...form,custom:e.target.value})} placeholder="Nome da anormalidade"/></label>}</>}<div className="modal-actions"><button type="button" className="button secondary" onClick={()=>setModal(null)}>Cancelar</button><button className="button primary"><Check size={16}/> {modal==='edit'?'Salvar alteração':'Registrar célula'}</button></div></form></Modal>}
- {modal==='rename'&&slide&&<Modal title="Editar lâmina" onClose={()=>setModal(null)}><form onSubmit={e=>{e.preventDefault();if(!form.name.trim())return;updateSlide(s=>({...s,name:form.name.trim(),species:form.species.trim(),treatment:form.treatment.trim(),goal:goalInput?Number(goalInput):null}));setModal(null)}}><label>Identificação da lâmina<input autoFocus required value={form.name} onChange={e=>setForm({...form,name:e.target.value})}/></label>{slide.protocol==='mitose'&&<div className="form-grid"><label>Espécie<input value={form.species} onChange={e=>setForm({...form,species:e.target.value})}/></label><label>Tratamento<input value={form.treatment} onChange={e=>setForm({...form,treatment:e.target.value})}/></label></div>}<label>Meta de contagem <span>Opcional</span><input type="number" min="1" step="1" max="10000000" value={goalInput} onChange={e=>setGoalInput(e.target.value)} placeholder="Quantidade de células"/></label><div className="modal-actions"><button type="button" className="button secondary" onClick={()=>setModal(null)}>Cancelar</button><button className="button primary">Salvar alterações</button></div></form></Modal>}
- {modal==='delete'&&slide&&<Modal title="Excluir lâmina?" onClose={()=>setModal(null)}><p className="modal-description">A lâmina <strong>{slide.name}</strong> e seus {slide.entries.length} registros serão removidos. Exporte um backup antes se quiser guardá-los.</p><div className="modal-actions"><button className="button secondary" onClick={()=>setModal(null)}>Cancelar</button><button className="button danger" onClick={()=>{commit({...state,slides:state.slides.filter(s=>s.id!==slide.id)});setActive(null);setModal(null)}}><Trash2 size={16}/> Excluir lâmina</button></div></Modal>}
- {modal==='backup'&&imported&&<Modal title="Importar backup" onClose={()=>{setModal(null);setImported(null)}}><p className="modal-description">O arquivo contém {imported.slides.length} lâmina(s). {imported.slides.filter(s=>state.slides.some(old=>old.id===s.id)).length} lâmina(s) já existentes serão substituídas pela versão do arquivo. As demais serão adicionadas.</p><div className="modal-actions"><button className="button secondary" onClick={()=>{setModal(null);setImported(null)}}>Cancelar</button><button className="button primary" onClick={mergeBackup}>Confirmar importação</button></div></Modal>}
- </>;
+const protocolLabel = (protocolo: ProtocoloDTO) => (protocolo.codigo === 'mitose' ? 'Mitose · ciclo celular' : protocolo.nome);
+
+/** Carrega todas as páginas, em sequência, para que a busca na tela valha para a lista inteira. */
+async function loadAllSlides(api: ContagemApi, laboratorioId: string | null, signal: AbortSignal): Promise<LaminaDTO[]> {
+  const slides: LaminaDTO[] = [];
+  let page = 0;
+  let totalPages = 1;
+  while (page < totalPages) {
+    const result = await api.listarLaminas({ ...(laboratorioId ? { laboratorioId } : {}), page, size: LIST_PAGE_SIZE, signal });
+    slides.push(...result.content);
+    totalPages = result.totalPages;
+    page += 1;
+  }
+  return slides;
+}
+
+export function Slides({ laboratory, onBack, readOnly, usuarioId, api = contagemApi }: {
+  laboratory: LaboratorioResponseDTO | null;
+  onBack: () => void;
+  readOnly: boolean;
+  usuarioId: number;
+  api?: ContagemApi;
+}) {
+  const laboratoryId = laboratory?.id ?? null;
+  const navigate = useNavigate();
+  const { pathname } = useLocation();
+  // A lâmina aberta vem do endereço, então recarregar a página ou voltar no navegador mantém a lâmina certa.
+  const rota = telaDaRota(pathname);
+  const active = rota.tela === 'laminas' && rota.laboratorioId === laboratoryId ? rota.laminaId : null;
+  const canCreate = !readOnly;
+  const [status, setStatus] = useState<'loading' | 'ready' | 'error'>('loading');
+  const [loadError, setLoadError] = useState('');
+  const [retry, setRetry] = useState(0);
+  const [slides, setSlides] = useState<LaminaDTO[]>([]);
+  const [protocolos, setProtocolos] = useState<ProtocoloDTO[]>([]);
+  const [error, setError] = useState('');
+  const [notice, setNotice] = useState('');
+  const [query, setQuery] = useState('');
+  const [creating, setCreating] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [createError, setCreateError] = useState('');
+  const newSlideId = useRef('');
+  const [form, setForm] = useState({ nome: '', protocolo: 'mitose', especie: '', tratamento: '', meta: DEFAULT_MITOSIS_GOAL });
+
+  useEffect(() => {
+    const controller = new AbortController();
+    setStatus('loading');
+    Promise.all([api.listarProtocolos(controller.signal), loadAllSlides(api, laboratoryId, controller.signal)])
+      .then(([loadedProtocols, loadedSlides]) => {
+        if (controller.signal.aborted) return;
+        setProtocolos(loadedProtocols);
+        setSlides(loadedSlides);
+        setStatus('ready');
+      })
+      .catch(failure => {
+        if (controller.signal.aborted) return;
+        setLoadError(mensagemDeErro(failure, 'Não foi possível carregar as lâminas.'));
+        setStatus('error');
+      });
+    return () => controller.abort();
+  }, [api, laboratoryId, retry]);
+
+  useEffect(() => { if (readOnly) setCreating(false); }, [readOnly]);
+
+  const upsert = useCallback((slide: LaminaDTO) => {
+    setSlides(current => (current.some(item => item.id === slide.id) ? current.map(item => (item.id === slide.id ? slide : item)) : [slide, ...current]));
+  }, []);
+
+  const options: ProtocolOption[] = [...protocolos]
+    .sort((a, b) => Number(b.codigo === 'mitose') - Number(a.codigo === 'mitose'))
+    .map(protocolo => ({ value: protocolo.codigo, label: protocolLabel(protocolo) }));
+  const protocolOf = (slide: LaminaDTO) => protocolos.find(protocolo => protocolo.versaoAtual.id === slide.protocoloVersaoId);
+  const slide = slides.find(item => item.id === active);
+
+  function openNew() {
+    if (!canCreate) return;
+    newSlideId.current = crypto.randomUUID();
+    setCreateError('');
+    setForm({ nome: '', protocolo: protocolos.some(item => item.codigo === 'mitose') ? 'mitose' : (protocolos[0]?.codigo ?? ''), especie: '', tratamento: '', meta: DEFAULT_MITOSIS_GOAL });
+    setCreating(true);
+  }
+
+  async function create(event: FormEvent) {
+    event.preventDefault();
+    const protocolo = protocolos.find(item => item.codigo === form.protocolo);
+    if (!canCreate || saving || !form.nome.trim() || !protocolo) return;
+    setSaving(true);
+    setCreateError('');
+    try {
+      const created = await api.criarLamina({
+        id: newSlideId.current,
+        protocoloVersaoId: protocolo.versaoAtual.id,
+        ...(laboratoryId ? { laboratorioId: laboratoryId } : {}),
+        nome: form.nome.trim(),
+        especie: form.especie.trim(),
+        tratamento: form.tratamento.trim(),
+        meta: form.meta ? Number(form.meta) : null,
+      });
+      upsert(created);
+      setCreating(false);
+      navigate(caminhoLamina(laboratoryId, created.id));
+    } catch (failure) {
+      setCreateError(mensagemDeErro(failure, 'Não foi possível criar a lâmina.'));
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  function leaveDetail(message = '') {
+    setNotice(message);
+    // A lâmina que saiu não existe mais: troca o endereço dela em vez de empilhar, para o Voltar não reabri-la.
+    navigate(caminhoLaminas(laboratoryId), { replace: true });
+  }
+
+  const matched = slides.filter(item => `${item.nome} ${item.especie} ${item.tratamento}`.toLocaleLowerCase('pt-BR').includes(query.toLocaleLowerCase('pt-BR')));
+  const totalCells = slides.reduce((sum, item) => sum + item.totalCelulas, 0);
+  const scopeName = laboratory?.nome ?? 'Lâminas avulsas';
+
+  return <>
+    <div className={`page-container slide-navigation${readOnly ? ' labs-read-only' : ''}`}>
+      <nav className="lab-scope-nav" aria-label="Caminho de navegação">
+        <button className="text-button" type="button" onClick={onBack}>Meus laboratórios</button><ChevronRight size={14} aria-hidden="true" />
+        {slide ? <><span>{scopeName}</span><ChevronRight size={14} aria-hidden="true" /><button className="text-button" type="button" onClick={() => { setNotice(''); navigate(caminhoLaminas(laboratoryId)); }}>Lâminas</button><ChevronRight size={14} aria-hidden="true" /><strong aria-current="page">{slide.nome}</strong></> : <strong aria-current="page">{scopeName}</strong>}
+      </nav>
+    </div>
+    {readOnly && <p className="page-container lab-muted">Este laboratório está desativado. Os registros estão disponíveis somente para leitura.</p>}
+    {notice && <p className="page-container slide-notice" role="status">{notice}</p>}
+    {error && <div className="error-banner" role="alert">{error}<button type="button" onClick={() => setError('')} aria-label="Dispensar"><X size={16} /></button></div>}
+    {status === 'loading' ? <main className="page-container home slide-state" aria-live="polite"><p>Carregando as lâminas…</p></main>
+      : status === 'error' ? <main className="page-container home slide-state"><h1 className={typeClass('title')}>Não foi possível carregar as lâminas</h1><p>{loadError}</p><button className="button secondary" type="button" onClick={() => setRetry(value => value + 1)}>Tentar de novo</button></main>
+      : active && !slide ? <main className="page-container home slide-state"><h1 className={typeClass('title')}>Lâmina não encontrada</h1><p>Esta lâmina não existe ou você não tem acesso a ela.</p><Link className="button secondary" to={caminhoLaminas(laboratoryId)}>Ver as lâminas</Link></main>
+      : !slide ? <main className="page-container home">
+        <div className="page-heading"><div><h1 className={typeClass('display')}>Lâminas</h1><p>Organize suas lâminas e acompanhe a contagem de células.</p></div>{canCreate && <button className="button primary" type="button" onClick={openNew}><Plus size={17} /> Nova lâmina</button>}</div>
+        <section className="overview" aria-label="Visão geral"><div className="overview-intro"><span className="overview-symbol"><FlaskConical size={22} /></span><div><h2 className={typeClass('title')}>Resumo</h2><p>Totais das lâminas e células registradas.</p></div></div><div className="overview-stat"><span>Lâminas registradas</span><strong>{slides.length}</strong></div><div className="overview-stat"><span>Células contadas</span><strong>{totalCells.toLocaleString('pt-BR')}</strong></div></section>
+        <section className="list-section"><div className="section-heading"><div><h2 className={typeClass('title')}>Registros</h2></div><label className="search"><Search size={17} /><span className="sr-only">Buscar lâminas</span><input placeholder="Buscar lâmina" value={query} onChange={event => setQuery(event.target.value)} /></label></div>
+          {matched.length ? <div className="slide-list"><div className="list-labels"><span>Identificação</span><span>Protocolo</span><span>Células</span><span>Criada por</span><span>Criada em</span><span /></div>{matched.map(item => <button className="slide-row" type="button" key={item.id} onClick={() => { setNotice(''); navigate(caminhoLamina(laboratoryId, item.id)); }}><span className="slide-identity"><span><strong>{item.nome}</strong>{(item.especie || item.tratamento) && <small>{[item.especie, item.tratamento].filter(Boolean).join(' · ')}</small>}</span></span><span><span className="protocol-tag">{protocolOf(item)?.nome ?? 'Protocolo'}</span></span><span className="numeric">{item.totalCelulas.toLocaleString('pt-BR')}</span><span className="slide-creator"><span className="creator-label">Criada por: </span>{item.donoNome}</span><span className="date">{formatarData(item.criadaEm)}</span><ChevronRight size={17} className="row-arrow" /></button>)}</div>
+            : <div className="empty-state"><span className="empty-symbol"><Microscope size={25} /></span><h3>{query ? 'Nenhuma lâmina encontrada' : 'Comece pela primeira lâmina'}</h3><p>{query ? 'Tente buscar por outra identificação, espécie ou tratamento.' : canCreate ? 'Crie uma lâmina para registrar suas observações e acompanhar a contagem de células.' : 'Ainda não há lâminas neste laboratório.'}</p>{!query && canCreate && <button className="button secondary" type="button" onClick={openNew}><Plus size={16} /> Nova lâmina</button>}</div>}</section>
+      </main>
+        : <SlideDetail key={slide.id} api={api} laminaId={slide.id} usuarioId={usuarioId} readOnly={readOnly} protocolos={protocolos} onError={setError} onGone={message => { setSlides(current => current.filter(item => item.id !== slide.id)); leaveDetail(message); }} onLaminaChanged={upsert} onDeleted={id => { setSlides(current => current.filter(item => item.id !== id)); leaveDetail(); }} />}
+    <footer className="footer page-container"><span>Laboratório de Citogenética · UFLA</span></footer>
+    {creating && <Modal title="Nova lâmina" onClose={() => setCreating(false)}><form onSubmit={event => void create(event)}>
+      <p className="modal-description">Identifique a lâmina e escolha o protocolo da análise.</p>
+      <label>Identificação da lâmina<input autoFocus required maxLength={120} placeholder="Ex.: L1 – planta A" value={form.nome} onChange={event => setForm({ ...form, nome: event.target.value })} /></label>
+      <ProtocolSelect value={form.protocolo} options={options} onChange={protocolo => setForm({ ...form, protocolo, meta: protocolo === 'mitose' ? DEFAULT_MITOSIS_GOAL : '' })} />
+      <label>Meta de contagem <span>Opcional</span><input type="number" min="1" step="1" max="10000000" value={form.meta} onChange={event => setForm({ ...form, meta: event.target.value })} placeholder="Quantidade de células" /></label>
+      {form.protocolo === 'mitose' && <div className="form-grid"><label>Espécie <span>Opcional</span><input maxLength={120} value={form.especie} onChange={event => setForm({ ...form, especie: event.target.value })} placeholder="Nome da espécie" /></label><label>Tratamento <span>Opcional</span><input maxLength={120} value={form.tratamento} onChange={event => setForm({ ...form, tratamento: event.target.value })} placeholder="Ex.: controle" /></label></div>}
+      {createError && <p className="select-error" role="alert">{createError}</p>}
+      <div className="modal-actions"><button type="button" className="button secondary" onClick={() => setCreating(false)}>Cancelar</button><button className="button primary" disabled={saving}>Criar lâmina <ArrowRight size={16} /></button></div>
+    </form></Modal>}
+  </>;
 }

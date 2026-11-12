@@ -10,8 +10,8 @@ const slide = {id:'1',name:'L1',protocol:'mitose',species:'',treatment:'',notes:
  {id:'b',phase:'Prófase',status:'anormal',type:'Micronúcleo',createdAt:'2026-10-27T12:01:00Z'},
  {id:'c',phase:'Prófase',status:'normal',type:'',createdAt:'2026-10-27T12:02:00Z'}
 ]};
-test('resumo deriva os totais, tipos e índice mitótico dos lançamentos',()=>{const result=summary(slide);assert.equal(result.total,3);assert.equal(result.abnormal,1);assert.equal(result.phases[1].total,2);assert.equal(result.phases[1].types['Micronúcleo'],1);assert.equal(pct(result.im,100),'66,7%');assert.equal(pct(1,result.phases[1].total),'50,0%')});
-test('lâmina vazia não divide por zero',()=>{const result=summary({...slide,entries:[]});assert.equal(result.im,0);assert.equal(pct(0,0),'0,0%')});
+test('resumo deriva os totais, tipos e índice mitótico dos lançamentos',()=>{const result=summary(slide);assert.equal(result.total,3);assert.equal(result.abnormal,1);assert.equal(result.phases[1].total,2);assert.equal(result.phases[1].types['Micronúcleo'],1);assert.equal(pct(result.im,100),'66,67%');assert.equal(pct(1,result.phases[1].total),'50,00%')});
+test('lâmina vazia não divide por zero',()=>{const result=summary({...slide,entries:[]});assert.equal(result.im,0);assert.equal(pct(0,0),'0,00%')});
 test('normalização evita duplicação por caixa e espaços',()=>assert.equal(normalize('  MICROnúcleo  extra '),normalize('micronúcleo extra')));
 test('backup reconhece estrutura válida e rejeita protocolo ou fase inválidos',()=>{assert.equal(isState({...emptyState(),slides:[slide]}),true);assert.equal(isState({...emptyState(),slides:[{...slide,protocol:'outro'}]}),false);assert.equal(isState({...emptyState(),slides:[{...slide,entries:[{...slide.entries[0],phase:'inválida'}]}]}),false)});
 

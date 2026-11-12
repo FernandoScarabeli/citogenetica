@@ -5,7 +5,7 @@ import { useSize } from '../lib/size-context';
 interface AuthLayoutProps {
   title: string;
   titleId: string;
-  description: string;
+  description: ReactNode;
   children: ReactNode;
   titleRef?: Ref<HTMLHeadingElement>;
   titleFocusable?: boolean;

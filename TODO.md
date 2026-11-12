@@ -76,7 +76,7 @@ Nada é commitado até o fim da sequência.
 
 ### 1.4 Etapas da API (seguindo o planejamento)
 - [x] **Etapa 1 · Base**: Laboratório, Participação (ATIVA/SAIU/REMOVIDA), Convite (hash do token, expiração, aceite atômico), Vínculo de orientação, regra do último administrador; `LaboratorioAccessQuery` pronta para as lâminas da Etapa 2
-- [~] **Etapa 2 · Contagem** (back-end pronto; falta ligar a tela e migrar as lâminas locais): Protocolo, Versão (imutável quando publicada), Fase (`conta_como_divisao`), Tipo de anormalidade (fixo e personalizado, normalização), Lâmina, Registro (`quantidade`, `registrado_em`, `fuso_registro`, exclusão lógica, versão), cálculos oficiais (totais, %, IM), desfazer, edição, histórico; seed de meiose e mitose
+- [x] **Etapa 2 · Contagem**: Protocolo, Versão (imutável quando publicada), Fase (`conta_como_divisao`), Tipo de anormalidade (fixo e personalizado, normalização), Lâmina, Registro (`quantidade`, `registrado_em`, `fuso_registro`, exclusão lógica, versão), cálculos oficiais (totais, %, IM), desfazer, edição, histórico; seed de meiose e mitose
 - [ ] **Etapa 3 · Dados**: exportação JSON versionada, importador dos backups legados (sem duplicar), CSV (resumo e uma linha por registro), PDF
 - [ ] **Etapa 4 · Offline/sync**: operações idempotentes (`operacao_id` + hash do payload), revisões, conflitos, consulta incremental com cursor
 - [ ] **Etapa 5 · Pesquisa**: Projeto, Experimento, editor de protocolos configuráveis
@@ -89,17 +89,17 @@ Nada é commitado até o fim da sequência.
 
 ### 2.1 Correções no que já existe
 - [x] Papéis sem hierarquia: admin não herda permissão de editar contagens (o planejamento é explícito) — papéis de laboratório já vêm da API e são combináveis; aplicado às contagens na API (Etapa 2)
-- [ ] Histórico por dia + edição de registro (o modal existe, mas nada abre ele)
-- [ ] "Desfazer" sem apagar registros em sequência depois de recarregar (limite e/ou confirmação)
-- [ ] Lote como **1 registro com `quantidade`**, e não N registros
+- [x] Histórico por dia + edição de registro
+- [x] "Desfazer" sem apagar registros em sequência depois de recarregar (limite e/ou confirmação)
+- [x] Lote como **1 registro com `quantidade`**, e não N registros
 - [ ] Importação mesclando por id de registro (não substituir a lâmina inteira) + prévia de conflitos
-- [ ] Escopo das anormalidades personalizadas: usuário + laboratório + fase
+- [x] Escopo das anormalidades personalizadas: usuário + laboratório + fase
 - [ ] Excluir lâmina: tratar falha do `commit`
 - [ ] CSV: escapar células que começam com `=`, `+`, `-` ou `@`
-- [ ] "Criada por" com dado real
+- [x] "Criada por" com dado real
 
 ### 2.2 Integração com a API
-- [~] Camada `api/` substituindo `storage.ts`, `laboratories.ts` e `demoUser` — `laboratories.ts` e `demoUser` removidos; `storage.ts` (lâminas) segue local até a Etapa 2
+- [x] Camada `api/` substituindo `storage.ts`, `laboratories.ts` e `demoUser` — `storage.ts` fica só para o backup e o envio das lâminas antigas do navegador
 - [x] Telas de cadastro, login, recuperação de senha e verificação de e-mail (e Minha conta: nome, senha, troca de e-mail)
 - [x] Laboratórios, convites e membros reais (e orientação)
 - [ ] Contagem, lâminas, resumo e IM vindos da API

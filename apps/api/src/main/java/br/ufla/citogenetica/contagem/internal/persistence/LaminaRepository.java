@@ -56,12 +56,12 @@ public interface LaminaRepository extends JpaRepository<Lamina, UUID> {
     @Query(value = """
             INSERT INTO lamina (id, version, created_at, last_modified_at, dono_usuario_id, laboratorio_id,
                                 protocolo_versao_id, nome, especie, tratamento, observacoes, meta, excluida_em)
-            VALUES (:id, 0, :agora, :agora, :donoId, :laboratorioId, :protocoloVersaoId, :nome, :especie,
+            VALUES (:id, 0, :criadaEm, :agora, :donoId, :laboratorioId, :protocoloVersaoId, :nome, :especie,
                     :tratamento, :observacoes, CAST(:meta AS INTEGER), NULL)
             ON CONFLICT DO NOTHING
             """, nativeQuery = true)
     int inserirSeAusente(
-            @Param("id") UUID id, @Param("agora") Instant agora, @Param("donoId") Long donoId,
+            @Param("id") UUID id, @Param("criadaEm") Instant criadaEm, @Param("agora") Instant agora, @Param("donoId") Long donoId,
             @Param("laboratorioId") UUID laboratorioId, @Param("protocoloVersaoId") UUID protocoloVersaoId,
             @Param("nome") String nome, @Param("especie") String especie, @Param("tratamento") String tratamento,
             @Param("observacoes") String observacoes, @Param("meta") Integer meta);

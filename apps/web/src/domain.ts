@@ -34,7 +34,7 @@ export function summary(slide: Slide) {
   const dividing = phases.filter(p => p.name !== 'Interfase').reduce((sum,p) => sum + p.total, 0);
   return {phases, total, abnormal: phases.reduce((sum,p)=>sum+p.abnormal,0), im: total ? dividing / total * 100 : 0};
 }
-export const pct = (num: number, den: number) => `${(den ? num / den * 100 : 0).toFixed(1).replace('.', ',')}%`;
+export const pct = (num: number, den: number) => `${(den ? num / den * 100 : 0).toFixed(2).replace('.', ',')}%`;
 export function isState(value: unknown): value is State {
   if (!value || typeof value !== 'object') return false;
   const v = value as State;

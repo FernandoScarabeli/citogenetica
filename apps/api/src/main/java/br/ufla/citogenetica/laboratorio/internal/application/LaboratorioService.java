@@ -249,6 +249,7 @@ public class LaboratorioService {
         Participacao alvo = participacaoRepository.findByIdAndLaboratorioIdForUpdate(participacaoId, laboratorioId)
                 .filter(participacao -> participacao.getEstado() == EstadoParticipacao.ATIVA)
                 .orElseThrow(() -> new NotFoundException(NAO_ENCONTRADO));
+        orientacaoLifecycleService.exigirSemOrientandosAtivos(alvo.getId(), nomeDoUsuario(alvo.getUsuarioId()));
         encerrarParticipacao(laboratorioId, alvo, atorId, EstadoParticipacao.REMOVIDA);
     }
 
@@ -298,6 +299,11 @@ public class LaboratorioService {
         }
         papelRepository.findAllByParticipacaoIdAndRevogadoEmIsNull(alvo.getId())
                 .forEach(papel -> papel.revogar(atorId, agora));
+    }
+
+    private String nomeDoUsuario(Long usuarioId) {
+        return usuarioRosterQuery.buscarPorIds(List.of(usuarioId)).stream()
+                .findFirst().map(UsuarioRosterInfo::nome).orElse("esta pessoa");
     }
 
     private ParticipacaoPapel novoPapel(Participacao participacao, PapelLaboratorio papel, Long atorId) {

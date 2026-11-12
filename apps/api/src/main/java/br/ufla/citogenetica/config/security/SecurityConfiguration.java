@@ -158,7 +158,9 @@ public class SecurityConfiguration {
                                 "/api/v1/auth/confirmar-troca-email",
                                 "/api/v1/auth/recuperar-senha",
                                 "/api/v1/auth/redefinir-senha",
-                                "/api/v1/auth/validar-codigo").permitAll()
+                                "/api/v1/auth/validar-codigo",
+                                "/api/v1/convites/previa",
+                                "/api/v1/orientacoes/convites/previa").permitAll()
 
                         .requestMatchers("/api/v1/admin/laboratorios/**").hasRole("ADMIN")
                         .requestMatchers("/api/v1/laboratorios", "/api/v1/laboratorios/**").authenticated()

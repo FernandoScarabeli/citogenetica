@@ -15,9 +15,12 @@ interface SessionContextValue {
   user: UsuarioResponseDTO | null;
   status: SessionStatus;
   loadError: unknown;
+  /** Verdadeiro quando uma sessão que estava aberta terminou (resposta 401 no meio do uso). */
+  expired: boolean;
   retry: () => Promise<void>;
   login: (email: string, senha: string) => Promise<UsuarioResponseDTO>;
-  logout: () => Promise<void>;
+  /** Se informado, a tela de entrada leva de volta a esse endereço depois do login. */
+  logout: (returnTo?: string) => Promise<void>;
   updateUser: (user: UsuarioResponseDTO) => void;
   clearSession: () => void;
 }
@@ -30,12 +33,15 @@ interface SessionProviderProps {
   notifications?: Pick<typeof notificacaoApi, 'startRealtime' | 'stopRealtime'>;
 }
 
+export const SESSION_EXPIRED_NOTICE = 'Sua sessão terminou. Entre de novo para continuar.';
+
 const SessionContext = createContext<SessionContextValue | null>(null);
 
 export function SessionProvider({ children, auth = authApi, usuario = usuarioApi, client = httpClient, notifications = notificacaoApi }: SessionProviderProps) {
   const [user, setUser] = useState<UsuarioResponseDTO | null>(null);
   const [status, setStatus] = useState<SessionStatus>('loading');
   const [loadError, setLoadError] = useState<unknown>(null);
+  const [expired, setExpired] = useState(false);
   const navigate = useNavigate();
   const location = useLocation();
   const statusRef = useRef(status);
@@ -53,6 +59,7 @@ export function SessionProvider({ children, auth = authApi, usuario = usuarioApi
       const currentUser = await usuario.getMe();
       if (requestGeneration !== sessionGenerationRef.current) return;
       setUser(currentUser);
+      setExpired(false);
       setStatus('authenticated');
     } catch (error) {
       if (requestGeneration !== sessionGenerationRef.current) return;
@@ -79,6 +86,7 @@ export function SessionProvider({ children, auth = authApi, usuario = usuarioApi
       || currentLocation.pathname === '/confirmar-troca-email';
     setUser(null);
     setLoadError(null);
+    setExpired(true);
     setStatus('unauthenticated');
     if (currentLocation.pathname !== '/entrar' && !publicConfirmation) {
       const returnTo = currentInternalPath(
@@ -86,7 +94,7 @@ export function SessionProvider({ children, auth = authApi, usuario = usuarioApi
         currentLocation.search,
         currentLocation.hash,
       );
-      navigate('/entrar', { replace: true, state: { returnTo } });
+      navigate('/entrar', { replace: true, state: { returnTo, notice: SESSION_EXPIRED_NOTICE } });
     }
     notifications.stopRealtime();
   }), [client, navigate, notifications]);
@@ -103,6 +111,7 @@ export function SessionProvider({ children, auth = authApi, usuario = usuarioApi
     if (requestGeneration === sessionGenerationRef.current) {
       setUser(currentUser);
       setLoadError(null);
+      setExpired(false);
       setStatus('authenticated');
     }
     return currentUser;
@@ -123,7 +132,7 @@ export function SessionProvider({ children, auth = authApi, usuario = usuarioApi
     setStatus('unauthenticated');
   }, [notifications]);
 
-  const logout = useCallback(async () => {
+  const logout = useCallback(async (returnTo?: string) => {
     notifications.stopRealtime();
     const requestGeneration = ++sessionGenerationRef.current;
     let notice: string | undefined;
@@ -136,12 +145,12 @@ export function SessionProvider({ children, auth = authApi, usuario = usuarioApi
         setUser(null);
         setLoadError(null);
         setStatus('unauthenticated');
-        navigate('/entrar', { replace: true, state: notice ? { notice } : null });
+        navigate('/entrar', { replace: true, state: notice || returnTo ? { notice, returnTo } : null });
       }
     }
   }, [auth, navigate, notifications]);
 
-  return <SessionContext.Provider value={{ user, status, loadError, retry, login, logout, updateUser, clearSession }}>
+  return <SessionContext.Provider value={{ user, status, loadError, expired, retry, login, logout, updateUser, clearSession }}>
     {children}
   </SessionContext.Provider>;
 }
