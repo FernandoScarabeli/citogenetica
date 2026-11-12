@@ -560,7 +560,7 @@ export function SlideDetail({ api, laminaId, usuarioId, readOnly, protocolos, on
   const extraForEdit = editing && editing.faseId === phaseId ? editing.tipos : [];
   const batchOptions = (faseId: string) => optionsFor(faseId);
 
-  return <main className={`page-container detail${tab === 'contagem' ? ' is-counting' : ''}`}>
+  return <main className="page-container detail">
     <div className="detail-heading">
       <div>
         <div className="title-line"><h1 className={typeClass('display')}>{lamina.nome}</h1><span className="protocol-tag">{protocolo?.nome ?? 'Protocolo'}</span></div>
