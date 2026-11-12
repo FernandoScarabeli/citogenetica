@@ -27,7 +27,7 @@
         <java.version>17</java.version>
         <springdoc.version>2.10.0</springdoc.version>
         <org.mapstruct.version>1.6.3</org.mapstruct.version>
-        <aws.sdk.version>2.57.9</aws.sdk.version>
+        <aws.sdk.version>2.57.12</aws.sdk.version>
         <testcontainers.version>1.21.4</testcontainers.version>
         <archunit.version>1.5.1</archunit.version>
     </properties>
