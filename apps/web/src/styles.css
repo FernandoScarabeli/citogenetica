@@ -125,27 +125,21 @@ form label.combo-option:hover{background:var(--lab-ground,#f2f5f2)}
 form label.combo-option input{flex:none;width:18px;height:18px;margin:0;padding:0;accent-color:var(--lab-accent,#263d32)}
 
 /* Contagem: resumo numa faixa só, para as fases começarem no alto. */
-.count-strip{display:flex;flex-wrap:wrap;align-items:center;gap:6px 22px;padding:10px 16px;background:var(--lab-surface,#fff);border:1px solid var(--lab-line,#e4eae4);border-radius:6px;font-size:var(--fs-caption);line-height:var(--lh-caption);color:var(--lab-muted,#748077)}
-.count-strip strong{margin-left:4px;color:var(--lab-ink,#25362b);font-size:var(--fs-body);font-weight:600;font-variant-numeric:tabular-nums}
-.count-strip-goal{display:flex;align-items:center;gap:0;flex:1 1 220px;min-width:200px}
-.count-strip-goal .progress-track{flex:1;min-width:60px;margin-left:10px;display:block;height:6px;border-radius:3px;background:var(--lab-line,#e3e9e3);overflow:hidden}
-.count-strip-goal .progress-track>span{display:block;height:100%;background:var(--lab-accent,#355c47)}
-.detail.is-counting .detail-heading{margin:0 0 12px;gap:12px;align-items:center}
-.detail.is-counting .detail-heading p{margin-top:2px}
-.detail.is-counting{padding-top:16px}
-.detail.is-counting .tabs{margin:14px 0 14px}
-.detail.is-counting .tabs button{padding-bottom:9px}
-.detail.is-counting .section-heading.compact{margin-bottom:10px}
-.detail.is-counting .section-heading.compact p{display:none}
-.detail.is-counting .phase-row{min-height:76px;padding:10px 18px}
-.detail.is-counting .workspace{gap:20px}
+
+
+
+
+
+
+
+
+
 /* Número perto do nome da fase em telas largas. */
 @media(min-width:601px){.phase-row{grid-template-columns:minmax(170px,230px) minmax(280px,440px);justify-content:start;column-gap:28px}}
 @media(max-width:600px){
- .count-strip{gap:4px 14px;padding:8px 12px}
- .detail.is-counting .detail-heading{margin-bottom:8px}
- .detail.is-counting .detail-heading p{display:none}
- .detail.is-counting .tabs{margin:10px 0}
- .detail.is-counting .section-heading.compact{margin-bottom:6px}
- .detail.is-counting .phase-row{padding:12px 16px;gap:8px}
+
+
+
+
+
 }
