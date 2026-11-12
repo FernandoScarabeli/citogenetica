@@ -2,6 +2,8 @@
 
 > Escrita em 2026-11-08. Para o Claude que vai conduzir a revisão.
 > **Se algo aqui divergir do código, o código vence.** Confira antes de afirmar.
+>
+> **Atualização de 2026-11-12:** as duas fases terminaram. Veja a seção "Situação" de `docs/revisao-fluxos.md`.
 
 ## 1. Por que esta revisão existe
 
