@@ -400,6 +400,22 @@ describe('gestão de laboratórios reais', () => {
     expect(await screen.findByText(/É necessário manter ao menos um Administrador ativo/)).toBeTruthy();
   });
 
+  it('mostra a mensagem de orientandos ativos ao remover e não a repete ao abrir a janela de novo', async () => {
+    const user = userEvent.setup();
+    const mensagem = 'Encerre as orientações de Bruna Almeida antes de removê-lo do laboratório.';
+    api.removerParticipacao.mockRejectedValueOnce(apiError(409, mensagem));
+    renderPage();
+    await openLaboratoryManagement(user);
+    await user.click(screen.getByRole('button', { name: 'Remover Bruna Almeida do laboratório' }));
+    await user.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Remover participação' }));
+    expect(await screen.findByText(mensagem)).toBeTruthy();
+
+    await user.click(screen.getByRole('button', { name: 'Remover Bruna Almeida do laboratório' }));
+    const dialog = screen.getByRole('dialog');
+    expect(within(dialog).queryByText(mensagem)).toBeNull();
+    expect(screen.queryByText(mensagem)).toBeNull();
+  });
+
   it('mostra o motivo de permissão 403 ao renomear', async () => {
     const user = userEvent.setup();
     api.atualizarNome.mockRejectedValueOnce(apiError(403, 'Acesso negado.'));

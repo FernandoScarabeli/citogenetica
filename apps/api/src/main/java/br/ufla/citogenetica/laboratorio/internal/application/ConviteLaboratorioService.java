@@ -26,6 +26,8 @@ import br.ufla.citogenetica.shared.web.error.ConflictException;
 import br.ufla.citogenetica.shared.web.error.NotFoundException;
 import br.ufla.citogenetica.usuario.api.UsuarioConviteInfo;
 import br.ufla.citogenetica.usuario.api.UsuarioConviteQuery;
+import br.ufla.citogenetica.usuario.api.UsuarioRosterInfo;
+import br.ufla.citogenetica.usuario.api.UsuarioRosterQuery;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.LockModeType;
 import jakarta.persistence.PersistenceContext;
@@ -46,6 +48,7 @@ public class ConviteLaboratorioService {
     private final ParticipacaoRepository participacaoRepository;
     private final ParticipacaoConviteService participacaoConviteService;
     private final UsuarioConviteQuery usuarioConviteQuery;
+    private final UsuarioRosterQuery usuarioRosterQuery;
     private final ConviteLaboratorioRateLimitService rateLimitService;
     private final ConviteTokenService tokenService;
     private final ConviteLaboratorioProperties properties;
@@ -62,6 +65,7 @@ public class ConviteLaboratorioService {
                                      ParticipacaoRepository participacaoRepository,
                                      ParticipacaoConviteService participacaoConviteService,
                                      UsuarioConviteQuery usuarioConviteQuery,
+                                     UsuarioRosterQuery usuarioRosterQuery,
                                      ConviteLaboratorioRateLimitService rateLimitService,
                                      ConviteTokenService tokenService,
                                      ConviteLaboratorioProperties properties,
@@ -74,6 +78,7 @@ public class ConviteLaboratorioService {
         this.participacaoRepository = participacaoRepository;
         this.participacaoConviteService = participacaoConviteService;
         this.usuarioConviteQuery = usuarioConviteQuery;
+        this.usuarioRosterQuery = usuarioRosterQuery;
         this.rateLimitService = rateLimitService;
         this.tokenService = tokenService;
         this.properties = properties;
@@ -160,6 +165,27 @@ public class ConviteLaboratorioService {
         }
     }
 
+    /** Pública: quem tem o link vê o nome do laboratório e de quem convidou, sem precisar entrar. */
+    @Transactional(readOnly = true)
+    public PreviaConvite previa(String token, String enderecoIp, String emailSessao) {
+        rateLimitService.limitarPreviaPorIp(enderecoIp);
+        byte[] hash = tokenService.hash(token);
+        ConviteLaboratorio convite = buscarPorToken(hash);
+        if (convite.getEstado() != EstadoConviteLaboratorio.PENDENTE
+                || !tokenService.iguais(convite.getTokenHash(), hash)
+                || convite.getLaboratorio().getEstado() != EstadoLaboratorio.ATIVO) {
+            throw new BadRequestException(CONVITE_INDISPONIVEL);
+        }
+        String convidadoPor = usuarioRosterQuery.buscarPorIds(List.of(convite.getConvidadoPorUsuarioId())).stream()
+                .findFirst().map(UsuarioRosterInfo::nome).orElseThrow(() -> new BadRequestException(CONVITE_INDISPONIVEL));
+        List<String> papeis = papeisConcedidos(convite).stream()
+                .sorted(Comparator.comparing(PapelLaboratorio::name)).map(Enum::name).toList();
+        PreviaConvite.Estado estado = convite.getExpiraEm().isAfter(clock.instant())
+                ? PreviaConvite.Estado.PENDENTE : PreviaConvite.Estado.EXPIRADO;
+        return new PreviaConvite(convite.getLaboratorio().getNome(), convidadoPor,
+                EmailMascarado.de(convite.getEmailDestino()), papeis, estado, paraContaAtual(convite.getEmailDestino(), emailSessao));
+    }
+
     @Transactional
     public void aceitar(String token, Long usuarioId, String emailSessao, String enderecoIp) {
         limitarConsumo(usuarioId, enderecoIp);
@@ -192,6 +218,11 @@ public class ConviteLaboratorioService {
         validarDestinatario(convite.getEmailDestino(), usuarioId, emailSessao);
         convite.recusar(usuarioId, clock.instant());
         conviteRepository.save(convite);
+    }
+
+    /** Sem sessão não há como saber: devolve nulo. Usa a mesma normalização do aceite. */
+    private Boolean paraContaAtual(String emailDestino, String emailSessao) {
+        return emailSessao == null ? null : emailDestino.equals(usuarioConviteQuery.normalizarEmail(emailSessao));
     }
 
     private void limitarConsumo(Long usuarioId, String enderecoIp) {

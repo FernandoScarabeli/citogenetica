@@ -2,6 +2,7 @@ package br.ufla.citogenetica.laboratorio.internal.web;
 
 import br.ufla.citogenetica.laboratorio.internal.application.ConviteLaboratorioService;
 import br.ufla.citogenetica.laboratorio.internal.web.dto.request.ConsumirConviteRequestDTO;
+import br.ufla.citogenetica.laboratorio.internal.web.dto.response.PreviaConviteResponseDTO;
 import br.ufla.citogenetica.usuario.api.UsuarioPrincipal;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
@@ -28,6 +29,22 @@ import org.springframework.web.bind.annotation.RestController;
 public class ConviteLaboratorioController {
 
     private final ConviteLaboratorioService conviteService;
+
+    @PostMapping("/previa")
+    @SecurityRequirement(name = "csrf-token")
+    @Operation(summary = "Ver o convite antes de entrar",
+            description = "Pública: quem tem o link vê o laboratório, quem convidou e o e-mail mascarado. O token vai no corpo, nunca na URL.")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Convite pendente ou expirado"),
+            @ApiResponse(responseCode = "400", description = "Convite inválido ou indisponível (resposta genérica)"),
+            @ApiResponse(responseCode = "429", description = "Limite de tentativas atingido")
+    })
+    public PreviaConviteResponseDTO previa(@RequestBody @Valid ConsumirConviteRequestDTO request,
+                                           @AuthenticationPrincipal UsuarioPrincipal principal,
+                                           HttpServletRequest servletRequest) {
+        String emailSessao = principal == null ? null : principal.email();
+        return PreviaConviteResponseDTO.de(conviteService.previa(request.token(), servletRequest.getRemoteAddr(), emailSessao));
+    }
 
     @PostMapping("/aceitar")
     @SecurityRequirement(name = "csrf-token")

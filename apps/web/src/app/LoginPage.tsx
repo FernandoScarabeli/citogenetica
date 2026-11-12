@@ -4,6 +4,7 @@ import { Link, Navigate, useLocation } from 'react-router';
 import { isRateLimited, isUnauthorized, NetworkError } from '../api/errors';
 import { useSession } from './SessionProvider';
 import { safeInternalPath } from './return-path';
+import { invitationPath, readPendingInvitation } from './pending-invitation';
 import { AuthLayout } from './AuthLayout';
 
 interface LoginLocationState {
@@ -83,7 +84,12 @@ export function LoginPage() {
   }
 
   // Com a sessão aberta (agora ou de antes), segue para onde a pessoa queria ir ou para os laboratórios.
-  if (status === 'authenticated') return <Navigate to={safeInternalPath(locationState?.returnTo) ?? '/laboratorios'} replace/>;
+  // Quem criou a conta a partir de um convite volta a ele, mesmo depois de confirmar o e-mail em outra aba.
+  if (status === 'authenticated') {
+    const pending = readPendingInvitation();
+    const destination = safeInternalPath(locationState?.returnTo) ?? (pending ? invitationPath(pending.kind) : '/laboratorios');
+    return <Navigate to={destination} replace/>;
+  }
 
   const descriptionId = message ? 'login-error' : undefined;
   const countdown = retrySeconds !== null && retrySeconds > 0

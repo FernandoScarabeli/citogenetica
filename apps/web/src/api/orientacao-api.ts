@@ -1,5 +1,6 @@
 import type { HttpClient } from './http-client';
 import { httpClient } from './http-client';
+import type { PreviaConviteResponseDTO } from './contracts/convite';
 import type {
   ConsumirConviteOrientacaoRequestDTO,
   ConviteOrientacaoResponseDTO,
@@ -53,6 +54,13 @@ export function createOrientacaoApi(client: Pick<HttpClient, 'request'> = httpCl
         `${LABORATORIES_PATH}/${encodeURIComponent(laboratorioId)}/orientacoes/convites/${encodeURIComponent(conviteId)}`,
         { method: 'DELETE', ...(signal ? { signal } : {}) },
       );
+    },
+
+    previaConvite(token: string, signal?: AbortSignal): Promise<PreviaConviteResponseDTO> {
+      const request: ConsumirConviteOrientacaoRequestDTO = { token };
+      return client.request<PreviaConviteResponseDTO>(`${ORIENTATION_INVITATIONS_PATH}/previa`, {
+        method: 'POST', json: request, ...(signal ? { signal } : {}),
+      });
     },
 
     aceitarConvite(token: string, signal?: AbortSignal): Promise<void> {

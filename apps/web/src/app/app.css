@@ -81,6 +81,10 @@
 
   .auth-page .invitation-session-error { display: grid; gap: 12px; }
   .auth-page .invitation-session-error p { margin: 0; }
+  .auth-page .invitation-actions:has(> :only-child) { grid-template-columns: 1fr; }
+  .auth-page .invitation-details { margin: 0 0 14px; color: var(--access-muted); font-size: var(--fs-body); }
+  .auth-page .invitation-details p { margin: 0 0 6px; }
+  .auth-page .invitation-details strong { color: var(--access-ink); font-weight: 550; }
   .auth-page .invitation-account { margin: 0 0 14px; color: var(--access-muted); font-size: var(--fs-body); }
   .auth-page .invitation-account strong { color: var(--access-ink); font-weight: 550; }
 

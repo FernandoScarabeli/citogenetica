@@ -17,7 +17,8 @@ interface SessionContextValue {
   loadError: unknown;
   retry: () => Promise<void>;
   login: (email: string, senha: string) => Promise<UsuarioResponseDTO>;
-  logout: () => Promise<void>;
+  /** Se informado, a tela de entrada leva de volta a esse endereço depois do login. */
+  logout: (returnTo?: string) => Promise<void>;
   updateUser: (user: UsuarioResponseDTO) => void;
   clearSession: () => void;
 }
@@ -123,7 +124,7 @@ export function SessionProvider({ children, auth = authApi, usuario = usuarioApi
     setStatus('unauthenticated');
   }, [notifications]);
 
-  const logout = useCallback(async () => {
+  const logout = useCallback(async (returnTo?: string) => {
     notifications.stopRealtime();
     const requestGeneration = ++sessionGenerationRef.current;
     let notice: string | undefined;
@@ -136,7 +137,7 @@ export function SessionProvider({ children, auth = authApi, usuario = usuarioApi
         setUser(null);
         setLoadError(null);
         setStatus('unauthenticated');
-        navigate('/entrar', { replace: true, state: notice ? { notice } : null });
+        navigate('/entrar', { replace: true, state: notice || returnTo ? { notice, returnTo } : null });
       }
     }
   }, [auth, navigate, notifications]);

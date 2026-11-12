@@ -456,6 +456,12 @@ export function Laboratories({ user, onLogout, onUserUpdate, renderSlides, api =
     }
   }
 
+  /** Abre a janela de confirmação sem o erro da vez anterior. */
+  function openConfirmation(next: Confirmation) {
+    setPageError('');
+    setConfirmation(next);
+  }
+
   async function confirmMembershipChange() {
     if (!currentLab || currentLab.estado !== 'ATIVO' || !confirmation || confirming) return;
     const target = confirmation;
@@ -556,7 +562,7 @@ export function Laboratories({ user, onLogout, onUserUpdate, renderSlides, api =
                 {section === 'members' ? <section className="members-section" aria-labelledby="members-title">
                   <div className="members-toolbar"><div><h2 id="members-title">Equipe do laboratório</h2></div><label className="members-search"><Search size={16} aria-hidden="true" /><span className="sr-only">Buscar membro por nome ou e-mail</span><input type="search" value={memberQuery} onChange={event => setMemberQuery(event.target.value)} placeholder="Buscar membro" /></label></div>
                   <div className="members-table-wrap"><table className="members-table"><thead><tr><th scope="col">Pessoa</th><th scope="col">Papéis</th>{admin && <th scope="col"><span className="sr-only">Ações</span></th>}</tr></thead><tbody>
-                    {visibleMembers.map(participation => <MemberRows key={participation.id} participation={participation} isMe={isCurrentUser(participation, user.email)} admin={!!admin} readOnly={currentLab.estado === 'DESATIVADO'} editing={editingParticipation === participation.id} roles={rolesDraft} saving={savingRoles} onEdit={() => beginRoleEdit(participation)} onRoles={setRolesDraft} onSave={event => void saveRoles(event, participation)} onCancel={() => setEditingParticipation(null)} onRemove={() => setConfirmation({ kind: 'remove', participation })} />)}
+                    {visibleMembers.map(participation => <MemberRows key={participation.id} participation={participation} isMe={isCurrentUser(participation, user.email)} admin={!!admin} readOnly={currentLab.estado === 'DESATIVADO'} editing={editingParticipation === participation.id} roles={rolesDraft} saving={savingRoles} onEdit={() => beginRoleEdit(participation)} onRoles={setRolesDraft} onSave={event => void saveRoles(event, participation)} onCancel={() => setEditingParticipation(null)} onRemove={() => openConfirmation({ kind: 'remove', participation })} />)}
                   </tbody></table>
                     {!visibleMembers.length && <div className="members-empty"><p>{memberQuery ? 'Nenhum membro encontrado.' : 'Não há membros ativos neste laboratório.'}</p>{memberQuery && <button className="text-button" type="button" onClick={() => setMemberQuery('')}>Limpar busca</button>}</div>}
                   </div>
@@ -565,7 +571,7 @@ export function Laboratories({ user, onLogout, onUserUpdate, renderSlides, api =
                   {admin ? <form className="laboratory-name-form" onSubmit={event => void saveLaboratoryName(event)}><label htmlFor="laboratory-name">Nome do laboratório</label><input id="laboratory-name" required maxLength={120} value={nameDraft} onChange={event => setNameDraft(event.target.value)} /><button className="button primary" type="submit" disabled={!nameDraft.trim() || savingName}>{savingName ? 'Salvando…' : 'Salvar nome'}</button></form>
                     : <div className="laboratory-read-only-name"><span>Nome do laboratório</span><strong>{currentLab.nome}</strong>{currentLab.estado === 'DESATIVADO' && <p>Este laboratório está desativado e disponível somente para consulta.</p>}</div>}
                 </section>}
-                {section === 'settings' && currentLab.estado === 'ATIVO' && <section className="leave-laboratory" aria-labelledby="leave-title"><div><h2 id="leave-title">Sair do laboratório</h2><p>Você perderá o acesso a este laboratório.</p></div><button className="button secondary" type="button" onClick={() => setConfirmation({ kind: 'leave' })}><LogOut size={16} aria-hidden="true" />Sair do laboratório</button></section>}
+                {section === 'settings' && currentLab.estado === 'ATIVO' && <section className="leave-laboratory" aria-labelledby="leave-title"><div><h2 id="leave-title">Sair do laboratório</h2><p>Você perderá o acesso a este laboratório.</p></div><button className="button secondary" type="button" onClick={() => openConfirmation({ kind: 'leave' })}><LogOut size={16} aria-hidden="true" />Sair do laboratório</button></section>}
                 </TabTransition>
                 </div>
               </>}
