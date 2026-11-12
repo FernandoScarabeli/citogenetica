@@ -275,6 +275,9 @@ describe('gestão de laboratórios reais', () => {
 
     renderPage();
     await screen.findByRole('heading', { name: 'Nenhum laboratório ainda' });
+    expect(screen.getByText(/Você ainda não participa de nenhum laboratório\. Se alguém vai te convidar, o convite chega por e-mail/)).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Abrir lâminas avulsas' })).toBeTruthy();
+    expect(screen.getByText('Lâminas que não pertencem a nenhum laboratório.')).toBeTruthy();
     await user.click(screen.getByRole('button', { name: 'Criar laboratório' }));
     await user.type(screen.getByLabelText('Nome do laboratório'), 'Citogenética vegetal');
     await user.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Criar laboratório' }));

@@ -81,3 +81,25 @@ export function mensagemDeErro(error: unknown, fallback: string): string {
 export function normalizarNomeTipo(nome: string): string {
   return nome.replace(/[\s\p{Z}\u0085]+/gu, ' ').trim().toLocaleLowerCase('pt-BR').normalize('NFD').replace(/\p{M}+/gu, '');
 }
+
+type RegistroDesfazivel = Pick<RegistroDTO, 'quantidade' | 'status'>;
+
+function celulasDoRegistro(registro: RegistroDesfazivel): string {
+  const plural = registro.quantidade !== 1;
+  if (registro.status === 'NORMAL') return plural ? 'normais' : 'normal';
+  return plural ? 'anormais' : 'anormal';
+}
+
+/** Texto do botão: diz o que será desfeito, por exemplo "Desfazer: 10 normais em Interfase". */
+export function rotuloDesfazer(registro: RegistroDesfazivel, fase: string): string {
+  return `Desfazer: ${registro.quantidade.toLocaleString('pt-BR')} ${celulasDoRegistro(registro)} em ${fase}`;
+}
+
+/** Frase da confirmação, por exemplo "10 células normais de Interfase". */
+export function descricaoDesfazer(registro: RegistroDesfazivel, fase: string): string {
+  const n = registro.quantidade;
+  const celulas = registro.status === 'NORMAL'
+    ? (n === 1 ? 'célula normal' : 'células normais')
+    : (n === 1 ? 'célula anormal' : 'células anormais');
+  return `${n.toLocaleString('pt-BR')} ${celulas} de ${fase}`;
+}

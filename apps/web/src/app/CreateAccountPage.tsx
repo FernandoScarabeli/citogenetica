@@ -73,7 +73,7 @@ export function CreateAccountPage() {
     globalErrorRef.current?.focus();
   }, [globalError]);
 
-  if (status === 'authenticated') return <Navigate to="/app" replace/>;
+  if (status === 'authenticated') return <Navigate to="/laboratorios" replace/>;
   if (status === 'loading') {
     return <main className="session-state" aria-live="polite"><p>Verificando sua sessão…</p></main>;
   }

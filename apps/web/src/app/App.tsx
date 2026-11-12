@@ -63,11 +63,13 @@ function ProtectedRoutes() {
 }
 
 function NotFoundPage() {
+  const { status } = useSession();
+  const home = status === 'authenticated' ? '/laboratorios' : '/';
   return <main className="not-found" aria-labelledby="not-found-title">
     <p className="not-found-code">404</p>
     <h1 id="not-found-title">Página não encontrada</h1>
     <p>O endereço informado não corresponde a uma página disponível.</p>
-    <Link className="button primary" to="/">Voltar à página inicial</Link>
+    <Link className="button primary" to={home}>Voltar à página inicial</Link>
   </main>;
 }
 
@@ -85,6 +87,7 @@ function AuthenticatedApp() {
 function RouteTable() {
   return <Routes>
     <Route path="/" element={<Landing/>}/>
+    <Route path="/app" element={<Navigate to="/laboratorios" replace/>}/>
     <Route path="/entrar" element={<LoginPage/>}/>
     <Route path="/criar-conta" element={<CreateAccountPage/>}/>
     <Route path="/confirmar-email" element={<ConfirmEmailPage/>}/>
@@ -93,7 +96,6 @@ function RouteTable() {
     <Route path="/orientacoes/convites/aceitar" element={<InvitationAcceptancePage kind="orientation"/>}/>
     <Route path="/recuperar-senha" element={<RecoverPasswordPage/>}/>
     <Route element={<ProtectedRoutes/>}>
-      <Route path="/app" element={<AuthenticatedApp/>}/>
       <Route path="/laboratorios" element={<AuthenticatedApp/>}/>
       <Route path="/perfil" element={<AuthenticatedApp/>}/>
       <Route path="/admin/laboratorios" element={<AdminLaboratoriesPage/>}/>

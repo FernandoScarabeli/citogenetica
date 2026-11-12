@@ -105,7 +105,7 @@ export function AdminLaboratories({ user, onLogout, api = adminApi }: {
 }
 
 function ForbiddenState() {
-  return <main className="container labs-main admin-forbidden" aria-labelledby="admin-forbidden-title">
+  return <main className="page-container labs-main admin-forbidden" aria-labelledby="admin-forbidden-title">
     <ShieldAlert size={28} aria-hidden="true" />
     <h1 id="admin-forbidden-title">Sem permissão para acessar esta página</h1>
     <p>A administração da plataforma é restrita a administradores gerais.</p>
@@ -207,7 +207,7 @@ function AdminLaboratoriesContent({ api }: { api: AdminApi }) {
 
   const filtering = !!filters.nome || !!filters.estado;
   const totalPages = result?.totalPages ?? 0;
-  return <main className="container labs-main admin-labs" aria-labelledby="admin-labs-title">
+  return <main className="page-container labs-main admin-labs" aria-labelledby="admin-labs-title">
     <FloatingNotice message={notice} onClose={() => setNotice('')} />
     <div className="labs-content">
       <Link className="admin-back" to="/laboratorios"><ChevronLeft size={15} aria-hidden="true" />Meus laboratórios</Link>

@@ -87,6 +87,45 @@ describe('sessão e rotas', () => {
     vi.clearAllMocks();
   });
 
+  it('unifica /app em /laboratorios', async () => {
+    mockApi({ me: async () => response(200, userDto) });
+    setPath('/app');
+    render(<App/>);
+    expect(await screen.findByRole('heading', { name: 'Meus laboratórios' })).toBeTruthy();
+    expect(window.location.pathname).toBe('/laboratorios');
+  });
+
+  it('leva quem já está logado da página inicial e de /entrar para os laboratórios', async () => {
+    mockApi({ me: async () => response(200, userDto) });
+    setPath('/');
+    const { unmount } = render(<App/>);
+    expect(await screen.findByRole('heading', { name: 'Meus laboratórios' })).toBeTruthy();
+    expect(window.location.pathname).toBe('/laboratorios');
+    unmount();
+
+    setPath('/entrar');
+    render(<App/>);
+    expect(await screen.findByRole('heading', { name: 'Meus laboratórios' })).toBeTruthy();
+    expect(window.location.pathname).toBe('/laboratorios');
+  });
+
+  it('na página inicial explica o sistema e não repete o acesso aos laboratórios', async () => {
+    mockApi();
+    setPath('/');
+    render(<App/>);
+    expect(screen.getByRole('heading', { name: 'Registro de lâminas de citogenética' })).toBeTruthy();
+    expect(screen.queryByRole('link', { name: /Acessar laboratórios/ })).toBeNull();
+    expect(screen.getByRole('link', { name: 'Entrar' }).getAttribute('href')).toBe('/entrar');
+  });
+
+  it('em "página não encontrada", quem está logado volta aos laboratórios', async () => {
+    mockApi({ me: async () => response(200, userDto) });
+    setPath('/nao-existe');
+    render(<App/>);
+    const link = await screen.findByRole('link', { name: 'Voltar à página inicial' });
+    await waitFor(() => expect(link.getAttribute('href')).toBe('/laboratorios'));
+  });
+
   it('inicia logada e exibe a identidade devolvida pela API', async () => {
     mockApi({ me: async () => response(200, userDto) });
     setPath('/laboratorios');
@@ -157,7 +196,7 @@ describe('sessão e rotas', () => {
     await submitLogin();
     await screen.findByRole('heading', { name: 'Meus laboratórios' });
 
-    expect(window.location.pathname).toBe('/app');
+    expect(window.location.pathname).toBe('/laboratorios');
     expect(window.location.hostname).toBe('localhost');
   });
 

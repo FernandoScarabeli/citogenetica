@@ -23,6 +23,19 @@ html[data-appearance="dark"] .labs-app {
   --lab-focus: #a4c5b2;
 }
 
+/* Botões de contagem e erros têm cores próprias; no escuro usam tons que mantêm o contraste. */
+html[data-appearance="dark"] .labs-app :is(.text-button, .breadcrumb button, .back-link) { color: var(--lab-accent); }
+html[data-appearance="dark"] .labs-app .text-button:hover { color: var(--lab-ink); }
+html[data-appearance="dark"] .labs-app .count-button { border-color: #3d5a49; background: #25352b; color: #b7d6c3; }
+html[data-appearance="dark"] .labs-app .count-button:hover { border-color: #5c8a6e; background: #2c4033; }
+html[data-appearance="dark"] .labs-app .count-button:active { background: #33493b; }
+html[data-appearance="dark"] .labs-app .abnormal-button { border-color: #5a3a34; background: #33231f; color: #efaaa0; }
+html[data-appearance="dark"] .labs-app .abnormal-button:hover { border-color: #8a5a52; background: #3d2924; }
+html[data-appearance="dark"] .labs-app .abnormal-button:active { background: #47302a; }
+html[data-appearance="dark"] .labs-app .batch-choice button[aria-pressed="true"] { background: #33493b; color: var(--lab-ink); }
+html[data-appearance="dark"] .labs-app :is(.select-error, .error-banner) { color: #efaaa0; }
+html[data-appearance="dark"] .labs-app .error-banner { background: #33231f; }
+
 .labs-app :is(button, a, input, textarea):focus-visible {
   outline: 3px solid var(--lab-focus);
   outline-offset: 3px;
@@ -81,7 +94,7 @@ html[data-appearance="dark"] .labs-app {
 .laboratory-search input,.members-search input { width: 100%; min-width: 0; height: 36px; margin: 0; padding: 0; border: 0; outline: 0; background: transparent; color: var(--lab-ink); font-size: 13px; }
 .laboratory-search input::placeholder,.members-search input::placeholder { color: #59675e; opacity: 1; }
 .laboratory-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); align-items: start; gap: 16px; }
-.laboratory-card { display: flex; flex-direction: column; min-width: 0; min-height: 190px; padding: 20px; border: 1px solid var(--lab-line); border-radius: 6px; background: var(--lab-surface); }
+.laboratory-card { position: relative; display: flex; flex-direction: column; min-width: 0; min-height: 190px; padding: 20px; border: 1px solid var(--lab-line); border-radius: 6px; background: var(--lab-surface); }
 .laboratory-card-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; }
 .laboratory-card-heading h3 { min-width: 0; margin: 0; overflow-wrap: anywhere; font-size: 17px; line-height: 23px; font-weight: 550; }
 .laboratory-state { display: inline-flex; flex: none; align-items: center; min-height: 24px; padding: 2px 8px; border: 1px solid transparent; border-radius: 4px; font-size: 12px; line-height: 18px; font-weight: 550; white-space: nowrap; }
@@ -92,6 +105,10 @@ html[data-appearance="dark"] .labs-app {
 .role-chip { display: inline-flex; align-items: center; min-height: 24px; padding: 2px 8px; border: 1px solid #d4e0d7; border-radius: 4px; background: #eff5f0; color: #2e4e39; font-size: 12px; line-height: 18px; white-space: nowrap; }
 .laboratory-card-actions { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: auto; }
 .laboratory-card-actions .text-button { white-space: nowrap; }
+/* O cartão inteiro abre as lâminas; "Gerenciar" fica acima, como ação secundária menor. */
+.laboratory-card-open::after { content: ""; position: absolute; inset: 0; border-radius: 6px; }
+.laboratory-card:hover { border-color: var(--lab-accent); }
+.labs-app .laboratory-card-manage { position: relative; z-index: 1; color: var(--lab-muted); font-size: 12px; }
 .laboratory-empty,.laboratory-loading { padding: 28px 20px; border: 1px solid var(--lab-line); border-radius: 6px; background: var(--lab-surface); }
 .laboratory-empty { text-align: center; }
 .laboratory-empty h3 { margin: 0; font-size: 16px; font-weight: 550; }

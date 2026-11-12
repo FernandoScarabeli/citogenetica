@@ -144,18 +144,18 @@ export function Slides({ laboratory, onBack, readOnly, usuarioId, api = contagem
   const scopeName = laboratory?.nome ?? 'Lâminas avulsas';
 
   return <>
-    <div className={`container slide-navigation${readOnly ? ' labs-read-only' : ''}`}>
+    <div className={`page-container slide-navigation${readOnly ? ' labs-read-only' : ''}`}>
       <nav className="lab-scope-nav" aria-label="Caminho de navegação">
         <button className="text-button" type="button" onClick={onBack}>Meus laboratórios</button><ChevronRight size={14} aria-hidden="true" />
         {slide ? <><span>{scopeName}</span><ChevronRight size={14} aria-hidden="true" /><button className="text-button" type="button" onClick={() => leaveDetail()}>Lâminas</button><ChevronRight size={14} aria-hidden="true" /><strong aria-current="page">{slide.nome}</strong></> : <strong aria-current="page">{scopeName}</strong>}
       </nav>
     </div>
-    {readOnly && <p className="container lab-muted">Este laboratório está desativado. Os registros estão disponíveis somente para leitura.</p>}
-    {notice && <p className="container slide-notice" role="status">{notice}</p>}
+    {readOnly && <p className="page-container lab-muted">Este laboratório está desativado. Os registros estão disponíveis somente para leitura.</p>}
+    {notice && <p className="page-container slide-notice" role="status">{notice}</p>}
     {error && <div className="error-banner" role="alert">{error}<button type="button" onClick={() => setError('')} aria-label="Dispensar"><X size={16} /></button></div>}
-    {status === 'loading' ? <main className="container home slide-state" aria-live="polite"><p>Carregando as lâminas…</p></main>
-      : status === 'error' ? <main className="container home slide-state"><h1 className={typeClass('title')}>Não foi possível carregar as lâminas</h1><p>{loadError}</p><button className="button secondary" type="button" onClick={() => setRetry(value => value + 1)}>Tentar de novo</button></main>
-      : !slide ? <main className="container home">
+    {status === 'loading' ? <main className="page-container home slide-state" aria-live="polite"><p>Carregando as lâminas…</p></main>
+      : status === 'error' ? <main className="page-container home slide-state"><h1 className={typeClass('title')}>Não foi possível carregar as lâminas</h1><p>{loadError}</p><button className="button secondary" type="button" onClick={() => setRetry(value => value + 1)}>Tentar de novo</button></main>
+      : !slide ? <main className="page-container home">
         <div className="page-heading"><div><h1 className={typeClass('display')}>Lâminas</h1><p>Organize suas lâminas e acompanhe a contagem de células.</p></div>{canCreate && <button className="button primary" type="button" onClick={openNew}><Plus size={17} /> Nova lâmina</button>}</div>
         {migration && <MigrationReport result={migration} onDismiss={() => setMigration(null)} />}
         {canCreate && <LocalSlidesPanel api={api} usuarioId={usuarioId} laboratorioId={laboratoryId} onFinished={migrationFinished} />}
@@ -165,7 +165,7 @@ export function Slides({ laboratory, onBack, readOnly, usuarioId, api = contagem
             : <div className="empty-state"><span className="empty-symbol"><Microscope size={25} /></span><h3>{query ? 'Nenhuma lâmina encontrada' : 'Comece pela primeira lâmina'}</h3><p>{query ? 'Tente buscar por outra identificação, espécie ou tratamento.' : canCreate ? 'Crie uma lâmina para registrar suas observações e acompanhar a contagem de células.' : 'Ainda não há lâminas neste laboratório.'}</p>{!query && canCreate && <button className="button secondary" type="button" onClick={openNew}><Plus size={16} /> Nova lâmina</button>}</div>}</section>
       </main>
         : <SlideDetail key={slide.id} api={api} laminaId={slide.id} usuarioId={usuarioId} readOnly={readOnly} protocolos={protocolos} onError={setError} onGone={message => { setSlides(current => current.filter(item => item.id !== slide.id)); leaveDetail(message); }} onLaminaChanged={upsert} onDeleted={id => { setSlides(current => current.filter(item => item.id !== id)); leaveDetail(); }} />}
-    <footer className="footer container"><span>Laboratório de Citogenética · UFLA</span></footer>
+    <footer className="footer page-container"><span>Laboratório de Citogenética · UFLA</span></footer>
     {creating && <Modal title="Nova lâmina" onClose={() => setCreating(false)}><form onSubmit={event => void create(event)}>
       <p className="modal-description">Identifique a lâmina e escolha o protocolo da análise.</p>
       <label>Identificação da lâmina<input autoFocus required maxLength={120} placeholder="Ex.: L1 – planta A" value={form.nome} onChange={event => setForm({ ...form, nome: event.target.value })} /></label>

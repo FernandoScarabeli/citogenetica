@@ -8,11 +8,12 @@ import type {
 } from './api/contracts/contagem';
 import { NetworkError, isConflict, isNotFound } from './api/errors';
 import {
-  MENSAGEM_SEM_CONEXAO, agruparPorDia, formatarData, formatarHora, fusoDoAparelho, instanteExibido, mensagemDeErro, normalizarNomeTipo, resumoCsv,
+  MENSAGEM_SEM_CONEXAO, agruparPorDia, descricaoDesfazer, formatarData, formatarHora, fusoDoAparelho, instanteExibido, mensagemDeErro, normalizarNomeTipo, resumoCsv, rotuloDesfazer,
 } from './contagem-utils';
 import { pct } from './domain';
 import { EntrySelect, Modal, TypeChecklist, type TypeChoice } from './SlideWidgets';
 import { download } from './storage';
+import { useNotesAutosave } from './useNotesAutosave';
 
 const HISTORY_PAGE_SIZE = 20;
 const num = (value: number) => value.toLocaleString('pt-BR');
@@ -22,7 +23,7 @@ const newId = () => crypto.randomUUID();
 type Loaded = { lamina: LaminaDTO; versao: VersaoProtocoloDTO; resumo: ResumoLaminaDTO; tipos: TipoPersonalizadoDTO[] };
 type History = { items: RegistroHistoricoDTO[]; page: number; totalPages: number };
 type Pending = { key: string; faseId: string; status: StatusRegistro };
-type ModalKind = 'abnormal' | 'edit-record' | 'edit-slide' | 'delete' | null;
+type ModalKind = 'abnormal' | 'edit-record' | 'edit-slide' | 'delete' | 'undo' | null;
 
 function historyFrom(page: PageDTO<RegistroHistoricoDTO>): History {
   return { items: page.content, page: page.currentPage, totalPages: page.totalPages };
@@ -59,8 +60,8 @@ export function SlideDetail({ api, laminaId, usuarioId, readOnly, protocolos, on
   const [tab, setTab] = useState<'contagem' | 'resumo' | 'historico'>('contagem');
   const [modal, setModal] = useState<ModalKind>(null);
   const [busy, setBusy] = useState(false);
-  const [notes, setNotes] = useState('');
   const [retry, setRetry] = useState(0);
+  const notes = useNotesAutosave(saveNotesText);
 
   // Formulários dos modais.
   const [phaseId, setPhaseId] = useState('');
@@ -93,6 +94,9 @@ export function SlideDetail({ api, laminaId, usuarioId, readOnly, protocolos, on
   useEffect(() => { mounted.current = true; return () => { mounted.current = false; }; }, []);
 
   const lamina = loaded?.lamina;
+  // O envio das observações pode rodar depois de a tela fechar; por isso lê a lâmina mais recente daqui.
+  const laminaRef = useRef(lamina);
+  laminaRef.current = lamina;
   const canEdit = !!lamina && !readOnly && lamina.donoUsuarioId === usuarioId;
   const protocolo = lamina ? protocolos.find(item => item.versaoAtual.id === lamina.protocoloVersaoId) : undefined;
   const isMitosis = protocolo?.codigo === 'mitose';
@@ -114,7 +118,7 @@ export function SlideDetail({ api, laminaId, usuarioId, readOnly, protocolos, on
       if (signal.aborted || seq !== loadSeq.current) return;
       setLoaded({ lamina: found, versao, resumo, tipos });
       setHistory(historyFrom(page));
-      setNotes(found.observacoes);
+      notes.reset(found.observacoes);
       setStatus('ready');
     } catch (error) {
       if (signal.aborted || seq !== loadSeq.current) return;
@@ -122,7 +126,7 @@ export function SlideDetail({ api, laminaId, usuarioId, readOnly, protocolos, on
       setLoadError(mensagemDeErro(error, 'Não foi possível carregar a lâmina.'));
       setStatus('error');
     }
-  }, [api, laminaId, readOnly, usuarioId]);
+  }, [api, laminaId, readOnly, usuarioId, notes.reset]);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -343,6 +347,7 @@ export function SlideDetail({ api, laminaId, usuarioId, readOnly, protocolos, on
 
   async function undoLast() {
     if (!canEdit || !last || busy) return;
+    setModal(null);
     setBusy(true);
     try {
       await api.desfazerRegistros(laminaId, {
@@ -400,16 +405,18 @@ export function SlideDetail({ api, laminaId, usuarioId, readOnly, protocolos, on
   const staleSlideMessage = 'Esta lâmina foi alterada em outro lugar. Os dados foram atualizados; confira e tente de novo.';
 
   async function saveSlide(patch: { nome: string; especie: string; tratamento: string; observacoes: string; meta: number | null }): Promise<boolean> {
-    if (!lamina) return false;
+    const current = laminaRef.current;
+    if (!current) return false;
     try {
-      const updated = await api.atualizarLamina(lamina.id, { versaoEsperada: lamina.versao, ...patch });
-      setLoaded(current => (current ? { ...current, lamina: updated } : current));
-      onLaminaChanged(updated);
+      const updated = await api.atualizarLamina(current.id, { versaoEsperada: current.versao, ...patch });
+      laminaRef.current = updated;
+      setLoaded(state => (state ? { ...state, lamina: updated } : state));
+      callbacks.current.onLaminaChanged(updated);
       return true;
     } catch (error) {
-      if (isNotFound(error)) onGone('Esta lâmina não está mais disponível.');
-      else if (isConflict(error)) { onError(staleSlideMessage); await refresh(); }
-      else onError(mensagemDeErro(error, 'Não foi possível salvar a lâmina.'));
+      if (isNotFound(error)) callbacks.current.onGone('Esta lâmina não está mais disponível.');
+      else if (isConflict(error)) { callbacks.current.onError(staleSlideMessage); await refresh(); }
+      else callbacks.current.onError(mensagemDeErro(error, 'Não foi possível salvar a lâmina.'));
       return false;
     }
   }
@@ -431,13 +438,10 @@ export function SlideDetail({ api, laminaId, usuarioId, readOnly, protocolos, on
     if (mounted.current) { setBusy(false); if (saved) setModal(null); }
   }
 
-  async function saveNotes() {
-    if (!canEdit || !lamina || busy) return;
-    setBusy(true);
-    await saveSlide({
-      nome: lamina.nome, especie: lamina.especie, tratamento: lamina.tratamento, observacoes: notes, meta: lamina.meta,
-    });
-    if (mounted.current) setBusy(false);
+  function saveNotesText(text: string): Promise<boolean> {
+    const current = laminaRef.current;
+    if (!current) return Promise.resolve(false);
+    return saveSlide({ nome: current.nome, especie: current.especie, tratamento: current.tratamento, observacoes: text, meta: current.meta });
   }
 
   async function removeSlide() {
@@ -461,9 +465,9 @@ export function SlideDetail({ api, laminaId, usuarioId, readOnly, protocolos, on
 
   // Tela --------------------------------------------------------------------------------------------------------------
 
-  if (status === 'loading') return <main className="container detail slide-state" aria-live="polite"><p>Carregando a lâmina…</p></main>;
+  if (status === 'loading') return <main className="page-container detail slide-state" aria-live="polite"><p>Carregando a lâmina…</p></main>;
   if (status === 'error' || !loaded || !lamina || !shown) {
-    return <main className="container detail slide-state"><h1 className={typeClass('title')}>Não foi possível abrir a lâmina</h1><p>{loadError}</p><button className="button secondary" type="button" onClick={() => setRetry(value => value + 1)}>Tentar de novo</button></main>;
+    return <main className="page-container detail slide-state"><h1 className={typeClass('title')}>Não foi possível abrir a lâmina</h1><p>{loadError}</p><button className="button secondary" type="button" onClick={() => setRetry(value => value + 1)}>Tentar de novo</button></main>;
   }
 
   const normal = shown.total - shown.anormais;
@@ -473,7 +477,7 @@ export function SlideDetail({ api, laminaId, usuarioId, readOnly, protocolos, on
   const extraForEdit = editing && editing.faseId === phaseId ? editing.tipos : [];
   const batchOptions = (faseId: string) => optionsFor(faseId);
 
-  return <main className="container detail">
+  return <main className="page-container detail">
     <div className="detail-heading">
       <div>
         <div className="title-line"><h1 className={typeClass('display')}>{lamina.nome}</h1><span className="protocol-tag">{protocolo?.nome ?? 'Protocolo'}</span></div>
@@ -496,7 +500,7 @@ export function SlideDetail({ api, laminaId, usuarioId, readOnly, protocolos, on
 
     {tab === 'contagem' && <div className="workspace"><section className="count-area">
       <div className="section-heading compact"><div><h2 className={typeClass('title')}>Contagem por fase</h2><p>Registre cada célula na fase correspondente.</p></div>
-        {canEdit && <div className="count-tools"><button className="text-button" type="button" disabled={!last || pending.length > 0 || busy} onClick={() => void undoLast()}><Undo2 size={15} /> Desfazer último</button></div>}
+        {canEdit && <div className="count-tools"><button className="text-button" type="button" disabled={!last || pending.length > 0 || busy} onClick={() => (last && last.quantidade > 1 ? setModal('undo') : void undoLast())}><Undo2 size={15} /> {last ? rotuloDesfazer(last, phaseName(last.faseId)) : 'Desfazer último'}</button></div>}
       </div>
       <div className="phase-list">{shown.fases.map(fase => <div className="phase-row" key={fase.faseId}>
         <div className="phase-title"><strong>{fase.nome}</strong><small>{num(fase.total)} {fase.total === 1 ? 'célula' : 'células'} no total</small>
@@ -521,8 +525,8 @@ export function SlideDetail({ api, laminaId, usuarioId, readOnly, protocolos, on
       </div>)}</div>
     </section>
     <section className="side-panel notes-panel" aria-label="Observações da lâmina"><div className="notes"><label htmlFor="notes">Observações</label><p>Anotações desta lâmina</p>
-      <textarea id="notes" readOnly={!canEdit} placeholder={canEdit ? 'Adicione suas observações...' : ''} value={notes} maxLength={5000} onChange={event => setNotes(event.target.value)} />
-      {canEdit && notes !== lamina.observacoes && <div className="notes-actions"><button className="button secondary" type="button" disabled={busy} onClick={() => void saveNotes()}>Salvar observações</button></div>}
+      <textarea id="notes" readOnly={!canEdit} placeholder={canEdit ? 'Adicione suas observações...' : ''} value={notes.text} maxLength={5000} onChange={event => notes.setText(event.target.value)} onBlur={() => void notes.flush()} />
+      {canEdit && <p className="notes-status" role="status">{notes.state === 'saving' ? 'Salvando…' : notes.state === 'saved' ? 'Salvo' : notes.state === 'error' ? <>Não foi possível salvar. <button className="text-button" type="button" onClick={() => void notes.flush()}>Tentar de novo</button></> : ''}</p>}
     </div></section></div>}
 
     {tab === 'resumo' && <section className="tab-content"><div className="section-heading"><div><h2 className={typeClass('title')}>Resumo da análise</h2><p>Distribuição das células e anormalidades por fase.</p></div><div className="action-group"><button className="button secondary" type="button" onClick={exportCsv}><Download size={16} /> Exportar CSV</button><button className="button secondary" type="button" onClick={() => window.print()}><FileText size={16} /> Imprimir / PDF</button></div></div>
@@ -562,6 +566,11 @@ export function SlideDetail({ api, laminaId, usuarioId, readOnly, protocolos, on
       <label>Meta de contagem <span>Opcional</span><input type="number" min="1" step="1" max="10000000" value={slideForm.meta} onChange={event => setSlideForm({ ...slideForm, meta: event.target.value })} placeholder="Quantidade de células" /></label>
       <div className="modal-actions"><button type="button" className="button secondary" onClick={() => setModal(null)}>Cancelar</button><button className="button primary" disabled={busy}>Salvar alterações</button></div>
     </form></Modal>}
+
+    {modal === 'undo' && last && <Modal title="Desfazer este registro?" onClose={() => setModal(null)}>
+      <p className="modal-description">Serão removidas {descricaoDesfazer(last, phaseName(last.faseId))}.</p>
+      <div className="modal-actions"><button type="button" className="button secondary" onClick={() => setModal(null)}>Cancelar</button><button type="button" className="button danger" disabled={busy} onClick={() => void undoLast()}><Undo2 size={16} /> Desfazer</button></div>
+    </Modal>}
 
     {modal === 'delete' && <Modal title="Excluir lâmina?" onClose={() => setModal(null)}>
       <p className="modal-description">A lâmina <strong>{lamina.nome}</strong> e as {num(lamina.totalCelulas)} {celulas(lamina.totalCelulas)} registradas nela serão excluídas. Esta ação não pode ser desfeita.</p>

@@ -458,15 +458,39 @@ describe('ajuste em lote', () => {
 });
 
 describe('desfazer último', () => {
-  it('desfaz a quantidade inteira do registro mais recente, com fase, situação e tipos', async () => {
+  it('diz o que vai desfazer e, com mais de uma célula, pede confirmação antes', async () => {
     const user = userEvent.setup();
     renderSlides();
     await openSlide(user);
-    await user.click(screen.getByRole('button', { name: /Desfazer último/ }));
+    await user.click(screen.getByRole('button', { name: 'Desfazer: 3 anormais em Prófase' }));
+
+    expect(api.desfazerRegistros).not.toHaveBeenCalled();
+    const dialog = screen.getByRole('dialog');
+    expect(dialog.textContent).toContain('3 células anormais de Prófase');
+    await user.click(within(dialog).getByRole('button', { name: /Desfazer/ }));
 
     await waitFor(() => expect(api.desfazerRegistros).toHaveBeenCalledTimes(1));
     expect(api.desfazerRegistros).toHaveBeenCalledWith('lamina-1', { id: expect.any(String), faseId: PROFASE, status: 'ANORMAL', tipoIds: [MICRO, STICK], quantidade: 3 });
     await waitFor(() => expect(api.buscarResumo).toHaveBeenCalledTimes(2));
+  });
+
+  it('cancelar a confirmação não desfaz nada', async () => {
+    const user = userEvent.setup();
+    renderSlides();
+    await openSlide(user);
+    await user.click(screen.getByRole('button', { name: /Desfazer: 3 anormais/ }));
+    await user.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Cancelar' }));
+    expect(api.desfazerRegistros).not.toHaveBeenCalled();
+  });
+
+  it('desfaz direto quando o último registro tem uma só célula', async () => {
+    api.listarRegistros.mockResolvedValue(page([{ ...REGISTRO_ANTIGO, quantidade: 1 }]));
+    const user = userEvent.setup();
+    renderSlides();
+    await openSlide(user);
+    await user.click(screen.getByRole('button', { name: 'Desfazer: 1 normal em Interfase' }));
+    await waitFor(() => expect(api.desfazerRegistros).toHaveBeenCalledWith('lamina-1', expect.objectContaining({ faseId: INTERFASE, status: 'NORMAL', quantidade: 1 })));
+    expect(screen.queryByRole('dialog')).toBeNull();
   });
 
   it('fica desativado sem registros', async () => {
@@ -547,14 +571,57 @@ describe('editar e excluir a lâmina', () => {
     await screen.findByRole('heading', { name: 'L1 renomeada' });
   });
 
-  it('salva as observações pelo botão', async () => {
-    api.atualizarLamina.mockResolvedValue({ ...LAMINA, versao: 4, observacoes: 'Nota salva e mais' });
-    const user = userEvent.setup();
-    renderSlides();
-    await openSlide(user);
-    await user.type(screen.getByLabelText('Observações'), ' e mais');
-    await user.click(screen.getByRole('button', { name: 'Salvar observações' }));
-    await waitFor(() => expect(api.atualizarLamina).toHaveBeenCalledWith('lamina-1', expect.objectContaining({ versaoEsperada: 3, observacoes: 'Nota salva e mais' })));
+  describe('observações salvas sozinhas', () => {
+    const salvas = { ...LAMINA, versao: 4, observacoes: 'Nota salva e mais' };
+
+    it('salva cerca de 1 s depois da última tecla e mostra "Salvo"', async () => {
+      api.atualizarLamina.mockResolvedValue(salvas);
+      const user = userEvent.setup();
+      renderSlides();
+      await openSlide(user);
+      expect(screen.queryByRole('button', { name: 'Salvar observações' })).toBeNull();
+      await user.type(screen.getByLabelText('Observações'), ' e mais');
+      expect(api.atualizarLamina).not.toHaveBeenCalled();
+
+      await waitFor(() => expect(api.atualizarLamina).toHaveBeenCalledTimes(1), { timeout: 3000 });
+      expect(api.atualizarLamina).toHaveBeenCalledWith('lamina-1', expect.objectContaining({ versaoEsperada: 3, observacoes: 'Nota salva e mais' }));
+      expect(await screen.findByText('Salvo')).toBeTruthy();
+    });
+
+    it('salva na hora ao sair do campo', async () => {
+      api.atualizarLamina.mockResolvedValue(salvas);
+      const user = userEvent.setup();
+      renderSlides();
+      await openSlide(user);
+      await user.type(screen.getByLabelText('Observações'), ' e mais');
+      await user.tab();
+      await waitFor(() => expect(api.atualizarLamina).toHaveBeenCalledTimes(1));
+    });
+
+    it('salva ao sair da lâmina antes do prazo', async () => {
+      api.atualizarLamina.mockResolvedValue(salvas);
+      const user = userEvent.setup();
+      const { unmount } = renderSlides();
+      await openSlide(user);
+      await user.type(screen.getByLabelText('Observações'), ' e mais');
+      unmount();
+      await waitFor(() => expect(api.atualizarLamina).toHaveBeenCalledWith('lamina-1', expect.objectContaining({ observacoes: 'Nota salva e mais' })));
+    });
+
+    it('se falhar, mantém o texto no campo e deixa tentar de novo', async () => {
+      api.atualizarLamina.mockRejectedValueOnce(apiError(500, 'Falha do servidor.')).mockResolvedValue(salvas);
+      const user = userEvent.setup();
+      renderSlides();
+      await openSlide(user);
+      const campo = screen.getByLabelText('Observações') as HTMLTextAreaElement;
+      await user.type(campo, ' e mais');
+      await user.tab();
+
+      await user.click(await screen.findByRole('button', { name: 'Tentar de novo' }));
+      await waitFor(() => expect(api.atualizarLamina).toHaveBeenCalledTimes(2));
+      expect(campo.value).toBe('Nota salva e mais');
+      expect(await screen.findByText('Salvo')).toBeTruthy();
+    });
   });
 
   it('em 409 ao editar avisa e recarrega', async () => {

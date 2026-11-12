@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { ArrowRight } from 'lucide-react';
-import { Link, useLocation, useNavigate } from 'react-router';
+import { Link, Navigate, useLocation } from 'react-router';
 import { isRateLimited, isUnauthorized, NetworkError } from '../api/errors';
 import { useSession } from './SessionProvider';
 import { safeInternalPath } from './return-path';
@@ -16,9 +16,8 @@ function loginNotice(value: unknown): string | undefined {
 }
 
 export function LoginPage() {
-  const { login } = useSession();
+  const { login, status } = useSession();
   const location = useLocation();
-  const navigate = useNavigate();
   const [email, setEmail] = useState('');
   const [senha, setSenha] = useState('');
   const [submitting, setSubmitting] = useState(false);
@@ -65,8 +64,6 @@ export function LoginPage() {
     setRetryReady(false);
     try {
       await login(email, senha);
-      const returnTo = safeInternalPath(locationState?.returnTo);
-      navigate(returnTo ?? '/app', { replace: true });
     } catch (error) {
       if (isUnauthorized(error)) {
         setCredentialsInvalid(true);
@@ -84,6 +81,9 @@ export function LoginPage() {
       setSubmitting(false);
     }
   }
+
+  // Com a sessão aberta (agora ou de antes), segue para onde a pessoa queria ir ou para os laboratórios.
+  if (status === 'authenticated') return <Navigate to={safeInternalPath(locationState?.returnTo) ?? '/laboratorios'} replace/>;
 
   const descriptionId = message ? 'login-error' : undefined;
   const countdown = retrySeconds !== null && retrySeconds > 0
