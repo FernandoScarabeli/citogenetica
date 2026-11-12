@@ -572,20 +572,13 @@ export function SlideDetail({ api, laminaId, usuarioId, readOnly, protocolos, on
       </div>}
     </div>
     {!readOnly && lamina.donoUsuarioId !== usuarioId && <p className="owner-note">Esta lâmina é de {lamina.donoNome}. Você pode consultar a contagem, mas só quem a criou pode alterá-la.</p>}
-    {tab === 'contagem' && <div className="count-strip" role="group" aria-label="Resumo da contagem">
-      <span>Total <strong>{num(shown.total)}</strong></span>
-      <span>Normais <strong>{num(normal)}</strong></span>
-      <span>Anormais <strong>{num(shown.anormais)}</strong></span>
-      {isMitosis && <span>IM <strong>{pct(shown.indiceMitotico, 100)}</strong></span>}
-      {goal !== null && <span className="count-strip-goal">Meta <strong>{num(shown.total)} / {num(goal)}</strong><span className="progress-track" role="progressbar" aria-label="Meta de contagem" aria-valuemin={0} aria-valuemax={goal} aria-valuenow={Math.min(shown.total, goal)}><span style={{ width: `${Math.min(shown.total / goal * 100, 100)}%` }} /></span></span>}
-    </div>}
-    {tab !== 'contagem' && <div className="detail-summary">
+    <div className="detail-summary">
       <div className="summary-main"><span>Total de células</span><strong>{num(shown.total)}</strong><small>registradas nesta lâmina</small></div>
       <div className="summary-item"><span>Células normais</span><strong>{num(normal)}</strong><small>{pct(normal, shown.total)} do total</small></div>
       <div className="summary-item"><span>Células anormais</span><strong>{num(shown.anormais)}</strong><small>{pct(shown.anormais, shown.total)} do total</small></div>
       {isMitosis && <div className="summary-item"><span>Índice mitótico</span><strong>{pct(shown.indiceMitotico, 100)}</strong><small>células em divisão</small></div>}
-    </div>}
-    {tab !== 'contagem' && goal !== null && <div className="progress-line"><div><span>Meta de contagem</span><strong>{num(shown.total)} <span>/ {num(goal)} células</span></strong></div><div className="progress-track" role="progressbar" aria-label="Meta de contagem" aria-valuemin={0} aria-valuemax={goal} aria-valuenow={Math.min(shown.total, goal)}><span style={{ width: `${Math.min(shown.total / goal * 100, 100)}%` }} /></div></div>}
+    </div>
+    {goal !== null && <div className="progress-line"><div><span>Meta de contagem</span><strong>{num(shown.total)} <span>/ {num(goal)} células</span></strong></div><div className="progress-track" role="progressbar" aria-label="Meta de contagem" aria-valuemin={0} aria-valuemax={goal} aria-valuenow={Math.min(shown.total, goal)}><span style={{ width: `${Math.min(shown.total / goal * 100, 100)}%` }} /></div></div>}
     <div className="tabs" role="tablist" aria-label="Seções da lâmina">{([['contagem', 'Contagem'], ['resumo', 'Resumo'], ['historico', 'Histórico']] as const).map(([value, label]) => <button type="button" role="tab" aria-selected={tab === value} className={tab === value ? 'selected' : ''} onClick={() => setTab(value)} key={value}>{label}</button>)}</div>
 
     {tab === 'contagem' && <div className="workspace"><section className="count-area">
