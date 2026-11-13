@@ -1,0 +1,132 @@
+# Ambiente de testes do cliente: API, banco e fotos neste PC; front no Netlify.
+# Nada é publicado em porta do PC. A única entrada é o túnel temporário da Cloudflare
+# (cloudflared), que conversa com a API pela rede interna do Compose.
+# Uso: veja docs/deploy-testes.md.
+name: citogenetica-servidor
+
+services:
+  api:
+    build:
+      context: ../../apps/api
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+      rustfs:
+        condition: service_healthy
+    env_file:
+      - .env
+    environment:
+      SERVER_PORT: "8080"
+      SPRING_DATASOURCE_HOST: db
+      SPRING_DATASOURCE_PORT: "5432"
+      STORAGE_INTERNAL_ENDPOINT: http://rustfs:9000
+      # Só o cloudflared (IP fixo abaixo) pode informar o IP do cliente em X-Forwarded-For.
+      API_SECURITY_TRUSTED_PROXY_REGEX: 10\.89\.58\.10
+      SPRINGDOC_API_DOCS_ENABLED: "false"
+      SPRINGDOC_SWAGGER_UI_ENABLED: "false"
+    networks:
+      - interna
+    healthcheck:
+      test: [ "CMD", "curl", "--fail", "--silent", "--show-error", "--max-time", "5", "--output", "/dev/null", "http://127.0.0.1:8080/actuator/health" ]
+      interval: 15s
+      timeout: 6s
+      retries: 5
+      start_period: 90s
+
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${SPRING_DATASOURCE_DATABASE:?Defina SPRING_DATASOURCE_DATABASE no .env}
+      POSTGRES_USER: ${SPRING_DATASOURCE_USERNAME:?Defina SPRING_DATASOURCE_USERNAME no .env}
+      POSTGRES_PASSWORD: ${SPRING_DATASOURCE_PASSWORD:?Defina SPRING_DATASOURCE_PASSWORD no .env}
+    volumes:
+      - db-data:/var/lib/postgresql/data
+    networks:
+      - interna
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -U \"$$POSTGRES_USER\" -d \"$$POSTGRES_DB\"" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  rustfs:
+    image: rustfs/rustfs:1.0.4
+    restart: unless-stopped
+    environment:
+      RUSTFS_ACCESS_KEY: ${STORAGE_ACCESS_KEY:?Defina STORAGE_ACCESS_KEY no .env}
+      RUSTFS_SECRET_KEY: ${STORAGE_SECRET_KEY:?Defina STORAGE_SECRET_KEY no .env}
+      RUSTFS_ADDRESS: :9000
+      RUSTFS_CONSOLE_ENABLE: "false"
+    volumes:
+      - rustfs-data:/data
+    command: [ "/data" ]
+    networks:
+      - interna
+    healthcheck:
+      test: [ "CMD-SHELL", "curl -fsS http://localhost:9000/health/ready >/dev/null" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Túnel temporário (*.trycloudflare.com): HTTPS sem abrir porta no roteador.
+  # O endereço muda a cada reinício; o serviço netlify-sync leva o novo endereço ao Netlify.
+  cloudflared:
+    image: cloudflare/cloudflared:2026.10.4
+    restart: unless-stopped
+    depends_on:
+      api:
+        condition: service_healthy
+    command: [ "tunnel", "--no-autoupdate", "--metrics", "0.0.0.0:2000", "--url", "http://api:8080" ]
+    networks:
+      interna:
+        ipv4_address: 10.89.58.10
+
+  netlify-sync:
+    build:
+      context: ./netlify-sync
+    restart: unless-stopped
+    depends_on:
+      - cloudflared
+    environment:
+      NETLIFY_AUTH_TOKEN: ${NETLIFY_AUTH_TOKEN:?Defina NETLIFY_AUTH_TOKEN no .env}
+      NETLIFY_SITE_ID: ${NETLIFY_SITE_ID:?Defina NETLIFY_SITE_ID no .env}
+    volumes:
+      - netlify-sync-estado:/estado
+    networks:
+      - interna
+
+  backup:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      PGHOST: db
+      PGDATABASE: ${SPRING_DATASOURCE_DATABASE}
+      PGUSER: ${SPRING_DATASOURCE_USERNAME}
+      PGPASSWORD: ${SPRING_DATASOURCE_PASSWORD}
+      BACKUP_MANTER: ${BACKUP_MANTER:-14}
+      BACKUP_HORA: ${BACKUP_HORA:-03}
+    entrypoint: [ "/bin/sh", "/backup/backup.sh" ]
+    volumes:
+      - ./backup/backup.sh:/backup/backup.sh:ro
+      # Fora dos volumes do Docker, para sobreviver a um "docker compose down -v".
+      - ${BACKUP_DIR:-./backups}:/backups
+      - rustfs-data:/rustfs:ro
+    networks:
+      - interna
+
+volumes:
+  db-data:
+  rustfs-data:
+  netlify-sync-estado:
+
+networks:
+  interna:
+    ipam:
+      config:
+        # Diferente da rede de desenvolvimento (10.89.57.0/24) para os dois poderem coexistir.
+        - subnet: 10.89.58.0/24

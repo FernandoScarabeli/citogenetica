@@ -36,3 +36,6 @@ local.yaml
 *~
 .DS_Store
 Thumbs.db
+
+# Backups do servidor de testes
+deploy/servidor/backups/
