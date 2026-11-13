@@ -1,8 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import { agruparPorDia, instanteExibido, mensagemDeErro, normalizarNomeTipo, resumoCsv } from '../src/contagem-utils';
+import { agruparPorDia, instanteExibido, mensagemDeErro, normalizarNomeTipo } from '../src/contagem-utils';
 import { ApiError, NetworkError } from '../src/api/errors';
 import { pct } from '../src/domain';
-import type { ResumoLaminaDTO } from '../src/api/contracts/contagem';
 
 describe('data exibida no histórico', () => {
   const oficial = '2026-11-08T15:00:00Z';
@@ -33,31 +32,6 @@ describe('percentuais', () => {
     expect(pct(1, 3)).toBe('33,33%');
     expect(pct(33.3333333, 100)).toBe('33,33%');
     expect(pct(0, 0)).toBe('0,00%');
-  });
-});
-
-describe('CSV do resumo', () => {
-  const resumo: ResumoLaminaDTO = {
-    laminaId: 'l1', total: 4, anormais: 1, indiceMitotico: 50,
-    fases: [{ faseId: 'f1', nome: 'Prófase', ordem: 1, normais: 3, anormais: 1, total: 4, percentualAnormais: 25, tipos: [
-      { tipoId: 't1', nome: '=HYPERLINK("http://x")', contagem: 1, percentual: 25 },
-    ] }],
-  };
-
-  it('mantém as colunas e usa o resumo da API', () => {
-    const csv = resumoCsv(resumo, 'nota');
-    expect(csv.startsWith('﻿"Fase";"Normais";"Anormais";"Total";"% anormais";"Tipos de anormalidade"')).toBe(true);
-    expect(csv).toContain('"Prófase";"3";"1";"4";"25,00%"');
-    expect(csv).toContain('"Observações";"nota"');
-  });
-
-  it('protege células que começam com =, +, - ou @', () => {
-    const csv = resumoCsv(resumo, '-1+1');
-    expect(csv).toContain('\'=HYPERLINK(""http://x"")');
-    expect(csv).toContain('"\'-1+1"');
-    for (const inicio of ['=', '+', '-', '@']) {
-      expect(resumoCsv({ ...resumo, fases: [{ ...resumo.fases[0], tipos: [{ ...resumo.fases[0].tipos[0], nome: `${inicio}x` }] }] }, '')).toContain(`"'${inicio}x: 1`);
-    }
   });
 });
 

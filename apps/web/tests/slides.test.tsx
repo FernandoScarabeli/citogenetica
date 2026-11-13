@@ -8,6 +8,9 @@ import type {
 } from '../src/api/contracts/contagem';
 import type { LaboratorioResponseDTO } from '../src/api/contracts/laboratorio';
 import { Slides } from '../src/Slides';
+import { salvarArquivo } from '../src/salvar-arquivo';
+
+vi.mock('../src/salvar-arquivo', () => ({ salvarArquivo: vi.fn() }));
 
 const VERSAO = 'aaaaaaaa-0000-4000-8000-000000000001';
 const INTERFASE = 'bbbbbbbb-0000-4000-8000-000000000001';
@@ -71,7 +74,15 @@ const api = {
   atualizarRegistro: vi.fn(),
   desfazerRegistros: vi.fn(),
   buscarResumo: vi.fn(),
+  baixarLaminaJson: vi.fn(),
+  baixarLaminaResumoCsv: vi.fn(),
+  baixarLaminaRegistrosCsv: vi.fn(),
+  baixarLaminaRelatorioPdf: vi.fn(),
+  baixarLaminasJson: vi.fn(),
+  baixarLaminasResumoCsv: vi.fn(),
+  baixarLaminasRegistrosCsv: vi.fn(),
 };
+const ARQUIVO = { blob: new Blob(['x']), nome: 'lamina-1.csv' };
 
 const ACTIVE_LAB: LaboratorioResponseDTO = { id: 'lab-1', nome: 'Citogenética Vegetal', estado: 'ATIVO', papeis: ['MEMBRO'], versao: 1 };
 
@@ -866,5 +877,110 @@ describe('células guardadas sem conexão', () => {
     expect(travado(abnormalButton())).toBe(false);
     await user.click(screen.getByRole('tab', { name: 'Histórico' }));
     expect(travado(screen.getAllByRole('button', { name: /Editar/ })[0])).toBe(true);
+  });
+});
+
+describe('exportação da lâmina', () => {
+  const botoes = [
+    ['Resumo (CSV)', 'baixarLaminaResumoCsv'],
+    ['Registros (CSV)', 'baixarLaminaRegistrosCsv'],
+    ['Relatório (PDF)', 'baixarLaminaRelatorioPdf'],
+    ['Dados completos (JSON)', 'baixarLaminaJson'],
+  ] as const;
+
+  async function abrirResumo(user: ReturnType<typeof userEvent.setup>) {
+    renderSlides();
+    await openSlide(user);
+    await user.click(screen.getByRole('tab', { name: 'Resumo' }));
+  }
+
+  it.each(botoes)('"%s" baixa da API e entrega o arquivo', async (rotulo, funcao) => {
+    api[funcao].mockResolvedValue(ARQUIVO);
+    const user = userEvent.setup();
+    await abrirResumo(user);
+    await user.click(screen.getByRole('button', { name: rotulo }));
+    await waitFor(() => expect(salvarArquivo).toHaveBeenCalledWith(ARQUIVO));
+    expect(api[funcao]).toHaveBeenCalledWith('lamina-1');
+    expect(screen.queryByRole('button', { name: /Imprimir/ })).toBeNull();
+  });
+
+  it('desabilita os botões enquanto baixa e mostra o progresso', async () => {
+    let concluir: (value: typeof ARQUIVO) => void = () => undefined;
+    api.baixarLaminaRelatorioPdf.mockReturnValue(new Promise(resolve => { concluir = resolve; }));
+    const user = userEvent.setup();
+    await abrirResumo(user);
+    await user.click(screen.getByRole('button', { name: 'Relatório (PDF)' }));
+    const ativo = await screen.findByRole('button', { name: 'Baixando…' });
+    expect(ativo.getAttribute('aria-busy')).toBe('true');
+    for (const rotulo of ['Resumo (CSV)', 'Registros (CSV)', 'Dados completos (JSON)']) {
+      expect((screen.getByRole('button', { name: rotulo }) as HTMLButtonElement).disabled).toBe(true);
+    }
+    concluir(ARQUIVO);
+    expect(await screen.findByRole('button', { name: 'Relatório (PDF)' })).toBeTruthy();
+    expect((screen.getByRole('button', { name: 'Resumo (CSV)' }) as HTMLButtonElement).disabled).toBe(false);
+  });
+
+  it('mostra o erro da API e não entrega arquivo', async () => {
+    api.baixarLaminaRegistrosCsv.mockRejectedValue(apiError(500, 'Falha ao gerar o arquivo.'));
+    const user = userEvent.setup();
+    await abrirResumo(user);
+    await user.click(screen.getByRole('button', { name: 'Registros (CSV)' }));
+    expect((await screen.findByRole('alert')).textContent).toContain('Falha ao gerar o arquivo.');
+    expect(salvarArquivo).not.toHaveBeenCalled();
+    expect((screen.getByRole('button', { name: 'Registros (CSV)' }) as HTMLButtonElement).disabled).toBe(false);
+  });
+
+  it('explica a falta de conexão', async () => {
+    api.baixarLaminaJson.mockRejectedValue(new NetworkError());
+    const user = userEvent.setup();
+    await abrirResumo(user);
+    await user.click(screen.getByRole('button', { name: 'Dados completos (JSON)' }));
+    expect((await screen.findByRole('alert')).textContent).toContain('Sem conexão');
+  });
+});
+
+describe('exportação das listas de lâminas', () => {
+  const grupo = () => screen.queryByRole('group', { name: 'Exportar todas as lâminas' });
+
+  it('baixa as três opções com o laboratório da lista', async () => {
+    api.baixarLaminasResumoCsv.mockResolvedValue(ARQUIVO);
+    api.baixarLaminasRegistrosCsv.mockResolvedValue(ARQUIVO);
+    api.baixarLaminasJson.mockResolvedValue(ARQUIVO);
+    const user = userEvent.setup();
+    renderSlides({ laboratory: ACTIVE_LAB });
+    await screen.findByRole('button', { name: /L1 planta A/ });
+    const exportar = within(grupo()!);
+    await user.click(exportar.getByRole('button', { name: 'Resumo (CSV)' }));
+    await user.click(exportar.getByRole('button', { name: 'Registros (CSV)' }));
+    await user.click(exportar.getByRole('button', { name: 'Dados (JSON)' }));
+    await waitFor(() => expect(salvarArquivo).toHaveBeenCalledTimes(3));
+    for (const funcao of ['baixarLaminasResumoCsv', 'baixarLaminasRegistrosCsv', 'baixarLaminasJson'] as const) {
+      expect(api[funcao]).toHaveBeenCalledWith({ laboratorioId: 'lab-1' });
+    }
+  });
+
+  it('nas avulsas, não manda laboratório', async () => {
+    api.baixarLaminasJson.mockResolvedValue(ARQUIVO);
+    const user = userEvent.setup();
+    renderSlides();
+    await screen.findByRole('button', { name: /L1 planta A/ });
+    await user.click(within(grupo()!).getByRole('button', { name: 'Dados (JSON)' }));
+    await waitFor(() => expect(api.baixarLaminasJson).toHaveBeenCalledWith({ laboratorioId: null }));
+  });
+
+  it('não aparece sem lâminas', async () => {
+    api.listarLaminas.mockResolvedValue(page([]));
+    renderSlides();
+    await screen.findByText('Comece pela primeira lâmina');
+    expect(grupo()).toBeNull();
+  });
+
+  it('mostra o erro de acesso negado', async () => {
+    api.baixarLaminasResumoCsv.mockRejectedValue(apiError(403));
+    const user = userEvent.setup();
+    renderSlides({ laboratory: ACTIVE_LAB });
+    await screen.findByRole('button', { name: /L1 planta A/ });
+    await user.click(within(grupo()!).getByRole('button', { name: 'Resumo (CSV)' }));
+    expect((await screen.findByRole('alert')).textContent).toContain('permissão');
   });
 });
