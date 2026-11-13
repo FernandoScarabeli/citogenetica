@@ -15,7 +15,7 @@ import { typeClass } from './lib/type-scale';
 import './laboratories.css';
 import './laboratory-management.css';
 import { FloatingNotice } from './components/ui/floating-notice';
-import { TabTransition } from './components/ui/tab-transition';
+import { TabIndicator, TabTransition } from './components/ui/tab-transition';
 import { loadPreferences, savePreferences } from './preferences';
 import type { UsuarioResponseDTO } from './api/contracts/usuario';
 import { ProfileSettings } from './app/ProfileSettings';
@@ -31,6 +31,9 @@ function errorMessage(error: unknown, fallback: string): string {
 function hasRole(papeis: PapelLaboratorio[], papel: PapelLaboratorio): boolean {
   return papeis.includes(papel);
 }
+
+/** Ordem das abas de Gerenciar, para a troca entrar do lado certo. */
+const ORDEM_ABAS: AbaGerenciar[] = ['membros', 'orientacao', 'convites', 'configuracoes'];
 
 /** Todo laboratório tem o papel Membro; ele só aparece quando é o único. */
 function papeisPrincipais(papeis: PapelLaboratorio[]): string {
@@ -591,8 +594,8 @@ export function Laboratories({ user, onLogout, onUserUpdate, renderSlides, api =
               : detailStatus === 'loading' || currentLab?.id !== selectedId ? <div className="laboratory-loading" aria-live="polite"><p>Carregando laboratório e membros…</p><span /><span /></div>
               : currentLab && <>
                 <div className="page-heading laboratory-detail-heading"><div><h1>{currentLab.nome}</h1><div className="laboratory-detail-meta"><span className={`laboratory-state ${currentLab.estado === 'ATIVO' ? 'is-active' : 'is-disabled'}`}>{currentLab.estado === 'ATIVO' ? 'Ativo' : 'Desativado'}</span>{currentLab.estado === 'DESATIVADO' && <span>Somente leitura</span>}</div></div><button className="button primary" type="button" onClick={() => openSlides(currentLab)}>Acessar lâminas <ArrowRight size={16} aria-hidden="true" /></button></div>
-                <div className="laboratory-management-panel"><nav className="tabs laboratory-tabs" aria-label="Gestão do laboratório"><button type="button" className={section === 'membros' ? 'selected' : ''} aria-current={section === 'membros' ? 'page' : undefined} onClick={() => openSection('membros')}>Membros <span>{members.length}</span></button><button type="button" className={section === 'orientacao' ? 'selected' : ''} aria-current={section === 'orientacao' ? 'page' : undefined} onClick={() => openSection('orientacao')}>Orientação</button>{admin && <button type="button" className={section === 'convites' ? 'selected' : ''} aria-current={section === 'convites' ? 'page' : undefined} onClick={() => openSection('convites')}>Convites</button>}<button type="button" className={section === 'configuracoes' ? 'selected' : ''} aria-current={section === 'configuracoes' ? 'page' : undefined} onClick={() => openSection('configuracoes')}>Configurações</button></nav>
-                <TabTransition tab={section}>
+                <div className="laboratory-management-panel"><nav className="tabs laboratory-tabs" aria-label="Gestão do laboratório"><button type="button" className={section === 'membros' ? 'selected' : ''} aria-current={section === 'membros' ? 'page' : undefined} onClick={() => openSection('membros')}>Membros <span>{members.length}</span></button><button type="button" className={section === 'orientacao' ? 'selected' : ''} aria-current={section === 'orientacao' ? 'page' : undefined} onClick={() => openSection('orientacao')}>Orientação</button>{admin && <button type="button" className={section === 'convites' ? 'selected' : ''} aria-current={section === 'convites' ? 'page' : undefined} onClick={() => openSection('convites')}>Convites</button>}<button type="button" className={section === 'configuracoes' ? 'selected' : ''} aria-current={section === 'configuracoes' ? 'page' : undefined} onClick={() => openSection('configuracoes')}>Configurações</button><TabIndicator active={section} /></nav>
+                <TabTransition tab={section} index={ORDEM_ABAS.indexOf(section)}>
                 {section === 'membros' ? <section className="members-section" aria-labelledby="members-title">
                   <div className="members-toolbar"><div><h2 id="members-title">Equipe do laboratório</h2></div><label className="members-search"><Search size={16} aria-hidden="true" /><span className="sr-only">Buscar membro por nome ou e-mail</span><input type="search" value={memberQuery} onChange={event => setMemberQuery(event.target.value)} placeholder="Buscar membro" /></label></div>
                   <div className="members-table-wrap"><table className="members-table"><thead><tr><th scope="col">Pessoa</th><th scope="col">Papéis</th>{admin && <th scope="col"><span className="sr-only">Ações</span></th>}</tr></thead><tbody>

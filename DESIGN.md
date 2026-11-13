@@ -120,8 +120,9 @@ a opacidade muda.
 
 ## Movimento entre abas
 
-As abas de gestão usam os tokens de Fluid Functionalism em `src/lib/springs.ts`,
-com entrada `moderate` de 160ms e saída de 120ms, sem quique. O conteúdo combina
-fade com deslocamento curto. Abas em saída ficam inertes e fora da árvore de
-acessibilidade. A preferência por movimento reduzido mantém somente o fade.
-Motion carrega seus recursos de animação em um arquivo separado, sob demanda.
+As abas de gestão usam só CSS (`src/components/ui/tab-transition.css`), sem
+biblioteca de animação. A linha da aba ativa desliza até a aba escolhida em
+220ms (`cubic-bezier(0.77, 0, 0.175, 1)`), com `translateX` + `scaleX`. O
+conteúdo antigo sai na hora, sem sobrepor; o novo entra em 200ms
+(`cubic-bezier(0.23, 1, 0.32, 1)`) com opacidade e 8px vindo do lado da aba
+escolhida. Com movimento reduzido, a linha pula direto e o conteúdo só esmaece.
