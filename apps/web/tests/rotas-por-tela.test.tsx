@@ -223,7 +223,7 @@ describe('observações ao sair da lâmina pela navegação', () => {
     contagem.atualizarLamina.mockResolvedValue({ ...LAMINA, versao: 4, observacoes: 'Nota salva e mais' });
     abrir('/laboratorios/lab-1/laminas/lamina-1');
     await screen.findByRole('heading', { name: 'L1 planta A' });
-    await user.type(screen.getByLabelText('Observações'), ' e mais');
+    await user.type(screen.getByLabelText('Observações da lâmina'), ' e mais');
     await user.click(screen.getByRole('button', { name: 'Lâminas' }));
     expect(await screen.findByRole('heading', { name: 'Lâminas' })).toBeTruthy();
     expect(caminho()).toBe('/laboratorios/lab-1/laminas');

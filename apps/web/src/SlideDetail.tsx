@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
-import { Braces, Check, FileSpreadsheet, FileText, Pencil, Plus, Trash2, Undo2, X } from 'lucide-react';
+import { Braces, Check, ChevronDown, Download, FileSpreadsheet, FileText, Pencil, Plus, SlidersHorizontal, Trash2, Undo2, X } from 'lucide-react';
 import { typeClass } from '@/lib/type-scale';
 import type { ContagemApi } from './api/contagem-api';
 import type {
@@ -13,8 +13,10 @@ import {
   agruparPorDia, descricaoDesfazer, formatarData, formatarHora, fusoDoAparelho, instanteExibido, mensagemDeErro, normalizarNomeTipo, rotuloDesfazer,
 } from './contagem-utils';
 import { pct } from './domain';
+import { ActionMenu } from './components/ui/action-menu';
 import { EntrySelect, Modal, TypeButtons, TypeChecklist, type TypeChoice } from './SlideWidgets';
 import { salvarArquivo } from './salvar-arquivo';
+import './slide-detail.css';
 import { useNotesAutosave } from './useNotesAutosave';
 
 const HISTORY_PAGE_SIZE = 20;
@@ -85,7 +87,6 @@ export function SlideDetail({ api, laminaId, usuarioId, readOnly, protocolos, on
   const [history, setHistory] = useState<History>({ items: [], page: 0, totalPages: 0 });
   const [loadingMore, setLoadingMore] = useState(false);
   const [pending, setPending] = useState<Pending[]>([]);
-  const [tab, setTab] = useState<'contagem' | 'resumo' | 'historico'>('contagem');
   const [modal, setModal] = useState<ModalKind>(null);
   const [busy, setBusy] = useState(false);
   const [baixando, setBaixando] = useState<ExportacaoKind | null>(null);
@@ -577,6 +578,13 @@ export function SlideDetail({ api, laminaId, usuarioId, readOnly, protocolos, on
 
   const normal = shown.total - shown.anormais;
   const goal = lamina.meta;
+  // Índice mitótico = células nas fases que contam como divisão / total, já com as células ainda a caminho do servidor.
+  const fasesDeDivisao = new Set(loaded.versao.fases.filter(fase => fase.contaComoDivisao).map(fase => fase.id));
+  const divisao = shown.fases.filter(fase => fasesDeDivisao.has(fase.faseId)).reduce((soma, fase) => soma + fase.total, 0);
+  const indice = shown.total ? divisao / shown.total : 0;
+  const batchFase = batchPhase ? shown.fases.find(fase => fase.faseId === batchPhase) ?? null : null;
+  const combos = removendoAnormais && batchFase ? combosDaFase(comboState.registros, batchFase.faseId) : [];
+  const comboAtual = combos.find(item => item.key === comboKey);
   const phaseName = (faseId: string) => loaded.versao.fases.find(fase => fase.id === faseId)?.nome ?? 'Fase';
   const editPhaseOptions = loaded.versao.fases.map(fase => ({ value: fase.id, label: fase.nome }));
   const extraForEdit = editing && editing.faseId === phaseId ? editing.tipos : [];
@@ -588,35 +596,39 @@ export function SlideDetail({ api, laminaId, usuarioId, readOnly, protocolos, on
         <div className="title-line"><h1 className={typeClass('display')}>{lamina.nome}</h1><span className="protocol-tag">{protocolo?.nome ?? 'Protocolo'}</span></div>
         <p>{(lamina.especie || lamina.tratamento) && <>{[lamina.especie, lamina.tratamento].filter(Boolean).join(' · ')} <span className="dot-separator">·</span> </>}Criada em {formatarData(lamina.criadaEm)}</p>
       </div>
-      {canEdit && <div className="detail-actions">
-        <button className="button secondary" type="button" disabled={guardadas > 0} title={guardadas > 0 ? DICA_FILA : undefined} onClick={openEditSlide}><Pencil size={15} /> Editar lâmina</button>
-        <button className="button icon-only secondary" type="button" title={guardadas > 0 ? DICA_FILA : 'Excluir lâmina'} disabled={guardadas > 0} aria-label="Excluir lâmina" onClick={() => setModal('delete')}><Trash2 size={17} /></button>
-      </div>}
+      <div className="detail-actions">
+        <ActionMenu rotulo="Exportar" Icone={Download} ocupado={baixando ? 'Baixando…' : null}
+          itens={EXPORTACOES.map(({ kind, rotulo, Icone }) => ({ tipo: 'acao' as const, id: kind, rotulo, Icone, aoEscolher: () => void exportar(kind) }))} />
+        {canEdit && <><button className="button secondary" type="button" disabled={guardadas > 0} title={guardadas > 0 ? DICA_FILA : undefined} onClick={openEditSlide}><Pencil size={15} /> Editar lâmina</button>
+        <button className="button icon-only secondary" type="button" title={guardadas > 0 ? DICA_FILA : 'Excluir lâmina'} disabled={guardadas > 0} aria-label="Excluir lâmina" onClick={() => setModal('delete')}><Trash2 size={17} /></button></>}
+      </div>
     </div>
     {!readOnly && lamina.donoUsuarioId !== usuarioId && <p className="owner-note">Esta lâmina é de {lamina.donoNome}. Você pode consultar a contagem, mas só quem a criou pode alterá-la.</p>}
     <div className="detail-summary">
       <div className="summary-main"><span>Total de células</span><strong>{num(shown.total)}</strong><small>registradas nesta lâmina</small></div>
       <div className="summary-item"><span>Células normais</span><strong>{num(normal)}</strong><small>{pct(normal, shown.total)} do total</small></div>
       <div className="summary-item"><span>Células anormais</span><strong>{num(shown.anormais)}</strong><small>{pct(shown.anormais, shown.total)} do total</small></div>
-      {isMitosis && <div className="summary-item"><span>Índice mitótico</span><strong>{pct(shown.indiceMitotico, 100)}</strong><small>células em divisão</small></div>}
+      {isMitosis && <div className="summary-item"><span>Índice mitótico</span><strong>{pct(divisao, shown.total)}</strong><small>células em divisão</small></div>}
     </div>
     {goal !== null && <div className="progress-line"><div><span>Meta de contagem</span><strong>{num(shown.total)} <span>/ {num(goal)} células</span></strong></div><div className="progress-track" role="progressbar" aria-label="Meta de contagem" aria-valuemin={0} aria-valuemax={goal} aria-valuenow={Math.min(shown.total, goal)}><span style={{ width: `${Math.min(shown.total / goal * 100, 100)}%` }} /></div></div>}
-    <div className="tabs" role="tablist" aria-label="Seções da lâmina">{([['contagem', 'Contagem'], ['resumo', 'Resumo'], ['historico', 'Histórico']] as const).map(([value, label]) => <button type="button" role="tab" aria-selected={tab === value} className={tab === value ? 'selected' : ''} onClick={() => setTab(value)} key={value}>{label}</button>)}</div>
-
-    {tab === 'contagem' && <div className="workspace"><section className="count-area">
-      <div className="section-heading compact"><div><h2 className={typeClass('title')}>Contagem por fase</h2><p>Registre cada célula na fase correspondente.</p></div>
+    <section className="count-section" aria-labelledby="contagem-titulo">
+      <div className="section-heading compact"><h2 id="contagem-titulo" className={typeClass('title')}>Contagem por fase</h2>
         {canEdit && <div className="count-tools"><button className="text-button" type="button" disabled={!last || pending.length > 0 || guardadas > 0 || busy} title={guardadas > 0 ? DICA_FILA : undefined} onClick={() => (last && last.quantidade > 1 ? setModal('undo') : void undoLast())}><Undo2 size={15} /> {last ? rotuloDesfazer(last, phaseName(last.faseId)) : 'Desfazer último'}</button></div>}
       </div>
-      <div className="phase-list">{shown.fases.map(fase => { const combos = removendoAnormais && batchPhase === fase.faseId ? combosDaFase(comboState.registros, fase.faseId) : []; const comboAtual = combos.find(item => item.key === comboKey); return <div className="phase-row" key={fase.faseId}>
-        <div className="phase-title"><strong>{fase.nome}</strong><small>{num(fase.total)} {fase.total === 1 ? 'célula' : 'células'} no total</small>
-          {canEdit && <button className="phase-adjust" type="button" ref={el => { batchTriggers.current[fase.faseId] = el; }} aria-expanded={batchPhase === fase.faseId} disabled={guardadas > 0} title={guardadas > 0 ? DICA_FILA : undefined} onClick={() => (batchPhase === fase.faseId ? closeBatch() : openBatch(fase.faseId))}>Ajustar quantidade<span className="sr-only"> em {fase.nome}</span></button>}
+      <div className="phase-grid">{shown.fases.map(fase => <article className={`phase-card${batchPhase === fase.faseId ? ' is-adjusting' : ''}`} key={fase.faseId} aria-labelledby={`fase-${fase.faseId}`}>
+        <div className="phase-card-head"><h3 id={`fase-${fase.faseId}`}>{fase.nome}</h3>
+          {canEdit && <button className="icon-button phase-adjust" type="button" ref={el => { batchTriggers.current[fase.faseId] = el; }} aria-expanded={batchPhase === fase.faseId} aria-label={`Ajustar quantidade em ${fase.nome}`} disabled={guardadas > 0} title={guardadas > 0 ? DICA_FILA : 'Ajustar quantidade'} onClick={() => (batchPhase === fase.faseId ? closeBatch() : openBatch(fase.faseId))}><SlidersHorizontal size={15} aria-hidden="true" /></button>}
         </div>
-        {canEdit && <div className="phase-actions">
-          <button className="count-button" type="button" aria-label={`Registrar ${fase.nome} normal; ${fase.normais} ${fase.normais === 1 ? 'célula normal' : 'células normais'}`} onClick={() => count(fase.faseId, 'NORMAL')}><span className="count-number">{num(fase.normais)}</span><span className="count-label"><Plus size={16} aria-hidden="true" /> Normal</span></button>
-          <button className="count-button abnormal-button" type="button" aria-label={`Registrar ${fase.nome} anormal; ${fase.anormais} ${fase.anormais === 1 ? 'célula anormal' : 'células anormais'}`} onClick={() => openAbnormal(fase.faseId)}><span className="count-number">{num(fase.anormais)}</span><span className="count-label"><Plus size={16} aria-hidden="true" /> Anormal</span></button>
+        <div className="phase-counts" aria-live="polite">
+          <div className="phase-count is-normal"><strong>{num(fase.normais)}</strong><span>normal</span></div>
+          <div className="phase-count is-abnormal"><strong>{num(fase.anormais)}</strong><span>anormal</span></div>
+        </div>
+        {canEdit && <div className="phase-buttons">
+          <button className="count-button is-normal" type="button" aria-label={`Registrar ${fase.nome} normal; ${num(fase.normais)} ${fase.normais === 1 ? 'célula normal' : 'células normais'}`} onClick={() => count(fase.faseId, 'NORMAL')}><Plus size={15} aria-hidden="true" /> Normal</button>
+          <button className="count-button is-abnormal" type="button" aria-label={`Registrar ${fase.nome} anormal; ${num(fase.anormais)} ${fase.anormais === 1 ? 'célula anormal' : 'células anormais'}`} onClick={() => openAbnormal(fase.faseId)}><Plus size={15} aria-hidden="true" /> Anormal</button>
         </div>}
-        {!canEdit && <div className="phase-actions" aria-label={`${fase.nome}: ${fase.normais} normais, ${fase.anormais} anormais`}><span className="numeric">{num(fase.normais)} normais · {num(fase.anormais)} anormais</span></div>}
-        {canEdit && batchPhase === fase.faseId && <form className="batch-editor" onSubmit={event => void submitBatch(event)}>
+      </article>)}</div>
+      {canEdit && batchFase && (fase => <form className="batch-editor" onSubmit={event => void submitBatch(event)}>
           <div className="batch-header"><div><h3>Ajustar {fase.nome}</h3><p>Adicione ou remova células desta fase.</p></div><button type="button" className="icon-button" aria-label="Fechar ajuste" onClick={closeBatch}><X size={18} /></button></div>
           <div className="batch-fields">
             <fieldset><legend>O que deseja fazer?</legend><div className="batch-choice"><button type="button" aria-pressed={batchAction === 'add'} onClick={() => { setBatchError(''); setBatchAction('add'); resetTypes(); }}>Adicionar</button><button type="button" aria-pressed={batchAction === 'remove'} onClick={() => { setBatchError(''); setBatchAction('remove'); resetTypes(); }}>Remover</button></div></fieldset>
@@ -633,19 +645,30 @@ export function SlideDetail({ api, laminaId, usuarioId, readOnly, protocolos, on
           {batchStatus === 'ANORMAL' && !removendoAnormais && <TypeChecklist legend={batchAction === 'add' ? 'Anormalidades observadas' : 'Anormalidades do registro a remover'} options={batchOptions(fase.faseId)} selected={selectedTypes} onToggle={id => { setBatchError(''); toggleType(id); }} other={otherChecked} onOther={value => { setBatchError(''); setOtherChecked(value); }} allowOther={batchAction === 'add'} otherText={otherText} onOtherText={value => { setBatchError(''); setOtherText(value); }} />}
           {batchError && <p className="select-error" role="alert">{batchError}</p>}
           <div className="batch-footer">{batchAction === 'remove' && batchStatus === 'NORMAL' ? <p>{`Disponível: ${num(fase.normais)} ${celulas(fase.normais)}.`}</p> : comboAtual ? <p>{`Disponível: ${num(comboAtual.quantidade)} ${celulas(comboAtual.quantidade)}.`}</p> : <span />}<div><button type="button" className="button secondary" onClick={closeBatch}>Cancelar</button><button disabled={busy} className={`button ${batchAction === 'remove' ? 'danger' : 'primary'}`}>{batchAction === 'remove' ? 'Remover células' : 'Adicionar células'}</button></div></div>
-        </form>}
-      </div>; })}</div>
+        </form>)(batchFase)}
     </section>
-    <section className="side-panel notes-panel" aria-label="Observações da lâmina"><div className="notes"><label htmlFor="notes">Observações</label><p>Anotações desta lâmina</p>
-      <textarea id="notes" readOnly={!canEdit} placeholder={canEdit ? 'Adicione suas observações...' : ''} value={notes.text} maxLength={5000} onChange={event => notes.setText(event.target.value)} onBlur={() => void notes.flush()} />
+
+    <section className="report-section" aria-labelledby="resumo-titulo">
+      <h2 id="resumo-titulo" className={typeClass('title')}>Resumo</h2>
+      <div className="table-wrap"><table className="summary-table"><thead><tr><th>Fase</th><th>Normal</th><th>Anormal</th><th>Total</th><th>% anormal</th><th>Tipos de anormalidade</th></tr></thead>
+        <tbody>{shown.fases.map(fase => <tr key={fase.faseId}><td>{fase.nome}</td><td>{num(fase.normais)}</td><td>{num(fase.anormais)}</td><td>{num(fase.total)}</td><td>{fase.total ? pct(fase.anormais, fase.total) : '—'}</td><td className="summary-types">{fase.tipos.length ? fase.tipos.map(tipo => <span key={tipo.tipoId}>{tipo.nome}: {num(tipo.contagem)} ({pct(tipo.percentual, 100)})</span>) : '—'}</td></tr>)}</tbody>
+        <tfoot><tr><th scope="row">Total</th><td>{num(normal)}</td><td>{num(shown.anormais)}</td><td>{num(shown.total)}</td><td>{shown.total ? pct(shown.anormais, shown.total) : '—'}</td><td /></tr></tfoot>
+      </table></div>
+      {(isMitosis || goal !== null) && <div className="index-box">
+        {isMitosis && <p className="index-formula">Índice mitótico (IM) = {num(divisao)} / {num(shown.total)} = {indice.toLocaleString('pt-BR', { minimumFractionDigits: 4, maximumFractionDigits: 4 })} ({pct(divisao, shown.total)})</p>}
+        {goal !== null && <p>Meta de contagem: {num(shown.total)} / {num(goal)} células nesta lâmina</p>}
+      </div>}
+    </section>
+
+    <section className="notes-section">
+      <label id="notes-label" htmlFor="notes" className={typeClass('title')}>Observações da lâmina</label>
+      <textarea id="notes" readOnly={!canEdit} placeholder={canEdit ? 'Anotações gerais sobre esta lâmina…' : ''} value={notes.text} maxLength={5000} onChange={event => notes.setText(event.target.value)} onBlur={() => void notes.flush()} />
       {canEdit && <p className="notes-status" role="status">{notes.state === 'saving' ? 'Salvando…' : notes.state === 'saved' ? 'Salvo' : notes.state === 'error' ? <>Não foi possível salvar. <button className="text-button" type="button" onClick={() => void notes.flush()}>Tentar de novo</button></> : ''}</p>}
-    </div></section></div>}
+    </section>
 
-    {tab === 'resumo' && <section className="tab-content"><div className="section-heading"><div><h2 className={typeClass('title')}>Resumo da análise</h2><p>Distribuição das células e anormalidades por fase.</p></div><div className="action-group" role="group" aria-label="Exportar lâmina">{EXPORTACOES.map(({ kind, rotulo, Icone }) => <button key={kind} className="button secondary" type="button" disabled={baixando !== null} aria-busy={baixando === kind} onClick={() => void exportar(kind)}><Icone size={16} aria-hidden="true" /> {baixando === kind ? 'Baixando…' : rotulo}</button>)}</div></div>
-      <div className="table-wrap"><table><thead><tr><th>Fase</th><th>Normais</th><th>Anormais</th><th>Total</th><th>% anormais</th></tr></thead><tbody>{shown.fases.map(fase => <tr key={fase.faseId}><td><strong>{fase.nome}</strong>{fase.tipos.map(tipo => <small key={tipo.tipoId}>{tipo.nome}: {tipo.contagem} ({pct(tipo.percentual, 100)})</small>)}</td><td>{fase.normais}</td><td>{fase.anormais}</td><td>{fase.total}</td><td>{pct(fase.percentualAnormais, 100)}</td></tr>)}</tbody></table></div>
-      {lamina.observacoes && <div className="report-notes typeset"><h3>Observações</h3><p>{lamina.observacoes}</p></div>}</section>}
-
-    {tab === 'historico' && <section className="tab-content"><div className="section-heading"><div><h2 className={typeClass('title')}>Histórico de registros</h2><p>Do mais recente ao mais antigo.</p></div></div>
+    <details className="history-section" aria-label="Histórico de registros">
+      <summary><span className={typeClass('title')}>Histórico de registros</span><ChevronDown size={18} aria-hidden="true" /></summary>
+      <div className="history-content">
       {history.items.length === 0 ? <div className="empty-state small-empty"><p>Nenhuma célula registrada nesta lâmina.</p></div> : <div className="history-list">
         {agruparPorDia(history.items).map(group => <div key={group.dia}><h3 className="history-date">{group.dia}</h3>{group.registros.map(record => <div className="history-row" key={record.id}>
           <div><strong>{phaseName(record.faseId)} · {record.status === 'NORMAL' ? 'Normal' : 'Anormal'}</strong><p>{num(record.quantidade)} {celulas(record.quantidade)}{record.tipos.length > 0 && <> · {record.tipos.map(tipo => tipo.nome).join(', ')}</>}</p></div>
@@ -654,7 +677,8 @@ export function SlideDetail({ api, laminaId, usuarioId, readOnly, protocolos, on
         </div>)}</div>)}
       </div>}
       {history.page + 1 < history.totalPages && <div className="history-more"><button className="button secondary" type="button" disabled={loadingMore} onClick={() => void loadMore()}>{loadingMore ? 'Carregando…' : 'Carregar mais'}</button></div>}
-    </section>}
+      </div>
+    </details>
 
     {guardadas > 0 && <div className="fila-aviso" role="status"><span aria-hidden="true" className="fila-aviso-ponto" />{fila.enviando ? mensagemFilaEnviando(guardadas) : mensagemFilaGuardada(guardadas)}</div>}
 
