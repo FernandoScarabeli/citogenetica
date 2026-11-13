@@ -1,16 +1,32 @@
 import { ApiError, NetworkError, isForbidden } from './api/errors';
 import type { RegistroDTO } from './api/contracts/contagem';
 
+type Horarios = Pick<RegistroDTO, 'registradoEm' | 'horaAparelho' | 'fusoAparelho'>;
+
+/** Atraso a partir do qual a célula conta como guardada sem internet e enviada depois. */
+export const ATRASO_DE_ENVIO_MS = 2 * 60 * 1000;
+
+/**
+ * Célula contada sem internet e enviada depois: chegou ao servidor bem depois do clique.
+ * Um clique com conexão chega em segundos; relógio do aparelho adiantado nunca entra aqui.
+ */
+export function enviadaDepois(registro: Horarios): boolean {
+  if (registro.fusoAparelho == null || !registro.horaAparelho) return false;
+  const clique = Date.parse(registro.horaAparelho);
+  const chegada = Date.parse(registro.registradoEm);
+  return Number.isFinite(clique) && Number.isFinite(chegada) && chegada - clique >= ATRASO_DE_ENVIO_MS;
+}
+
 /**
  * Instante que a tela de histórico mostra para um registro.
  *
- * A hora oficial é sempre a do servidor (`registradoEm`). Só há uma exceção: contagens antigas enviadas
- * do navegador chegam sem fuso (`fusoAparelho` nulo) mas com a hora em que a célula foi contada
- * (`horaAparelho`); nesse caso a data original é a que importa. Se o fuso existir, a contagem foi feita
- * com a tela já ligada ao servidor, e a hora do aparelho é apenas informativa.
+ * Em geral vale a hora do servidor (`registradoEm`). Há duas exceções, em que importa quando a célula foi
+ * contada (`horaAparelho`): contagens antigas importadas, que chegam sem fuso, e células guardadas sem internet
+ * e enviadas depois. Nesse segundo caso a tela também mostra a hora do envio (ver `enviadaDepois`).
  */
-export function instanteExibido(registro: Pick<RegistroDTO, 'registradoEm' | 'horaAparelho' | 'fusoAparelho'>): string {
+export function instanteExibido(registro: Horarios): string {
   if (registro.fusoAparelho == null && registro.horaAparelho) return registro.horaAparelho;
+  if (enviadaDepois(registro)) return registro.horaAparelho as string;
   return registro.registradoEm;
 }
 
@@ -19,6 +35,14 @@ const horaFormat = new Intl.DateTimeFormat('pt-BR', { hour: '2-digit', minute: '
 
 export const formatarData = (iso: string) => diaFormat.format(new Date(iso)).replace('.', '');
 export const formatarHora = (iso: string) => horaFormat.format(new Date(iso));
+
+/** "enviada às 14:30", ou com a data quando o envio foi em outro dia. */
+export function textoEnvio(registro: Horarios): string {
+  const mesmoDia = formatarData(registro.registradoEm) === formatarData(instanteExibido(registro));
+  return mesmoDia
+    ? `enviada às ${formatarHora(registro.registradoEm)}`
+    : `enviada em ${formatarData(registro.registradoEm)} às ${formatarHora(registro.registradoEm)}`;
+}
 
 /** Agrupa registros já ordenados por dia (calendário local), mantendo a ordem recebida. */
 export function agruparPorDia<T extends Pick<RegistroDTO, 'registradoEm' | 'horaAparelho' | 'fusoAparelho'>>(registros: T[]): { dia: string; registros: T[] }[] {

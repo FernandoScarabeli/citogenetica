@@ -734,6 +734,22 @@ describe('editar e excluir a lâmina', () => {
   });
 });
 
+describe('hora no histórico', () => {
+  it('célula enviada depois mostra a hora do clique e a do envio', async () => {
+    const reenviada = { ...REGISTRO, id: 'reg-offline', registradoEm: '2026-11-08T17:30:00Z', horaAparelho: '2026-11-08T13:05:00Z', fusoAparelho: 'America/Sao_Paulo' };
+    api.listarRegistros.mockResolvedValue(page([reenviada, REGISTRO_ANTIGO]));
+    const user = userEvent.setup();
+    renderSlides();
+    await openSlide(user);
+    await abrirHistorico(user);
+
+    const hora = new Intl.DateTimeFormat('pt-BR', { hour: '2-digit', minute: '2-digit' });
+    const linha = (await historico().findByText(`enviada às ${hora.format(new Date(reenviada.registradoEm))}`)).closest('.history-row') as HTMLElement;
+    expect(within(linha).getByText(hora.format(new Date(reenviada.horaAparelho))).getAttribute('dateTime')).toBe(reenviada.horaAparelho);
+    expect(historico().getAllByText(/^enviada/)).toHaveLength(1);
+  });
+});
+
 describe('percentuais', () => {
   it('mostra duas casas decimais, inclusive no índice mitótico', async () => {
     const user = userEvent.setup();

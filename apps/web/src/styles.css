@@ -101,6 +101,7 @@ form label.check-option span{color:inherit;font-weight:inherit}
 .slide-state p{color:var(--lab-muted,#7c867d)}
 .owner-note{margin:0 0 18px;padding:11px 14px;border:1px solid var(--lab-line,#dce5dd);border-radius:6px;background:var(--lab-ground,#f5f8f5);color:var(--lab-ink,#46544a);font-size:var(--fs-caption);line-height:var(--lh-caption)}
 .history-row .history-edit{flex:none}
+.history-row .history-time{display:flex;flex-direction:column;align-items:flex-end;gap:2px;flex:none}.history-row .history-time small{font-size:var(--fs-micro);line-height:var(--lh-micro);color:var(--lab-muted,#8b958c)}
 .history-more{display:flex;justify-content:center;margin:16px 0}
 .notes-actions{display:flex;justify-content:flex-end;margin-top:10px}
 .fila-aviso{position:sticky;bottom:0;z-index:20;display:flex;align-items:center;gap:10px;margin-top:20px;padding:13px 16px;border:1px solid var(--lab-accent,#395a4c);border-radius:6px;background:var(--lab-ground,#f5f8f5);color:var(--lab-ink,#26342c);font-size:var(--fs-body);line-height:var(--lh-body);font-weight:550;box-shadow:0 -4px 16px #17281e1c}
