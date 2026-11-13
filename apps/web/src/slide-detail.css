@@ -71,6 +71,7 @@ html[data-appearance="dark"] .labs-app .detail .batch-choice button[aria-pressed
 .summary-table .summary-types { min-width: 200px; color: var(--lab-muted, #59675e); }
 .summary-table .summary-types span { display: block; }
 .summary-table .summary-types span + span { margin-top: 2px; }
+.summary-note { margin: 8px 0 0; color: var(--lab-muted, #59675e); font-size: var(--fs-caption); line-height: var(--lh-caption); }
 .index-box { display: grid; gap: 4px; margin-top: 12px; padding: 14px 18px; border: 1px solid var(--lab-line, #e3e8e3); border-radius: 6px; background: var(--lab-ground, #edf1ed); color: var(--lab-muted, #59675e); font-size: var(--fs-caption); line-height: var(--lh-caption); }
 .index-box p { margin: 0; }
 .index-box .index-formula { color: var(--lab-ink, #212924); font-size: var(--fs-body); line-height: var(--lh-body); font-weight: 600; font-variant-numeric: tabular-nums; }

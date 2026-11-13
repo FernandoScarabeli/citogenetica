@@ -744,6 +744,20 @@ describe('percentuais', () => {
     expect(screen.getByText('Micronúcleo: 1 (50,00%)')).toBeTruthy();
     expect(screen.getAllByText('50,00%').length).toBeGreaterThan(0);
   });
+
+  it('explica que os tipos podem somar mais que o % de anormais só quando há tipos', async () => {
+    const aviso = /percentuais dos tipos podem somar mais que o % de anormais/;
+    const user = userEvent.setup();
+    const { unmount } = renderSlides();
+    await openSlide(user);
+    expect(screen.getByText(aviso)).toBeTruthy();
+    unmount();
+
+    api.buscarResumo.mockResolvedValue({ ...RESUMO, anormais: 0, fases: RESUMO.fases.map(fase => ({ ...fase, anormais: 0, tipos: [] })) });
+    renderSlides();
+    await openSlide(user);
+    expect(screen.queryByText(aviso)).toBeNull();
+  });
 });
 
 describe('células guardadas sem conexão', () => {
