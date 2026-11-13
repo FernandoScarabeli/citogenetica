@@ -261,6 +261,27 @@ export function Laboratories({ user, onLogout, onUserUpdate, renderSlides, api =
     return () => { active = false; controller.abort(); };
   }, [view, selectedId, detailRetry, returnToListForMissingLab]);
 
+  /**
+   * Ninguém avisa este navegador quando alguém aceita um convite: a lista de membros é relida em silêncio
+   * ao voltar para a aba do navegador e ao abrir "Membros", para o contador não ficar velho.
+   */
+  const refreshMembers = useCallback(() => {
+    if (view !== 'manage' || !selectedId || detailStatus !== 'ready') return;
+    laboratorioApi.listarParticipacoes(selectedId)
+      .then(latest => setMembers(latest))
+      .catch(() => { /* a lista atual continua valendo; erros aparecem na próxima ação */ });
+  }, [view, selectedId, detailStatus]);
+
+  useEffect(() => {
+    const whenVisible = () => { if (document.visibilityState === 'visible') refreshMembers(); };
+    window.addEventListener('focus', whenVisible);
+    document.addEventListener('visibilitychange', whenVisible);
+    return () => {
+      window.removeEventListener('focus', whenVisible);
+      document.removeEventListener('visibilitychange', whenVisible);
+    };
+  }, [refreshMembers]);
+
   useEffect(() => {
     if (view !== 'slides') return;
     if (!selectedId) {
@@ -312,6 +333,7 @@ export function Laboratories({ user, onLogout, onUserUpdate, renderSlides, api =
   /** Troca de aba sem empilhar histórico: o Voltar leva à tela anterior, não à aba anterior. */
   function openSection(aba: AbaGerenciar) {
     setEditingParticipation(null);
+    if (aba === 'membros' && section !== 'membros') refreshMembers();
     navigate({ search: aba === 'membros' ? '' : `?aba=${aba}` }, { replace: true });
   }
 
