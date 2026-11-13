@@ -140,13 +140,11 @@ app:
 
 storage:
   internal-endpoint: ${STORAGE_INTERNAL_ENDPOINT:http://localhost:9000}
-  public-endpoint: ${STORAGE_PUBLIC_ENDPOINT:http://localhost:9000}
   region: ${STORAGE_REGION:us-east-1}
   path-style: ${STORAGE_PATH_STYLE:true}
   bucket: ${STORAGE_BUCKET:citogenetica}
   access-key: ${STORAGE_ACCESS_KEY}
   secret-key: ${STORAGE_SECRET_KEY}
-  presigned-url-validity-seconds: ${STORAGE_PRESIGNED_URL_VALIDITY_SECONDS:900}
 
 # Fora do perfil dev, o health público responde só o status (padrão do Spring: never),
 # sem versão do banco, caminhos ou espaço em disco. Nenhum outro endpoint é exposto.

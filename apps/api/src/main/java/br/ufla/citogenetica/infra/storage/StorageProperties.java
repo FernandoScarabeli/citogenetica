@@ -3,8 +3,6 @@ package br.ufla.citogenetica.infra.storage;
 import br.ufla.citogenetica.shared.secret.SecretValue;
 import br.ufla.citogenetica.shared.secret.ValidSecret;
 import jakarta.validation.constraints.AssertTrue;
-import jakarta.validation.constraints.Max;
-import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
@@ -17,7 +15,6 @@ import java.net.URI;
 @ConfigurationProperties(prefix = "storage")
 public record StorageProperties(
         @NotBlank String internalEndpoint,
-        @NotBlank String publicEndpoint,
         @NotBlank
         @Pattern(regexp = "[a-z0-9]+(?:-[a-z0-9]+)*-[0-9]+") String region,
         boolean pathStyle,
@@ -31,8 +28,7 @@ public record StorageProperties(
                 minimumBytes = 32,
                 maximumBytes = 128,
                 message = "STORAGE_SECRET_KEY deve ter entre 32 e 128 bytes e não pode ser um placeholder conhecido.")
-        SecretValue secretKey,
-        @Min(1) @Max(604800) long presignedUrlValiditySeconds) {
+        SecretValue secretKey) {
 
     private static final java.util.regex.Pattern ACCESS_KEY_PATTERN =
             java.util.regex.Pattern.compile("[A-Za-z0-9][A-Za-z0-9._-]{2,127}");
@@ -50,9 +46,9 @@ public record StorageProperties(
         return accessKey != null && ACCESS_KEY_PATTERN.matcher(accessKey.reveal()).matches();
     }
 
-    @AssertTrue(message = "Os endpoints devem ser URLs HTTP(S) sem credenciais, caminho ou query string")
+    @AssertTrue(message = "O endpoint deve ser uma URL HTTP(S) sem credenciais, caminho ou query string")
     public boolean isEndpointsValid() {
-        return isValidEndpoint(internalEndpoint) && isValidEndpoint(publicEndpoint);
+        return isValidEndpoint(internalEndpoint);
     }
 
     private static boolean isValidEndpoint(String value) {
