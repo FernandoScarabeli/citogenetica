@@ -190,7 +190,27 @@ public class ConviteLaboratorioService {
     public void aceitar(String token, Long usuarioId, String emailSessao, String enderecoIp) {
         limitarConsumo(usuarioId, enderecoIp);
         byte[] hash = tokenService.hash(token);
-        ConviteLaboratorio referencia = buscarPorToken(hash);
+        concluirAceite(buscarPorToken(hash), hash, usuarioId, emailSessao);
+    }
+
+    /**
+     * Resposta pelo sino de notificações. A sessão do próprio destinatário (e-mail igual, conta ativa e confirmada)
+     * prova o mesmo que o link do e-mail: que quem responde é dono do endereço convidado.
+     */
+    @Transactional
+    public void aceitarPelaNotificacao(UUID conviteId, Long usuarioId, String emailSessao, String enderecoIp) {
+        limitarConsumo(usuarioId, enderecoIp);
+        concluirAceite(buscarPorId(conviteId), null, usuarioId, emailSessao);
+    }
+
+    @Transactional
+    public void recusarPelaNotificacao(UUID conviteId, Long usuarioId, String emailSessao, String enderecoIp) {
+        limitarConsumo(usuarioId, enderecoIp);
+        concluirRecusa(buscarPorId(conviteId), null, usuarioId, emailSessao);
+    }
+
+    /** {@code hash} nulo quando a resposta vem pelo sino, sem o link do e-mail. */
+    private void concluirAceite(ConviteLaboratorio referencia, byte[] hash, Long usuarioId, String emailSessao) {
         Laboratorio laboratorio = accessPolicy.bloquearLaboratorio(referencia.getLaboratorio().getId());
         ConviteLaboratorio convite = buscarConviteBloqueado(referencia.getLaboratorio().getId(), referencia.getId());
         validarTokenPendente(convite, hash);
@@ -211,7 +231,10 @@ public class ConviteLaboratorioService {
     public void recusar(String token, Long usuarioId, String emailSessao, String enderecoIp) {
         limitarConsumo(usuarioId, enderecoIp);
         byte[] hash = tokenService.hash(token);
-        ConviteLaboratorio referencia = buscarPorToken(hash);
+        concluirRecusa(buscarPorToken(hash), hash, usuarioId, emailSessao);
+    }
+
+    private void concluirRecusa(ConviteLaboratorio referencia, byte[] hash, Long usuarioId, String emailSessao) {
         accessPolicy.bloquearLaboratorio(referencia.getLaboratorio().getId());
         ConviteLaboratorio convite = buscarConviteBloqueado(referencia.getLaboratorio().getId(), referencia.getId());
         validarTokenPendente(convite, hash);
@@ -238,6 +261,11 @@ public class ConviteLaboratorioService {
                 .orElseThrow(() -> new BadRequestException(CONVITE_INDISPONIVEL));
     }
 
+    private ConviteLaboratorio buscarPorId(UUID conviteId) {
+        return conviteRepository.findById(conviteId)
+                .orElseThrow(() -> new BadRequestException(CONVITE_INDISPONIVEL));
+    }
+
     private ConviteLaboratorio buscarConviteBloqueado(UUID laboratorioId, UUID conviteId) {
         ConviteLaboratorio convite = conviteRepository.findByIdForUpdate(conviteId)
                 .orElseThrow(() -> new NotFoundException(NAO_ENCONTRADO));
@@ -250,7 +278,7 @@ public class ConviteLaboratorioService {
 
     private void validarTokenPendente(ConviteLaboratorio convite, byte[] hashRecebido) {
         if (convite.getEstado() != EstadoConviteLaboratorio.PENDENTE
-                || !tokenService.iguais(convite.getTokenHash(), hashRecebido)
+                || (hashRecebido != null && !tokenService.iguais(convite.getTokenHash(), hashRecebido))
                 || !convite.getExpiraEm().isAfter(clock.instant())) {
             throw new BadRequestException(CONVITE_INDISPONIVEL);
         }

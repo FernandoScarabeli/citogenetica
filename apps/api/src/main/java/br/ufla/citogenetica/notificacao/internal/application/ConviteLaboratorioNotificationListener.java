@@ -29,6 +29,7 @@ public class ConviteLaboratorioNotificationListener {
         notificar(evento.emailDestino(), evento.conviteId(), "Convite para laboratório",
                 "Você recebeu um convite para o laboratório “" + evento.laboratorioNome() + "”.",
                 Map.of("conviteId", evento.conviteId().toString(),
+                        "convite", "LABORATORIO",
                         "laboratorioId", evento.laboratorioId().toString(),
                         "papeis", evento.papeis()));
     }
@@ -39,6 +40,7 @@ public class ConviteLaboratorioNotificationListener {
         notificar(evento.emailDestino(), evento.conviteId(), "Convite de orientação",
                 "Você recebeu um convite de orientação no laboratório “" + evento.laboratorioNome() + "”.",
                 Map.of("conviteId", evento.conviteId().toString(),
+                        "convite", "ORIENTACAO",
                         "laboratorioId", evento.laboratorioId().toString()));
     }
 

@@ -27,6 +27,7 @@ vi.mock('../src/api/convite-api', () => ({ conviteApi: invitationsApi }));
 vi.mock('../src/api/orientacao-api', () => ({ orientacaoApi: orientationApi }));
 
 import { Laboratories } from '../src/Laboratories';
+import { EVENTO_CONVITE_ACEITO } from '../src/NotificationCenter';
 
 const USER: UsuarioResponseDTO = {
   id: 12,
@@ -498,6 +499,17 @@ describe('lista de laboratórios em tabela', () => {
     return screen.getAllByRole('row').slice(1).map(row => within(row).getAllByRole('cell').map(cell => cell.textContent)
       .concat(within(row).getByRole('rowheader').textContent ?? ''));
   }
+
+  it('recarrega a lista quando um convite é aceito pelo sino', async () => {
+    api.listarMeus.mockResolvedValueOnce([]).mockResolvedValue(LABS);
+    renderPage();
+    await screen.findByRole('heading', { name: 'Meus laboratórios' });
+    expect(screen.queryByRole('table')).toBeNull();
+
+    window.dispatchEvent(new Event(EVENTO_CONVITE_ACEITO));
+
+    expect(await screen.findByRole('table')).toBeTruthy();
+  });
 
   it('ordena por nome, mostra o papel principal e o número de lâminas', async () => {
     api.listarMeus.mockResolvedValue(LABS);

@@ -17,10 +17,13 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.dao.OptimisticLockingFailureException;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
+
+import java.util.UUID;
 
 @RestController
 @RequestMapping("/api/v1/orientacoes/convites")
@@ -84,6 +87,48 @@ public class ConviteOrientacaoConsumoController {
                                         HttpServletRequest servletRequest) {
         try {
             orientacaoService.recusar(request.token(), principal.id(), principal.email(), servletRequest.getRemoteAddr());
+        } catch (OptimisticLockingFailureException exception) {
+            throw new BadRequestException("Convite inválido ou indisponível.");
+        }
+        return ResponseEntity.noContent().build();
+    }
+
+    @PostMapping("/{conviteId}/aceitar")
+    @SecurityRequirement(name = "csrf-token")
+    @Operation(summary = "Aceitar convite de orientação pelo sino",
+            description = "Sem o link do e-mail: a sessão precisa ser da conta ativa e confirmada do e-mail convidado.")
+    @ApiResponses({
+            @ApiResponse(responseCode = "204", description = "Convite aceito e vínculo criado"),
+            @ApiResponse(responseCode = "400", description = "Convite inválido ou indisponível (resposta genérica)"),
+            @ApiResponse(responseCode = "401", description = "Sessão ausente ou conta não habilitada"),
+            @ApiResponse(responseCode = "429", description = "Limite de tentativas atingido; a resposta inclui Retry-After")
+    })
+    public ResponseEntity<Void> aceitarPelaNotificacao(@PathVariable UUID conviteId,
+                                                       @AuthenticationPrincipal UsuarioPrincipal principal,
+                                                       HttpServletRequest servletRequest) {
+        try {
+            orientacaoService.aceitarPelaNotificacao(conviteId, principal.id(), principal.email(), servletRequest.getRemoteAddr());
+        } catch (OptimisticLockingFailureException exception) {
+            throw new BadRequestException("Convite inválido ou indisponível.");
+        }
+        return ResponseEntity.noContent().build();
+    }
+
+    @PostMapping("/{conviteId}/recusar")
+    @SecurityRequirement(name = "csrf-token")
+    @Operation(summary = "Recusar convite de orientação pelo sino",
+            description = "Sem o link do e-mail: a sessão precisa ser da conta ativa e confirmada do e-mail convidado.")
+    @ApiResponses({
+            @ApiResponse(responseCode = "204", description = "Convite recusado sem criar participação ou vínculo"),
+            @ApiResponse(responseCode = "400", description = "Convite inválido ou indisponível (resposta genérica)"),
+            @ApiResponse(responseCode = "401", description = "Sessão ausente ou conta não habilitada"),
+            @ApiResponse(responseCode = "429", description = "Limite de tentativas atingido; a resposta inclui Retry-After")
+    })
+    public ResponseEntity<Void> recusarPelaNotificacao(@PathVariable UUID conviteId,
+                                                       @AuthenticationPrincipal UsuarioPrincipal principal,
+                                                       HttpServletRequest servletRequest) {
+        try {
+            orientacaoService.recusarPelaNotificacao(conviteId, principal.id(), principal.email(), servletRequest.getRemoteAddr());
         } catch (OptimisticLockingFailureException exception) {
             throw new BadRequestException("Convite inválido ou indisponível.");
         }

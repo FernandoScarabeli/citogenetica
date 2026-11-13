@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Bell, Check, RefreshCw } from 'lucide-react';
-import { isUnauthorized } from './api/errors';
+import { ApiError, isUnauthorized } from './api/errors';
+import { conviteApi } from './api/convite-api';
+import { orientacaoApi } from './api/orientacao-api';
 import { notificacaoApi, type createNotificacaoApi } from './api/notificacao-api';
 import type { NotificacaoResponseDTO } from './api/contracts/notificacao';
 import './notifications.css';
@@ -14,11 +16,28 @@ function dateLabel(value: string): string {
   return new Intl.DateTimeFormat('pt-BR', { dateStyle: 'short', timeStyle: 'short' }).format(date);
 }
 
-function inviteNotification(item: NotificacaoResponseDTO): boolean {
-  return item.titulo.toLocaleLowerCase('pt-BR').includes('convite');
+type TipoConvite = 'LABORATORIO' | 'ORIENTACAO';
+type Resposta = 'aceitar' | 'recusar';
+export type ResponderConvite = (tipo: TipoConvite, conviteId: string, resposta: Resposta) => Promise<void>;
+
+/** Avisado quando um convite é aceito pelo sino, para a lista de laboratórios se atualizar. */
+export const EVENTO_CONVITE_ACEITO = 'citogenetica:convite-aceito';
+
+const responderPadrao: ResponderConvite = (tipo, conviteId, resposta) => tipo === 'ORIENTACAO'
+  ? orientacaoApi.responderConvitePeloSino(conviteId, resposta)
+  : conviteApi.responderPeloSino(conviteId, resposta);
+
+/** Convite que dá para responder dali: precisa do id. Notificações antigas não trazem o tipo, então o título decide. */
+function conviteDa(item: NotificacaoResponseDTO): { id: string; tipo: TipoConvite } | null {
+  const id = item.dados?.conviteId;
+  if (typeof id !== 'string' || !id) return null;
+  const tipo = item.dados?.convite === 'ORIENTACAO' || item.dados?.convite === 'LABORATORIO'
+    ? item.dados.convite
+    : item.titulo.toLocaleLowerCase('pt-BR').includes('orientação') ? 'ORIENTACAO' : 'LABORATORIO';
+  return { id, tipo };
 }
 
-export function NotificationCenter({ api = notificacaoApi }: { api?: NotificationDataSource }) {
+export function NotificationCenter({ api = notificacaoApi, responderConvite = responderPadrao }: { api?: NotificationDataSource; responderConvite?: ResponderConvite }) {
   const [open, setOpen] = useState(false);
   const [count, setCount] = useState(0);
   const [countError, setCountError] = useState(false);
@@ -31,6 +50,8 @@ export function NotificationCenter({ api = notificacaoApi }: { api?: Notificatio
   const [savingId, setSavingId] = useState<number | null>(null);
   const [savingAll, setSavingAll] = useState(false);
   const [actionError, setActionError] = useState('');
+  const [respostas, setRespostas] = useState<Record<number, 'aceito' | 'recusado'>>({});
+  const [respondendoId, setRespondendoId] = useState<number | null>(null);
   const root = useRef<HTMLDivElement>(null);
   const trigger = useRef<HTMLButtonElement>(null);
   const listRequest = useRef(0);
@@ -155,6 +176,31 @@ export function NotificationCenter({ api = notificacaoApi }: { api?: Notificatio
     }
   }
 
+  async function responder(item: NotificacaoResponseDTO, convite: { id: string; tipo: TipoConvite }, resposta: Resposta) {
+    if (respondendoId !== null) return;
+    setRespondendoId(item.id);
+    setActionError('');
+    try {
+      await responderConvite(convite.tipo, convite.id, resposta);
+      setRespostas(current => ({ ...current, [item.id]: resposta === 'aceitar' ? 'aceito' : 'recusado' }));
+      if (resposta === 'aceitar') window.dispatchEvent(new Event(EVENTO_CONVITE_ACEITO));
+      if (!item.lida) {
+        try {
+          const updated = await api.marcarLida(item.id);
+          setItems(current => current.map(notification => notification.id === updated.id ? updated : notification));
+          await refreshCount();
+        } catch { /* o convite já foi respondido; a notificação fica não lida até a próxima vez */ }
+      }
+    } catch (error) {
+      if (isUnauthorized(error)) return;
+      setActionError(error instanceof ApiError && error.status === 400
+        ? 'Este convite já foi respondido, expirou ou foi cancelado.'
+        : error instanceof ApiError && error.message ? error.message : 'Não foi possível responder ao convite. Tente novamente.');
+    } finally {
+      setRespondendoId(null);
+    }
+  }
+
   async function markAllRead() {
     if (count === 0 || savingAll || savingId !== null) return;
     setSavingAll(true);
@@ -213,7 +259,18 @@ export function NotificationCenter({ api = notificacaoApi }: { api?: Notificatio
           <div className="notification-copy">
             <h3>{item.titulo}</h3>
             <p>{item.mensagem}</p>
-            {inviteNotification(item) && <p className="notification-invite-note">Para aceitar, use o link recebido por e-mail.</p>}
+            {(() => {
+              const convite = conviteDa(item);
+              if (!convite) return item.titulo.toLocaleLowerCase('pt-BR').includes('convite')
+                ? <p className="notification-invite-note">Para aceitar, use o link recebido por e-mail.</p> : null;
+              const resposta = respostas[item.id];
+              if (resposta) return <p className="notification-invite-note" role="status">{resposta === 'aceito' ? 'Convite aceito.' : 'Convite recusado.'}</p>;
+              const ocupado = respondendoId !== null;
+              return <div className="notification-invite-actions">
+                <button className="notification-invite-accept" type="button" disabled={ocupado} onClick={() => void responder(item, convite, 'aceitar')}>{respondendoId === item.id ? 'Enviando…' : 'Aceitar'}</button>
+                <button className="notification-text-action" type="button" disabled={ocupado} onClick={() => void responder(item, convite, 'recusar')}>Recusar</button>
+              </div>;
+            })()}
             <time dateTime={item.dataCriacao}>{dateLabel(item.dataCriacao)}</time>
           </div>
           {!item.lida && <button className="notification-read-action" type="button" disabled={savingId !== null || savingAll} onClick={() => void markRead(item)}>

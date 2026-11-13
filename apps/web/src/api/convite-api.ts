@@ -56,6 +56,13 @@ export function createConviteApi(client: Pick<HttpClient, 'request'> = httpClien
         method: 'POST', json: request, ...(signal ? { signal } : {}),
       });
     },
+
+    /** Resposta pelo sino: a sessão da conta convidada substitui o link do e-mail. */
+    responderPeloSino(conviteId: string, resposta: 'aceitar' | 'recusar', signal?: AbortSignal): Promise<void> {
+      return client.request<void>(`${INVITATIONS_PATH}/${encodeURIComponent(conviteId)}/${resposta}`, {
+        method: 'POST', ...(signal ? { signal } : {}),
+      });
+    },
   };
 }
 
