@@ -31,13 +31,11 @@ services:
       API_CORS_ALLOWED_ORIGINS: ${API_CORS_ALLOWED_ORIGINS:?Defina API_CORS_ALLOWED_ORIGINS no arquivo .env}
       API_EMAIL_FROM: ${API_EMAIL_FROM:?Defina API_EMAIL_FROM no arquivo .env}
       STORAGE_INTERNAL_ENDPOINT: http://rustfs:9000
-      STORAGE_PUBLIC_ENDPOINT: ${STORAGE_PUBLIC_ENDPOINT:?Defina STORAGE_PUBLIC_ENDPOINT no arquivo .env}
       STORAGE_REGION: ${STORAGE_REGION:?Defina STORAGE_REGION no arquivo .env}
       STORAGE_PATH_STYLE: ${STORAGE_PATH_STYLE:?Defina STORAGE_PATH_STYLE no arquivo .env}
       STORAGE_BUCKET: ${STORAGE_BUCKET:?Defina STORAGE_BUCKET no arquivo .env}
       STORAGE_ACCESS_KEY: ${STORAGE_ACCESS_KEY:?Defina STORAGE_ACCESS_KEY no arquivo .env}
       STORAGE_SECRET_KEY: ${STORAGE_SECRET_KEY:?Defina STORAGE_SECRET_KEY no arquivo .env}
-      STORAGE_PRESIGNED_URL_VALIDITY_SECONDS: ${STORAGE_PRESIGNED_URL_VALIDITY_SECONDS:?Defina STORAGE_PRESIGNED_URL_VALIDITY_SECONDS no arquivo .env}
       SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE:?Defina SPRING_PROFILES_ACTIVE no arquivo .env}
       # Confia nos cabeçalhos X-Forwarded-* somente vindos do serviço web (IP fixo abaixo), para que
       # limites por IP vejam o cliente real e ninguém consiga forjar o próprio endereço.
@@ -87,7 +85,6 @@ services:
       RUSTFS_ADDRESS: :9000
       RUSTFS_CONSOLE_ADDRESS: :9001
       RUSTFS_CONSOLE_ENABLE: "true"
-      RUSTFS_CORS_ALLOWED_ORIGINS: ${API_FRONTEND_URL:?Defina API_FRONTEND_URL no arquivo .env}
     ports:
       - "${STORAGE_PORT:?Defina STORAGE_PORT no arquivo .env}:9000"
       - "${STORAGE_CONSOLE_PORT:?Defina STORAGE_CONSOLE_PORT no arquivo .env}:9001"

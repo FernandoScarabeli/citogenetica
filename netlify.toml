@@ -1,0 +1,31 @@
+# Front do ambiente de testes do cliente. A API roda no PC servidor (deploy/servidor) atrás de um
+# túnel temporário; o endereço dele chega aqui pela variável API_ORIGIN, que o serviço
+# netlify-sync do servidor atualiza sozinho. Passo a passo em docs/deploy-testes.md.
+[build]
+  base = "apps/web"
+  command = "npm run build && node ../../deploy/netlify/gerar-redirects.mjs dist"
+  publish = "dist"
+
+[build.environment]
+  # O túnel temporário não mantém SSE; as notificações são consultadas a cada 30 s.
+  VITE_NOTIFICACOES_POR_CONSULTA = "true"
+
+# Rotas do SPA (o /api/* vem antes, no _redirects gerado no build).
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200
+
+# Os mesmos cabeçalhos do apps/web/nginx.conf.
+[[headers]]
+  for = "/*"
+  [headers.values]
+    X-Content-Type-Options = "nosniff"
+    Referrer-Policy = "strict-origin-when-cross-origin"
+    X-Frame-Options = "DENY"
+    Content-Security-Policy = "frame-ancestors 'none';"
+
+[[headers]]
+  for = "/assets/*"
+  [headers.values]
+    Cache-Control = "public, max-age=31536000, immutable"

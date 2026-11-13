@@ -141,13 +141,11 @@ class SecretPropertiesValidationTest {
         properties.put("app.email.auth", "false");
         properties.put("app.email.starttls-enable", "false");
         properties.put("storage.internal-endpoint", "http://rustfs:9000");
-        properties.put("storage.public-endpoint", "http://localhost:9000");
         properties.put("storage.region", "us-east-1");
         properties.put("storage.path-style", "true");
         properties.put("storage.bucket", "citogenetica");
         properties.put("storage.access-key", "a8398767b0d546459aa33edbcdecdff1");
         properties.put("storage.secret-key", STORAGE_SECRET);
-        properties.put("storage.presigned-url-validity-seconds", "900");
         return properties;
     }
 

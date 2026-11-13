@@ -6,7 +6,7 @@ import type {
   NotificacaoPageDTO,
   NotificacaoResponseDTO,
 } from './contracts/notificacao';
-import { createNotificacaoSseClient, type NotificacaoSseClient } from './notificacao-sse-client';
+import { createNotificacaoRealtimeClient, type NotificacaoSseClient } from './notificacao-sse-client';
 
 const NOTIFICATIONS_PATH = '/api/v1/notificacoes';
 
@@ -21,7 +21,7 @@ export type NotificacaoApiClient = Pick<HttpClient, 'request'> & Partial<Pick<Ht
 
 export function createNotificacaoApi(
   client: NotificacaoApiClient = httpClient,
-  sseClient: NotificacaoSseClient = createNotificacaoSseClient(),
+  sseClient: NotificacaoSseClient = createNotificacaoRealtimeClient(),
 ) {
   const changeListeners = new Set<() => void>();
   let realtimeUserId: number | null = null;
