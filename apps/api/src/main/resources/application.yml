@@ -15,11 +15,12 @@ spring:
   application:
     name: citogenetica-api
 
-  # Maior arquivo aceito hoje: a foto de perfil (2 MB). A folga no pedido cobre os cabeçalhos do formulário.
+  # Maior arquivo aceito hoje: a foto de lâmina (10 MB; a de perfil é conferida em 2 MB no serviço).
+  # A folga no pedido cobre os cabeçalhos e a legenda do formulário.
   servlet:
     multipart:
-      max-file-size: 2MB
-      max-request-size: 3MB
+      max-file-size: 10MB
+      max-request-size: 11MB
 
   session:
     timeout: ${API_SECURITY_SESSION_TIMEOUT:30m}
