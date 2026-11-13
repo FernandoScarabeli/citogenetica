@@ -320,6 +320,27 @@ describe('gestão de laboratórios reais', () => {
     expect(await screen.findByText('Papéis de Bruna Almeida atualizados.')).toBeTruthy();
   });
 
+  it('atualiza o contador de membros ao voltar para a aba do navegador e ao abrir Membros', async () => {
+    const user = userEvent.setup();
+    const NOVO = { ...OTHER, id: '1ea2e25b-4e57-4275-a3d3-faf6ceec7428', nome: 'Carla Nova', email: 'carla@ufla.br' };
+    let currentMembers: ParticipacaoResponseDTO[] = [SELF, OTHER];
+    api.listarParticipacoes.mockImplementation(async () => currentMembers);
+    renderPage();
+    await openLaboratoryManagement(user);
+    const abaMembros = () => screen.getByRole('button', { name: /^Membros/ });
+    expect(abaMembros().textContent).toBe('Membros 2');
+
+    currentMembers = [SELF, OTHER, NOVO];
+    fireEvent.focus(window);
+    await waitFor(() => expect(abaMembros().textContent).toBe('Membros 3'));
+    expect(screen.getByText('Carla Nova')).toBeTruthy();
+
+    currentMembers = [SELF, OTHER];
+    await user.click(screen.getByRole('button', { name: 'Configurações' }));
+    await user.click(abaMembros());
+    await waitFor(() => expect(abaMembros().textContent).toBe('Membros 2'));
+  });
+
   it('recarrega membros e avisa quando a versão da participação ficou obsoleta', async () => {
     const user = userEvent.setup();
     const latestOther = { ...OTHER, papeis: ['MEMBRO', 'ADMIN'] as const, versao: 5 };
