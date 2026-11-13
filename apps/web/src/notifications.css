@@ -18,6 +18,10 @@
 .labs-app .notification-copy h3 { margin: 0; color: var(--lab-ink); font-size: 14px; line-height: 20px; font-weight: 500; overflow-wrap: anywhere; }
 .labs-app .notification-copy p { margin: 4px 0 0; color: var(--lab-ink); font-size: 13px; line-height: 19px; overflow-wrap: anywhere; }
 .labs-app .notification-copy .notification-invite-note { color: var(--lab-muted); font-size: 12px; line-height: 17px; }
+.labs-app .notification-invite-actions { display: flex; align-items: center; gap: 12px; margin-top: 8px; }
+.labs-app .notification-invite-accept { min-height: 34px; padding: 6px 14px; border: 0; border-radius: 4px; background: var(--lab-primary); color: #fff; font-size: 13px; line-height: 18px; font-weight: 550; }
+.labs-app .notification-invite-accept:hover { background: var(--lab-primary-hover); }
+.labs-app .notification-invite-accept:disabled { cursor: wait; opacity: .65; }
 .labs-app .notification-copy time { display: block; margin-top: 6px; color: var(--lab-muted); font-size: 12px; line-height: 17px; }
 .labs-app .notification-read-action { justify-self: start; min-height: 32px; }
 .labs-app .notification-load-more { display: inline-flex; align-items: center; justify-content: center; gap: 8px; align-self: center; min-height: 42px; margin-top: 8px; padding: 5px 10px; border: 0; border-radius: 4px; background: transparent; color: var(--lab-accent); font-size: 13px; font-weight: 550; }

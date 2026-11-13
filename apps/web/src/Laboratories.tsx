@@ -20,7 +20,7 @@ import { loadPreferences, savePreferences } from './preferences';
 import { fotoPerfilUrl } from './api/usuario-api';
 import type { UsuarioResponseDTO } from './api/contracts/usuario';
 import { ProfileSettings } from './app/ProfileSettings';
-import { NotificationCenter } from './NotificationCenter';
+import { EVENTO_CONVITE_ACEITO, NotificationCenter } from './NotificationCenter';
 import { AccountMenu } from './app/AccountMenu';
 
 const initialPreferences = loadPreferences();
@@ -218,6 +218,13 @@ export function Laboratories({ user, onLogout, onUserUpdate, renderSlides, api =
       .catch(() => { if (!controller.signal.aborted) setSlideTotals(new Map()); });
     return () => controller.abort();
   }, [listStatus, labs, api, migrationTick]);
+
+  // Convite aceito pelo sino: o laboratório novo já aparece na lista, sem recarregar a página.
+  useEffect(() => {
+    const recarregar = () => { void loadLabs(); };
+    window.addEventListener(EVENTO_CONVITE_ACEITO, recarregar);
+    return () => window.removeEventListener(EVENTO_CONVITE_ACEITO, recarregar);
+  }, [loadLabs]);
 
   const returnToListForMissingLab = useCallback((message = 'Este laboratório não está mais disponível para sua participação.') => {
     setCurrentLab(null);

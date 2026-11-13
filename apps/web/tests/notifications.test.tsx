@@ -1,7 +1,8 @@
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
-import { NotificationCenter } from '../src/NotificationCenter';
+import { EVENTO_CONVITE_ACEITO, NotificationCenter, type ResponderConvite } from '../src/NotificationCenter';
+import { ApiError } from '../src/api/errors';
 import type { NotificacaoResponseDTO } from '../src/api/contracts/notificacao';
 import type { createNotificacaoApi } from '../src/api/notificacao-api';
 
@@ -64,8 +65,8 @@ function apiFixture(options: {
   };
 }
 
-function renderCenter(api: ReturnType<typeof createNotificacaoApi>) {
-  return render(<div className="labs-app"><NotificationCenter api={api} /></div>);
+function renderCenter(api: ReturnType<typeof createNotificacaoApi>, responderConvite?: ResponderConvite) {
+  return render(<div className="labs-app"><NotificationCenter api={api} responderConvite={responderConvite} /></div>);
 }
 
 describe('NotificationCenter', () => {
@@ -91,7 +92,9 @@ describe('NotificationCenter', () => {
     const user = userEvent.setup();
     await user.click(await screen.findByRole('button', { name: 'Notificações, 2 não lidas' }));
 
-    expect(await screen.findAllByText('Para aceitar, use o link recebido por e-mail.')).toHaveLength(2);
+    // Com o id do convite dá para responder ali; sem ele, sobra o caminho do e-mail.
+    expect(await screen.findByRole('button', { name: 'Aceitar' })).toBeTruthy();
+    expect(screen.getAllByText('Para aceitar, use o link recebido por e-mail.')).toHaveLength(1);
     expect(screen.getByText(/Convite para laboratório/)).toBeTruthy();
     expect(screen.queryByText('convite-1')).toBeNull();
     await user.click(screen.getByRole('button', { name: 'Carregar mais' }));
@@ -108,6 +111,51 @@ describe('NotificationCenter', () => {
     await waitFor(() => expect(fixture.api.marcarTodasLidas).toHaveBeenCalledTimes(1));
     expect(screen.getByRole('button', { name: 'Notificações, 0 não lidas' })).toBeTruthy();
     expect(screen.queryByRole('button', { name: 'Marcar todas como lidas' })).toBeNull();
+  });
+
+  it('aceita o convite pelo sino, marca como lida e avisa a lista de laboratórios', async () => {
+    const convite = notification({ id: 1, titulo: 'Convite para laboratório', mensagem: 'Você recebeu um convite para o laboratório “Raízes”.', dados: { conviteId: 'convite-1', convite: 'LABORATORIO' } });
+    const fixture = apiFixture({ count: 1, pages: [[convite]] });
+    const responder = vi.fn<ResponderConvite>(async () => undefined);
+    const avisado = vi.fn();
+    window.addEventListener(EVENTO_CONVITE_ACEITO, avisado);
+    try {
+      renderCenter(fixture.api, responder);
+      const user = userEvent.setup();
+      await user.click(await screen.findByRole('button', { name: 'Notificações, 1 não lida' }));
+      await user.click(await screen.findByRole('button', { name: 'Aceitar' }));
+
+      expect(await screen.findByText('Convite aceito.')).toBeTruthy();
+      expect(responder).toHaveBeenCalledWith('LABORATORIO', 'convite-1', 'aceitar');
+      expect(fixture.api.marcarLida).toHaveBeenCalledWith(1);
+      expect(avisado).toHaveBeenCalledTimes(1);
+      expect(screen.queryByRole('button', { name: 'Aceitar' })).toBeNull();
+      expect(screen.getByRole('button', { name: 'Notificações, 0 não lidas' })).toBeTruthy();
+    } finally {
+      window.removeEventListener(EVENTO_CONVITE_ACEITO, avisado);
+    }
+  });
+
+  it('recusa convite de orientação antigo (tipo pelo título) e explica convite já respondido', async () => {
+    const orientacao = notification({ id: 5, titulo: 'Convite de orientação', mensagem: 'Você recebeu um convite de orientação.', dados: { conviteId: 'orient-1' } });
+    const velho = notification({ id: 6, titulo: 'Convite para laboratório', mensagem: 'Convite antigo.', dados: { conviteId: 'lab-velho' } });
+    const fixture = apiFixture({ count: 2, pages: [[orientacao, velho]] });
+    const responder = vi.fn<ResponderConvite>(async (_tipo, id) => {
+      if (id === 'lab-velho') throw new ApiError({ status: 400, error: 'Bad Request', message: 'Convite inválido ou indisponível.', path: '/api/v1/convites/lab-velho/aceitar' });
+    });
+    renderCenter(fixture.api, responder);
+    const user = userEvent.setup();
+    await user.click(await screen.findByRole('button', { name: 'Notificações, 2 não lidas' }));
+
+    const itemOrientacao = (await screen.findByRole('heading', { name: 'Convite de orientação' })).closest('li') as HTMLElement;
+    await user.click(within(itemOrientacao).getByRole('button', { name: 'Recusar' }));
+    expect(await within(itemOrientacao).findByText('Convite recusado.')).toBeTruthy();
+    expect(responder).toHaveBeenCalledWith('ORIENTACAO', 'orient-1', 'recusar');
+
+    const itemVelho = screen.getByRole('heading', { name: 'Convite para laboratório' }).closest('li') as HTMLElement;
+    await user.click(within(itemVelho).getByRole('button', { name: 'Aceitar' }));
+    expect((await screen.findByRole('alert')).textContent).toBe('Este convite já foi respondido, expirou ou foi cancelado.');
+    expect(within(itemVelho).getByRole('button', { name: 'Aceitar' })).toBeTruthy();
   });
 
   it('atualiza a contagem e a primeira página após evento e ao voltar para a aba', async () => {

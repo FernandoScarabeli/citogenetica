@@ -240,6 +240,51 @@ class ConviteLaboratorioIntegrationTest extends AbstractIntegrationTest {
     }
 
     @Test
+    void destinatarioAceitaPeloSinoSemOLinkEOutraContaNao() throws Exception {
+        Usuario admin = criarUsuario("admin");
+        Usuario destinatario = criarUsuario("destinatario");
+        Usuario outraPessoa = criarUsuario("outra-pessoa");
+        UUID laboratorioId = criarLaboratorio(admin, "Pelo sino");
+        criarConvite(login(admin), laboratorioId, destinatario.getEmail(), List.of("MEMBRO", "ADMIN"));
+        UUID convite = conviteId(laboratorioId);
+
+        responderPeloSino(login(outraPessoa), convite, "aceitar")
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message").value("Convite inválido ou indisponível."));
+        assertEquals(0, contarParticipacoes(laboratorioId, outraPessoa.getId(), EstadoParticipacao.ATIVA));
+
+        Cookie sessao = login(destinatario);
+        responderPeloSino(sessao, convite, "aceitar").andExpect(status().isNoContent());
+        UUID participacao = participacaoRepository
+                .findByLaboratorioIdAndUsuarioIdAndEstado(laboratorioId, destinatario.getId(), EstadoParticipacao.ATIVA)
+                .orElseThrow().getId();
+        assertEquals(Set.of(PapelLaboratorio.MEMBRO, PapelLaboratorio.ADMIN), papeisAtivos(participacao));
+
+        // Já respondido: nem pelo sino de novo, nem pelo link do e-mail.
+        responderPeloSino(sessao, convite, "aceitar").andExpect(status().isBadRequest());
+        String token = tokenDoEmail(destinatario.getEmail(), "Convite para participar de um laboratório — Citogenética UFLA");
+        consumir(sessao, "/aceitar", token, novoIp()).andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void destinatarioRecusaPeloSinoEConviteInexistenteDaRespostaGenerica() throws Exception {
+        Usuario admin = criarUsuario("admin");
+        Usuario destinatario = criarUsuario("destinatario");
+        UUID laboratorioId = criarLaboratorio(admin, "Recusa pelo sino");
+        criarConvite(login(admin), laboratorioId, destinatario.getEmail(), List.of("MEMBRO"));
+        Cookie sessao = login(destinatario);
+
+        responderPeloSino(sessao, conviteId(laboratorioId), "recusar").andExpect(status().isNoContent());
+        assertEquals(0, contarParticipacoes(laboratorioId, destinatario.getId(), EstadoParticipacao.ATIVA));
+        assertEquals("RECUSADO", jdbcTemplate.queryForObject(
+                "SELECT estado FROM convite_laboratorio WHERE laboratorio_id = ?", String.class, laboratorioId));
+
+        responderPeloSino(sessao, UUID.randomUUID(), "aceitar")
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message").value("Convite inválido ou indisponível."));
+    }
+
+    @Test
     void conviteAceitoNaoPodeSerReutilizadoERecusaNaoCriaParticipacao() throws Exception {
         Usuario admin = criarUsuario("admin");
         Usuario destinatario = criarUsuario("destinatario");
@@ -526,6 +571,11 @@ class ConviteLaboratorioIntegrationTest extends AbstractIntegrationTest {
         return requisicaoAutenticada(sessao, post("/api/v1/convites" + acao)
                 .with(request -> { request.setRemoteAddr(ip); return request; })
                 .contentType(MediaType.APPLICATION_JSON).content(json("token", token)));
+    }
+
+    private ResultActions responderPeloSino(Cookie sessao, UUID conviteId, String acao) throws Exception {
+        return requisicaoAutenticada(sessao, post("/api/v1/convites/{id}/" + acao, conviteId)
+                .with(request -> { request.setRemoteAddr(novoIp()); return request; }));
     }
 
     private int consumirConcorrente(Cookie sessao, String token, CountDownLatch inicio) throws Exception {

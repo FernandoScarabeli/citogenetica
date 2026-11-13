@@ -330,6 +330,34 @@ class OrientacaoIntegrationTest extends AbstractIntegrationTest {
     }
 
     @Test
+    void destinatarioAceitaOuRecusaPeloSinoSemOLinkEOutraContaNao() throws Exception {
+        Usuario orientador = criarUsuario("orientador");
+        Usuario pesquisador = criarUsuario("pesquisador");
+        Usuario outraPessoa = criarUsuario("outra-pessoa");
+        UUID laboratorioId = criarLaboratorio(orientador, "Orientação pelo sino");
+        adicionarParticipacao(laboratorioId, orientador.getId(), Set.of(PapelLaboratorio.ORIENTADOR));
+        convidar(login(orientador), laboratorioId, pesquisador.getEmail()).andExpect(status().isCreated());
+        UUID convite = conviteId(laboratorioId, orientador.getId());
+
+        responderPeloSino(login(outraPessoa), convite, "aceitar")
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message").value("Convite inválido ou indisponível."));
+        assertEquals(0, contarVinculos(laboratorioId));
+
+        Cookie sessao = login(pesquisador);
+        responderPeloSino(sessao, convite, "aceitar").andExpect(status().isNoContent());
+        assertEquals(1, contarVinculosAtivos(laboratorioId));
+        assertEquals(1, contarParticipacoes(laboratorioId, pesquisador.getId(), EstadoParticipacao.ATIVA));
+        responderPeloSino(sessao, convite, "recusar").andExpect(status().isBadRequest());
+
+        Usuario outroPesquisador = criarUsuario("pesquisador-b");
+        convidar(login(orientador), laboratorioId, outroPesquisador.getEmail()).andExpect(status().isCreated());
+        responderPeloSino(login(outroPesquisador), conviteIdPorEmail(outroPesquisador.getEmail()), "recusar")
+                .andExpect(status().isNoContent());
+        assertEquals(1, contarVinculos(laboratorioId));
+    }
+
+    @Test
     void recusaNaoCriaParticipacaoNemVinculo() throws Exception {
         Usuario orientador = criarUsuario("orientador");
         Usuario pesquisador = criarUsuario("pesquisador");
@@ -677,6 +705,11 @@ class OrientacaoIntegrationTest extends AbstractIntegrationTest {
         return requisicaoAutenticada(sessao, post("/api/v1/orientacoes/convites" + acao)
                 .with(request -> { request.setRemoteAddr(ip); return request; })
                 .contentType(MediaType.APPLICATION_JSON).content(json("token", token)));
+    }
+
+    private ResultActions responderPeloSino(Cookie sessao, UUID conviteId, String acao) throws Exception {
+        return requisicaoAutenticada(sessao, post("/api/v1/orientacoes/convites/{id}/" + acao, conviteId)
+                .with(request -> { request.setRemoteAddr(novoIp()); return request; }));
     }
 
     private String consumirConcorrente(Cookie sessao, String token, CountDownLatch inicio) throws Exception {
