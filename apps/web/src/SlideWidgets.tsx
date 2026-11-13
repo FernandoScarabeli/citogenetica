@@ -35,11 +35,14 @@ export function EntrySelect({label,value,options,onChange,placeholder,invalid,co
  }
  return <div className="protocol-field entry-select-field"><span className="protocol-label" id={`${id}-label`}>{label}</span><div className="protocol-select" ref={root}><button ref={trigger} type="button" className="protocol-trigger" role="combobox" aria-labelledby={`${id}-label ${id}-value`} aria-expanded={open} aria-controls={open?`${id}-options`:undefined} aria-activedescendant={open?`${id}-option-${active}`:undefined} aria-haspopup="listbox" aria-invalid={invalid||undefined} aria-describedby={invalid?`${id}-error`:undefined} onClick={()=>open?setOpen(false):show()} onKeyDown={onKeyDown}><span id={`${id}-value`} className={!value?'select-placeholder':undefined}>{options.find(option=>option.value===value)?.label||placeholder}</span><ChevronDown size={16} aria-hidden="true"/></button>{open&&<div className={`protocol-options entry-options${opensUp?' opens-up':''}`} id={`${id}-options`} role="listbox" aria-labelledby={`${id}-label`}>{options.map((option,index)=><div id={`${id}-option-${index}`} key={option.value} role="option" aria-selected={option.value===value} className={`protocol-option${active===index?' is-active':''}`} onMouseEnter={()=>setActive(index)} onMouseDown={event=>event.preventDefault()} onClick={()=>choose(index)}><span>{option.label}</span>{option.value===value&&<Check size={16} aria-hidden="true"/>}</div>)}</div>}</div>{invalid&&<span className="select-error" id={`${id}-error`} role="alert">Selecione uma anormalidade.</span>}</div>;
 }
-/** `locked` impede fechar com Esc enquanto uma operação está em andamento (quem usa também ignora `onClose` nesse caso). */
-export function Modal({title,children,onClose,locked=false,className}: {title:string;children:ReactNode;onClose:()=>void;locked?:boolean;className?:string}) {
+/**
+ * `locked` impede fechar com Esc enquanto uma operação está em andamento (quem usa também ignora `onClose` nesse caso).
+ * `closeOnBackdrop={false}`: clicar fora não fecha (ex.: anotando uma foto, para não perder o que não foi salvo).
+ */
+export function Modal({title,children,onClose,locked=false,closeOnBackdrop=true,className}: {title:string;children:ReactNode;onClose:()=>void;locked?:boolean;closeOnBackdrop?:boolean;className?:string}) {
   const ref=useRef<HTMLDialogElement>(null);
   useEffect(()=>{ref.current?.showModal();},[]);
-  return <dialog ref={ref} className={className} onClose={onClose} onCancel={e=>{if(locked) e.preventDefault()}} onClick={e=>{if(e.target===ref.current) onClose()}}><div className="modal-head"><h2 className={typeClass("title")}>{title}</h2><button className="icon-button" aria-label="Fechar" onClick={onClose}><X size={19}/></button></div>{children}</dialog>;
+  return <dialog ref={ref} className={className} onClose={onClose} onCancel={e=>{if(locked) e.preventDefault()}} onClick={e=>{if(e.target===ref.current&&closeOnBackdrop) onClose()}}><div className="modal-head"><h2 className={typeClass("title")}>{title}</h2><button className="icon-button" aria-label="Fechar" onClick={onClose}><X size={19}/></button></div>{children}</dialog>;
 }
 
 export type TypeChoice = { id: string; nome: string };
