@@ -1,9 +1,9 @@
 package br.ufla.citogenetica.contagem.internal.web.csv;
 
-import java.math.BigDecimal;
-import java.math.RoundingMode;
 import java.util.ArrayList;
 import java.util.List;
+
+import br.ufla.citogenetica.contagem.internal.web.Percentual;
 
 /**
  * Monta um CSV no padrão do Excel em português: BOM, separador ponto e vírgula, fim de linha CRLF, decimais com
@@ -63,7 +63,7 @@ public final class EscritorCsv {
 
     /** Duas casas, HALF_UP, vírgula decimal e sem separador de milhar. */
     public static String formatarPercentual(double valor) {
-        return BigDecimal.valueOf(valor).setScale(2, RoundingMode.HALF_UP).toPlainString().replace('.', ',');
+        return Percentual.formatar(valor);
     }
 
     /**

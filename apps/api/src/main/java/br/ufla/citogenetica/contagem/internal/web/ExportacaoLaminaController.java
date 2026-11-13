@@ -8,6 +8,7 @@ import br.ufla.citogenetica.contagem.internal.application.ExportacaoLaminaServic
 import br.ufla.citogenetica.contagem.internal.application.ExportacaoLaminas;
 import br.ufla.citogenetica.contagem.internal.application.ExportacaoResumos;
 import br.ufla.citogenetica.contagem.internal.web.csv.CsvLaminas;
+import br.ufla.citogenetica.contagem.internal.web.pdf.RelatorioLaminaPdf;
 import br.ufla.citogenetica.contagem.internal.web.dto.response.ExportacaoLaminasResponseDTO;
 import br.ufla.citogenetica.shared.validation.CanonicalUuidV4;
 import br.ufla.citogenetica.usuario.api.UsuarioPrincipal;
@@ -32,7 +33,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
-/** Exportação em JSON e CSV, só leitura, com a mesma regra de acesso das rotas de lâmina. */
+/** Exportação em JSON, CSV e relatório em PDF, só leitura, com a mesma regra de acesso das rotas de lâmina. */
 @RestController
 @RequestMapping("/api/v1/laminas")
 @RequiredArgsConstructor
@@ -45,6 +46,7 @@ public class ExportacaoLaminaController {
     private static final String PREFIXO_ARQUIVO_VARIAS = "laminas-";
     private static final String EXTENSAO = ".json";
     private static final String CSV = "text/csv";
+    private static final String PDF = MediaType.APPLICATION_PDF_VALUE;
     private static final MediaType CSV_UTF8 = new MediaType("text", "csv", StandardCharsets.UTF_8);
 
     private final ExportacaoLaminaService service;
@@ -188,6 +190,35 @@ public class ExportacaoLaminaController {
         ExportacaoLaminas exportacao = service.exportarVarias(
                 laboratorioId == null ? null : UUID.fromString(laboratorioId), donoUsuarioId, principal.id());
         return anexoCsv(CsvLaminas.registros(exportacao), nomeVarias("registros", exportacao.exportadoEm(), ".csv"));
+    }
+
+    // ------------------------------------------------------------------ relatório PDF (uma lâmina)
+
+    @GetMapping(value = "/{id}/relatorio.pdf", produces = PDF)
+    @Operation(summary = "Baixar o relatório em PDF de uma lâmina",
+            description = "PDF (A4 retrato, pt-BR) com o cabeçalho da lâmina, a tabela por fase com os mesmos números "
+                    + "de GET /laminas/{id}/resumo, o índice mitótico (mitose), a nota sobre os tipos de anormalidade "
+                    + "e as observações. Datas no horário de Brasília. " + DESC_UMA)
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Arquivo PDF retornado (Content-Disposition: attachment)",
+                    content = @Content(mediaType = PDF, schema = @Schema(type = "string", format = "binary"))),
+            @ApiResponse(responseCode = "400", description = "UUID inválido", content = @Content),
+            @ApiResponse(responseCode = "401", description = "Sessão ausente ou conta não habilitada", content = @Content),
+            @ApiResponse(responseCode = "403", description = "Participa do laboratório, mas não pode ver os dados do dono", content = @Content),
+            @ApiResponse(responseCode = "404", description = "Lâmina inexistente, excluída, avulsa de outra pessoa ou de laboratório sem acesso", content = @Content)
+    })
+    public ResponseEntity<byte[]> relatorioPdf(
+            @PathVariable @CanonicalUuidV4 String id,
+            @AuthenticationPrincipal UsuarioPrincipal principal) {
+        ExportacaoResumos resumos = service.resumir(UUID.fromString(id), principal.id());
+        ExportacaoResumos.LaminaResumida item = resumos.laminas().get(0);
+        String nome = PREFIXO_ARQUIVO_UMA + NomeArquivo.limpar(item.lamina().nome()) + "-relatorio.pdf";
+        ContentDisposition disposicao = ContentDisposition.attachment()
+                .filename(nome, StandardCharsets.UTF_8).build();
+        return ResponseEntity.ok()
+                .header(HttpHeaders.CONTENT_DISPOSITION, disposicao.toString())
+                .contentType(MediaType.APPLICATION_PDF)
+                .body(RelatorioLaminaPdf.gerar(item, resumos.exportadoEm()));
     }
 
     /** A data do nome do arquivo é a de Brasília, igual nos três arquivos de várias lâminas. */
