@@ -1,90 +1,87 @@
-import { useState, type PointerEvent as ReactPointerEvent } from 'react';
-import type { AnotacaoFotoDTO, CorAnotacao } from './api/colaboracao-api';
+import { useId, useState, type ReactNode } from 'react';
+import type { AnotacaoFotoDTO } from './api/colaboracao-api';
 
-export const CORES_ANOTACAO: { id: CorAnotacao; nome: string; hex: string }[] = [
-  { id: 'azul', nome: 'Azul', hex: '#1b2a8a' },
-  { id: 'amarelo', nome: 'Amarelo', hex: '#ffd60a' },
-  { id: 'vermelho', nome: 'Vermelho', hex: '#e5383b' },
-  { id: 'branco', nome: 'Branco', hex: '#ffffff' },
-  { id: 'preto', nome: 'Preto', hex: '#111111' },
-];
-const hex = (cor: CorAnotacao) => CORES_ANOTACAO.find(item => item.id === cor)?.hex ?? '#1b2a8a';
-/** Contorno de contraste para a marcação aparecer em fundo claro ou escuro. */
-const contorno = (cor: CorAnotacao) => (cor === 'branco' || cor === 'amarelo' ? 'rgba(0,0,0,.55)' : 'rgba(255,255,255,.8)');
+/** Nomes de cor da primeira versão das marcações; as novas guardam a cor em hex. */
+const CORES_ANTIGAS: Record<string, string> = { azul: '#1b2a8a', amarelo: '#ffd60a', vermelho: '#e5383b', branco: '#ffffff', preto: '#111111' };
 
-type Ponto = { x: number; y: number };
+export const corHex = (cor: string) => CORES_ANTIGAS[cor] ?? (/^#[0-9a-f]{6}$/i.test(cor) ? cor.toLowerCase() : '#ffd60a');
 
-/** Desenho das marcações num SVG com o mesmo sistema de coordenadas da imagem (largura × altura em pixels). */
-function Marcacoes({ anotacoes, largura, altura, rascunho }: { anotacoes: AnotacaoFotoDTO[]; largura: number; altura: number; rascunho?: AnotacaoFotoDTO | null }) {
+/** Luminância relativa (0 a 1), para escolher o contorno que destaca a marcação. */
+export function luminancia(hex: string): number {
+  const canal = (i: number) => {
+    const c = parseInt(hex.slice(i, i + 2), 16) / 255;
+    return c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4;
+  };
+  return 0.2126 * canal(1) + 0.7152 * canal(3) + 0.0722 * canal(5);
+}
+const contorno = (hex: string) => (luminancia(hex) > 0.45 ? 'rgba(0,0,0,.5)' : 'rgba(255,255,255,.55)');
+
+/** Tamanho do texto: o padrão vezes o `tamanho` da marcação (0,4 a 4). */
+export const escalaTexto = (item: AnotacaoFotoDTO) => (item.tipo === 'TEXTO' && item.tamanho ? item.tamanho : 1);
+
+/** Medidas das marcações a partir do maior lado da foto, para ficarem iguais em qualquer resolução. */
+export const medidas = (largura: number, altura: number) => {
   const base = Math.max(largura, altura);
-  const traco = base * 0.007;
-  const fonte = base * 0.06;
-  const todas = rascunho ? [...anotacoes, rascunho] : anotacoes;
-  return <>
-    <defs>{CORES_ANOTACAO.map(cor => <marker key={cor.id} id={`ponta-${cor.id}`} viewBox="0 0 10 10" refX="7" refY="5" markerWidth="5" markerHeight="5" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill={cor.hex} /></marker>)}</defs>
-    {todas.map((item, indice) => item.tipo === 'SETA'
-      ? <g key={indice}>
-          <line x1={item.x1 * largura} y1={item.y1 * altura} x2={item.x2 * largura} y2={item.y2 * altura} stroke={contorno(item.cor)} strokeWidth={traco * 1.9} strokeLinecap="round" />
-          <line x1={item.x1 * largura} y1={item.y1 * altura} x2={item.x2 * largura} y2={item.y2 * altura} stroke={hex(item.cor)} strokeWidth={traco} strokeLinecap="round" markerEnd={`url(#ponta-${item.cor})`} />
-        </g>
-      : <text key={indice} x={item.x1 * largura} y={item.y1 * altura} fill={hex(item.cor)} stroke={contorno(item.cor)} strokeWidth={fonte * 0.06} paintOrder="stroke" fontSize={fonte} fontWeight={700} fontFamily="Inter, system-ui, sans-serif" textAnchor="middle" dominantBaseline="middle">{item.texto}</text>)}
-  </>;
+  return { base, fonte: base * 0.042, alca: base * 0.011 };
+};
+
+/** Contorno da seta como um polígono só: haste afinando para trás e ponta com entalhe. */
+function caminhoSeta(x1: number, y1: number, x2: number, y2: number, base: number): string {
+  const comprimento = Math.hypot(x2 - x1, y2 - y1);
+  if (comprimento < 1) return '';
+  const dx = (x2 - x1) / comprimento, dy = (y2 - y1) / comprimento;
+  const nx = -dy, ny = dx;
+  const ponta = Math.min(base * 0.045, comprimento * 0.55);
+  const abertura = ponta * 0.5;
+  const cauda = base * 0.0022, haste = base * 0.0065;
+  const bx = x2 - dx * ponta, by = y2 - dy * ponta;
+  const ex = x2 - dx * ponta * 0.72, ey = y2 - dy * ponta * 0.72;
+  const p = (x: number, y: number) => `${x.toFixed(2)},${y.toFixed(2)}`;
+  return `M${p(x1 + nx * cauda, y1 + ny * cauda)} L${p(ex + nx * haste, ey + ny * haste)} L${p(bx + nx * abertura, by + ny * abertura)} `
+    + `L${p(x2, y2)} L${p(bx - nx * abertura, by - ny * abertura)} L${p(ex - nx * haste, ey - ny * haste)} L${p(x1 - nx * cauda, y1 - ny * cauda)} Z`;
+}
+
+/** Uma marcação desenhada no sistema de coordenadas da foto (pixels). */
+export function Marcacao({ item, largura, altura, sombra, oculta, children }: {
+  item: AnotacaoFotoDTO; largura: number; altura: number; sombra: string; oculta?: boolean; children?: ReactNode;
+}) {
+  const { base, fonte } = medidas(largura, altura);
+  const cor = corHex(item.cor);
+  const estilo = oculta ? { opacity: 0 } : undefined;
+  if (item.tipo === 'SETA') {
+    return <g style={estilo}>
+      <path d={caminhoSeta(item.x1 * largura, item.y1 * altura, item.x2 * largura, item.y2 * altura, base)} fill={cor} stroke={contorno(cor)}
+        strokeWidth={base * 0.0018} strokeLinejoin="round" paintOrder="stroke" filter={`url(#${sombra})`} />
+      {children}
+    </g>;
+  }
+  const tamanhoFonte = fonte * escalaTexto(item);
+  return <g style={estilo}>
+    <text x={item.x1 * largura} y={item.y1 * altura} fill={cor} stroke={contorno(cor)} strokeWidth={tamanhoFonte * 0.045} strokeLinejoin="round" paintOrder="stroke"
+      fontSize={tamanhoFonte} fontWeight={650} fontFamily="Inter Variable, Inter, system-ui, sans-serif" textAnchor="middle" dominantBaseline="central"
+      filter={`url(#${sombra})`}>{item.texto}</text>
+    {children}
+  </g>;
+}
+
+export function FiltroSombra({ id, base }: { id: string; base: number }) {
+  return <filter id={id} x="-20%" y="-20%" width="140%" height="140%">
+    <feDropShadow dx="0" dy={base * 0.001} stdDeviation={base * 0.0014} floodColor="#000" floodOpacity="0.3" />
+  </filter>;
 }
 
 /**
- * Foto com as marcações por cima. `modo="miniatura"` recorta o centro (como object-fit: cover) e as marcações
- * acompanham o recorte; `modo="inteira"` mostra a foto no tamanho dela, sem faixas pretas.
+ * Foto com as marcações por cima, só para ver. `modo="miniatura"` recorta o centro (como object-fit: cover) e as
+ * marcações acompanham o recorte; `modo="inteira"` mostra a foto no tamanho dela, sem faixas pretas.
  */
-export function FotoAnotada({ src, alt, anotacoes, modo, editor }: {
-  src: string; alt: string; anotacoes: AnotacaoFotoDTO[]; modo: 'miniatura' | 'inteira';
-  editor?: { ferramenta: 'SETA' | 'TEXTO'; cor: CorAnotacao; texto: string; aoAdicionar: (anotacao: AnotacaoFotoDTO) => void };
-}) {
+export function FotoAnotada({ src, alt, anotacoes, modo }: { src: string; alt: string; anotacoes: AnotacaoFotoDTO[]; modo: 'miniatura' | 'inteira' }) {
   const [tamanho, setTamanho] = useState<{ largura: number; altura: number } | null>(null);
-  const [inicio, setInicio] = useState<Ponto | null>(null);
-  const [ponta, setPonta] = useState<Ponto | null>(null);
-
-  function ponto(event: ReactPointerEvent<SVGSVGElement>): Ponto {
-    const caixa = event.currentTarget.getBoundingClientRect();
-    const limitar = (valor: number) => Math.min(1, Math.max(0, valor));
-    return { x: limitar((event.clientX - caixa.left) / (caixa.width || 1)), y: limitar((event.clientY - caixa.top) / (caixa.height || 1)) };
-  }
-
-  function aoPressionar(event: ReactPointerEvent<SVGSVGElement>) {
-    if (!editor) return;
-    const p = ponto(event);
-    if (editor.ferramenta === 'TEXTO') {
-      if (editor.texto.trim()) editor.aoAdicionar({ tipo: 'TEXTO', x1: p.x, y1: p.y, texto: editor.texto.trim(), cor: editor.cor });
-      return;
-    }
-    event.currentTarget.setPointerCapture?.(event.pointerId);
-    setInicio(p);
-    setPonta(p);
-  }
-
-  function aoSoltar(event: ReactPointerEvent<SVGSVGElement>) {
-    if (!editor || !inicio) return;
-    const fim = ponto(event);
-    // Um clique sem arrastar vira uma seta curta, apontando para onde se clicou.
-    const curto = Math.hypot(fim.x - inicio.x, fim.y - inicio.y) < 0.02;
-    const origem = curto ? { x: Math.max(0, inicio.x - 0.08), y: Math.min(1, inicio.y + 0.06) } : inicio;
-    editor.aoAdicionar({ tipo: 'SETA', x1: origem.x, y1: origem.y, x2: fim.x, y2: fim.y, cor: editor.cor });
-    setInicio(null);
-    setPonta(null);
-  }
-
-  const rascunho: AnotacaoFotoDTO | null = editor && inicio && ponta ? { tipo: 'SETA', x1: inicio.x, y1: inicio.y, x2: ponta.x, y2: ponta.y, cor: editor.cor } : null;
-
-  return <span className={`foto-anotada foto-anotada-${modo}${editor ? ' editando' : ''}`}>
+  const sombra = `sombra-${useId().replace(/:/g, '')}`;
+  return <span className={`foto-anotada foto-anotada-${modo}`}>
     <img src={src} alt={alt} loading={modo === 'miniatura' ? 'lazy' : undefined} onLoad={event => setTamanho({ largura: event.currentTarget.naturalWidth || 1, altura: event.currentTarget.naturalHeight || 1 })} />
-    {tamanho && (anotacoes.length > 0 || editor) && <svg
-      viewBox={`0 0 ${tamanho.largura} ${tamanho.altura}`}
-      preserveAspectRatio={modo === 'miniatura' ? 'xMidYMid slice' : 'none'}
-      aria-hidden={editor ? undefined : true}
-      role={editor ? 'application' : undefined}
-      aria-label={editor ? (editor.ferramenta === 'SETA' ? 'Arraste na foto para desenhar a seta; a ponta fica onde soltar' : 'Clique na foto para colocar o texto') : undefined}
-      onPointerDown={aoPressionar}
-      onPointerMove={event => { if (inicio) setPonta(ponto(event)); }}
-      onPointerUp={aoSoltar}
-    ><Marcacoes anotacoes={anotacoes} largura={tamanho.largura} altura={tamanho.altura} rascunho={rascunho} /></svg>}
+    {tamanho && anotacoes.length > 0 && <svg viewBox={`0 0 ${tamanho.largura} ${tamanho.altura}`} preserveAspectRatio={modo === 'miniatura' ? 'xMidYMid slice' : 'none'} aria-hidden="true">
+      <defs><FiltroSombra id={sombra} base={medidas(tamanho.largura, tamanho.altura).base} /></defs>
+      {anotacoes.map((item, indice) => <Marcacao key={indice} item={item} largura={tamanho.largura} altura={tamanho.altura} sombra={sombra} />)}
+    </svg>}
   </span>;
 }

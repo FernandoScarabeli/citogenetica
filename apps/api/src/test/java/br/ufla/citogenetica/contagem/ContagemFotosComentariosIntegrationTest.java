@@ -123,13 +123,15 @@ class ContagemFotosComentariosIntegrationTest extends AbstractContagemIntegratio
         UUID lamina = criarLamina(c.pesquisador(), c.laboratorio());
         String foto = json(enviarFoto(sessao(c.pesquisador()), lamina, JPEG, null).andReturn()).path("id").asText();
         Map<String, Object> seta = Map.of("tipo", "SETA", "x1", 0.2, "y1", 0.3, "x2", 0.35, "y2", 0.2, "cor", "azul");
-        Map<String, Object> texto = Map.of("tipo", "TEXTO", "x1", 0.15, "y1", 0.32, "texto", " A ", "cor", "azul");
+        Map<String, Object> texto = Map.of("tipo", "TEXTO", "x1", 0.15, "y1", 0.32, "texto", " Parede celular ", "cor", "#FF6B00", "tamanho", 1.5);
 
         editarFoto(sessao(c.pesquisador()), lamina, foto, Map.of("legenda", "Parede celular", "anotacoes", List.of(seta, texto)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.legenda").value("Parede celular"))
                 .andExpect(jsonPath("$.anotacoes.length()").value(2))
-                .andExpect(jsonPath("$.anotacoes[1].texto").value("A"));
+                .andExpect(jsonPath("$.anotacoes[1].texto").value("Parede celular"))
+                .andExpect(jsonPath("$.anotacoes[1].cor").value("#ff6b00"))
+                .andExpect(jsonPath("$.anotacoes[1].tamanho").value(1.5));
         requisicaoAutenticada(sessao(c.orientador()), get(LAMINAS + "/{id}/fotos", lamina))
                 .andExpect(jsonPath("$[0].anotacoes[0].tipo").value("SETA"))
                 .andExpect(jsonPath("$[0].anotacoes[0].x2").value(0.35));
@@ -144,7 +146,13 @@ class ContagemFotosComentariosIntegrationTest extends AbstractContagemIntegratio
                 List.of(Map.of("tipo", "TEXTO", "x1", 0.5, "y1", 0.5, "texto", "  ", "cor", "azul"))))
                 .andExpect(status().isUnprocessableEntity());
         editarFoto(sessao(c.pesquisador()), lamina, foto, Map.of("anotacoes",
-                List.of(Map.of("tipo", "SETA", "x1", 0.1, "y1", 0.1, "x2", 0.2, "y2", 0.2, "cor", "#ff00ff"))))
+                List.of(Map.of("tipo", "SETA", "x1", 0.1, "y1", 0.1, "x2", 0.2, "y2", 0.2, "cor", "roxo"))))
+                .andExpect(status().isUnprocessableEntity());
+        editarFoto(sessao(c.pesquisador()), lamina, foto, Map.of("anotacoes",
+                List.of(Map.of("tipo", "SETA", "x1", 0.1, "y1", 0.1, "x2", 0.2, "y2", 0.2, "cor", "#ff00"))))
+                .andExpect(status().isUnprocessableEntity());
+        editarFoto(sessao(c.pesquisador()), lamina, foto, Map.of("anotacoes",
+                List.of(Map.of("tipo", "TEXTO", "x1", 0.5, "y1", 0.5, "texto", "A", "cor", "azul", "tamanho", 9))))
                 .andExpect(status().isUnprocessableEntity());
 
         editarFoto(sessao(c.pesquisador()), lamina, foto, Map.of("anotacoes", List.of()))

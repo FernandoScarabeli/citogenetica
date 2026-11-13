@@ -2,9 +2,11 @@ package br.ufla.citogenetica.contagem.internal.application;
 
 import java.time.Instant;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
+import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 import br.ufla.citogenetica.contagem.internal.domain.AnotacaoFoto;
@@ -52,7 +54,11 @@ public class FotoLaminaService {
 
     public static final int MAXIMO_ANOTACOES = 100;
     private static final int TEXTO_ANOTACAO_MAXIMO = 80;
-    private static final Set<String> CORES = Set.of("azul", "amarelo", "vermelho", "branco", "preto");
+    private static final double TAMANHO_TEXTO_MINIMO = 0.4;
+    private static final double TAMANHO_TEXTO_MAXIMO = 4;
+    /** Nomes das cores da primeira versão; marcações novas usam qualquer cor em hex (#rrggbb). */
+    private static final Set<String> CORES_ANTIGAS = Set.of("azul", "amarelo", "vermelho", "branco", "preto");
+    private static final Pattern COR_HEX = Pattern.compile("#[0-9a-fA-F]{6}");
 
     public record Arquivo(byte[] conteudo, String contentType) {}
 
@@ -128,9 +134,10 @@ public class FotoLaminaService {
     }
 
     private static AnotacaoFoto anotacao(AnotacaoFoto bruta) {
-        if (bruta == null || bruta.tipo() == null || !CORES.contains(bruta.cor())) {
+        if (bruta == null || bruta.tipo() == null || cor(bruta.cor()) == null) {
             throw new BusinessException("Marcação inválida.");
         }
+        String cor = cor(bruta.cor());
         exigirCoordenada(bruta.x1());
         exigirCoordenada(bruta.y1());
         return switch (bruta.tipo()) {
@@ -140,17 +147,31 @@ public class FotoLaminaService {
                 }
                 exigirCoordenada(bruta.x2());
                 exigirCoordenada(bruta.y2());
-                yield new AnotacaoFoto("SETA", bruta.x1(), bruta.y1(), bruta.x2(), bruta.y2(), null, bruta.cor());
+                yield new AnotacaoFoto("SETA", bruta.x1(), bruta.y1(), bruta.x2(), bruta.y2(), null, cor, null);
             }
             case "TEXTO" -> {
                 String texto = bruta.texto() == null ? "" : bruta.texto().strip();
                 if (texto.isEmpty() || texto.length() > TEXTO_ANOTACAO_MAXIMO) {
                     throw new BusinessException("O texto da marcação deve ter de 1 a " + TEXTO_ANOTACAO_MAXIMO + " caracteres.");
                 }
-                yield new AnotacaoFoto("TEXTO", bruta.x1(), bruta.y1(), null, null, texto, bruta.cor());
+                Double tamanho = bruta.tamanho();
+                if (tamanho != null && (!Double.isFinite(tamanho) || tamanho < TAMANHO_TEXTO_MINIMO || tamanho > TAMANHO_TEXTO_MAXIMO)) {
+                    throw new BusinessException("Tamanho do texto da marcação inválido.");
+                }
+                yield new AnotacaoFoto("TEXTO", bruta.x1(), bruta.y1(), null, null, texto, cor, tamanho);
             }
             default -> throw new BusinessException("Marcação inválida.");
         };
+    }
+
+    private static String cor(String bruta) {
+        if (bruta == null) {
+            return null;
+        }
+        if (CORES_ANTIGAS.contains(bruta)) {
+            return bruta;
+        }
+        return COR_HEX.matcher(bruta).matches() ? bruta.toLowerCase(Locale.ROOT) : null;
     }
 
     private static void exigirCoordenada(Double valor) {

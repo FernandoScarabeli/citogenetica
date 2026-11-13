@@ -1,8 +1,9 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react';
-import { ArrowUpRight, Eraser, ImagePlus, PenLine, Trash2, Type, Undo2 } from 'lucide-react';
+import { ImagePlus, PenLine, Trash2 } from 'lucide-react';
 import { typeClass } from '@/lib/type-scale';
-import { colaboracaoApi, fotoUrl, type AnotacaoFotoDTO, type ColaboracaoApi, type ComentarioLaminaDTO, type CorAnotacao, type FotoLaminaDTO } from './api/colaboracao-api';
-import { CORES_ANOTACAO, FotoAnotada } from './FotoAnotada';
+import { colaboracaoApi, fotoUrl, type AnotacaoFotoDTO, type ColaboracaoApi, type ComentarioLaminaDTO, type FotoLaminaDTO } from './api/colaboracao-api';
+import { EditorMarcacoes } from './EditorMarcacoes';
+import { FotoAnotada } from './FotoAnotada';
 import { ApiError, NetworkError, isUnauthorized } from './api/errors';
 import { formatarData, formatarHora } from './contagem-utils';
 import { Modal } from './SlideWidgets';
@@ -29,14 +30,8 @@ export function SlidePhotos({ laminaId, canEdit, api = colaboracaoApi }: { lamin
   const [aberta, setAberta] = useState<FotoLaminaDTO | null>(null);
   const [apagando, setApagando] = useState(false);
   const [edicao, setEdicao] = useState<{ legenda: string; anotacoes: AnotacaoFotoDTO[] } | null>(null);
-  const [ferramenta, setFerramenta] = useState<'SETA' | 'TEXTO'>('SETA');
-  const [cor, setCor] = useState<CorAnotacao>('azul');
-  const [textoMarcacao, setTextoMarcacao] = useState('A');
   const [salvando, setSalvando] = useState(false);
   const arquivoRef = useRef<HTMLInputElement>(null);
-
-  /** Próxima letra livre (A, B, C…) para o texto da marcação, como nas figuras de artigo. */
-  const proximaLetra = (anotacoes: AnotacaoFotoDTO[]) => String.fromCharCode(65 + Math.min(25, anotacoes.filter(item => item.tipo === 'TEXTO').length));
 
   function abrir(foto: FotoLaminaDTO) {
     setErro('');
@@ -45,20 +40,8 @@ export function SlidePhotos({ laminaId, canEdit, api = colaboracaoApi }: { lamin
   }
 
   function comecarEdicao(foto: FotoLaminaDTO) {
-    const anotacoes = foto.anotacoes ?? [];
     setErro('');
-    setFerramenta('SETA');
-    setTextoMarcacao(proximaLetra(anotacoes));
-    setEdicao({ legenda: foto.legenda ?? '', anotacoes });
-  }
-
-  function adicionar(anotacao: AnotacaoFotoDTO) {
-    setEdicao(atual => {
-      if (!atual) return atual;
-      const anotacoes = [...atual.anotacoes, anotacao];
-      if (anotacao.tipo === 'TEXTO' && /^[A-Z]$/.test(anotacao.texto)) setTextoMarcacao(proximaLetra(anotacoes));
-      return { ...atual, anotacoes };
-    });
+    setEdicao({ legenda: foto.legenda ?? '', anotacoes: foto.anotacoes ?? [] });
   }
 
   async function salvarEdicao() {
@@ -157,26 +140,12 @@ export function SlidePhotos({ laminaId, canEdit, api = colaboracaoApi }: { lamin
       </form>
     </Modal>}
 
-    {aberta && <Modal title={edicao ? 'Anotar foto' : aberta.legenda || 'Foto da lâmina'} className="photo-dialog" locked={salvando} onClose={() => { if (!salvando) { setAberta(null); setEdicao(null); } }}>
-      {edicao && <div className="annotate-toolbar" role="toolbar" aria-label="Ferramentas de marcação">
-        <div className="annotate-group" role="group" aria-label="Ferramenta">
-          <button type="button" aria-pressed={ferramenta === 'SETA'} onClick={() => setFerramenta('SETA')}><ArrowUpRight size={16} aria-hidden="true" /> Seta</button>
-          <button type="button" aria-pressed={ferramenta === 'TEXTO'} onClick={() => setFerramenta('TEXTO')}><Type size={16} aria-hidden="true" /> Texto</button>
-        </div>
-        {ferramenta === 'TEXTO' && <label className="annotate-text">Texto <input value={textoMarcacao} maxLength={80} onChange={event => setTextoMarcacao(event.target.value)} /></label>}
-        <div className="annotate-group annotate-colors" role="group" aria-label="Cor">
-          {CORES_ANOTACAO.map(item => <button key={item.id} type="button" className="annotate-swatch" aria-pressed={cor === item.id} aria-label={item.nome} title={item.nome} style={{ background: item.hex }} onClick={() => setCor(item.id)} />)}
-        </div>
-        <div className="annotate-group">
-          <button type="button" disabled={edicao.anotacoes.length === 0} onClick={() => setEdicao(atual => atual && { ...atual, anotacoes: atual.anotacoes.slice(0, -1) })}><Undo2 size={16} aria-hidden="true" /> Desfazer</button>
-          <button type="button" disabled={edicao.anotacoes.length === 0} onClick={() => { setEdicao(atual => atual && { ...atual, anotacoes: [] }); setTextoMarcacao('A'); }}><Eraser size={16} aria-hidden="true" /> Limpar</button>
-        </div>
-      </div>}
-      {edicao && <p className="annotate-hint">{ferramenta === 'SETA' ? 'Arraste na foto: a ponta da seta fica onde você soltar.' : 'Clique na foto onde o texto deve ficar.'}</p>}
-      <div className="photo-stage">
-        <FotoAnotada src={fotoUrl(laminaId, aberta.id)} alt={aberta.legenda || 'Foto da lâmina'} anotacoes={edicao ? edicao.anotacoes : aberta.anotacoes ?? []} modo="inteira"
-          editor={edicao ? { ferramenta, cor, texto: textoMarcacao, aoAdicionar: adicionar } : undefined} />
-      </div>
+    {aberta && <Modal title={edicao ? 'Anotar foto' : aberta.legenda || 'Foto da lâmina'} className={`photo-dialog${edicao ? ' editing' : ''}`} locked={salvando} closeOnBackdrop={!edicao}
+      onClose={() => { if (!salvando) { setAberta(null); setEdicao(null); } }}>
+      {edicao
+        ? <EditorMarcacoes src={fotoUrl(laminaId, aberta.id)} alt={aberta.legenda || 'Foto da lâmina'} inicial={edicao.anotacoes}
+            aoMudar={anotacoes => setEdicao(atual => atual && { ...atual, anotacoes })} />
+        : <div className="photo-stage"><FotoAnotada src={fotoUrl(laminaId, aberta.id)} alt={aberta.legenda || 'Foto da lâmina'} anotacoes={aberta.anotacoes ?? []} modo="inteira" /></div>}
       {edicao
         ? <>
             <label className="annotate-caption">Legenda <span>Opcional</span><input maxLength={200} value={edicao.legenda} onChange={event => setEdicao(atual => atual && { ...atual, legenda: event.target.value })} placeholder="Ex.: A e B mostram a parede celular" /></label>

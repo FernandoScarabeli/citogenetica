@@ -1,11 +1,12 @@
 import { httpClient, type HttpClient } from './http-client.js';
 
-export type CorAnotacao = 'azul' | 'amarelo' | 'vermelho' | 'branco' | 'preto';
+/** Cor em hex (#rrggbb). Marcações antigas podem trazer um nome: azul, amarelo, vermelho, branco ou preto. */
+export type CorAnotacao = string;
 
 /** Marcação sobre a foto; coordenadas de 0 a 1 relativas à imagem. Seta vai de (x1, y1) até a ponta (x2, y2). */
 export type AnotacaoFotoDTO =
   | { tipo: 'SETA'; x1: number; y1: number; x2: number; y2: number; cor: CorAnotacao; texto?: null }
-  | { tipo: 'TEXTO'; x1: number; y1: number; texto: string; cor: CorAnotacao; x2?: null; y2?: null };
+  | { tipo: 'TEXTO'; x1: number; y1: number; texto: string; cor: CorAnotacao; tamanho?: number | null; x2?: null; y2?: null };
 
 export interface FotoLaminaDTO {
   id: string;
