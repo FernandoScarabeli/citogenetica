@@ -122,8 +122,12 @@ function AdminLaboratoriesContent({ api }: { api: AdminApi }) {
   const [draft, setDraft] = useState('');
   const [filters, setFilters] = useState<{ nome: string; estado: StateFilter }>({ nome: '', estado: '' });
   const [page, setPage] = useState(0);
+  // De onde as linhas novas entram: da direita em "Próxima", da esquerda em "Anterior", de baixo ao filtrar ou buscar.
+  const direction = useRef<'next' | 'previous' | 'filter' | 'none'>('filter');
   const [reload, setReload] = useState(0);
   const [result, setResult] = useState<AdminLaboratorioPageDTO | null>(null);
+  // Muda a cada resposta nova: as linhas animam quando os dados chegam, não no clique.
+  const [resultVersion, setResultVersion] = useState(0);
   const [status, setStatus] = useState<'loading' | 'ready' | 'error' | 'forbidden'>('loading');
   const [loadError, setLoadError] = useState('');
   const [action, setAction] = useState<Action | null>(null);
@@ -150,6 +154,7 @@ function AdminLaboratoriesContent({ api }: { api: AdminApi }) {
         return;
       }
       setResult(data);
+      setResultVersion(version => version + 1);
       setStatus('ready');
     }).catch((error: unknown) => {
       if (controller.signal.aborted) return;
@@ -165,16 +170,19 @@ function AdminLaboratoriesContent({ api }: { api: AdminApi }) {
 
   function submitSearch(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    direction.current = 'filter';
     setFilters(current => ({ ...current, nome: draft.trim() }));
     setPage(0);
   }
 
   function changeState(estado: StateFilter) {
+    direction.current = 'filter';
     setFilters(current => ({ ...current, estado }));
     setPage(0);
   }
 
   function clearFilters() {
+    direction.current = 'filter';
     setDraft('');
     setFilters({ nome: '', estado: '' });
     setPage(0);
@@ -192,6 +200,7 @@ function AdminLaboratoriesContent({ api }: { api: AdminApi }) {
         ? `${action.laboratory.nome} foi desativado.`
         : `${action.laboratory.nome} foi reativado.`);
       setAction(null);
+      direction.current = 'none';
       setReload(value => value + 1);
     } catch (error) {
       const message = actionErrorMessage(error, action.kind);
@@ -241,7 +250,7 @@ function AdminLaboratoriesContent({ api }: { api: AdminApi }) {
               <div className="admin-table-wrap"><table className="admin-table">
                 <caption className="sr-only">Laboratórios da plataforma</caption>
                 <thead><tr><th scope="col">Laboratório</th><th scope="col">Estado</th><th scope="col">Membros ativos</th><th scope="col">Administradores</th><th scope="col"><span className="sr-only">Ações</span></th></tr></thead>
-                <tbody key={`${filters.nome}|${filters.estado}|${page}|${result.totalElements}`} className="admin-rows">{result.content.map(lab => <tr key={lab.id}>
+                <tbody key={resultVersion} className={`admin-rows is-${direction.current}`}>{result.content.map((lab, index) => <tr key={lab.id} style={{ '--row': index } as React.CSSProperties}>
                   <td data-label="Laboratório"><strong>{lab.nome}</strong></td>
                   <td data-label="Estado"><span className={`laboratory-state ${lab.estado === 'ATIVO' ? 'is-active' : 'is-disabled'}`}>{lab.estado === 'ATIVO' ? 'Ativo' : 'Desativado'}</span></td>
                   <td data-label="Membros ativos" className="admin-count">{lab.quantidadeMembrosAtivos}</td>
@@ -257,8 +266,8 @@ function AdminLaboratoriesContent({ api }: { api: AdminApi }) {
               <nav className="admin-pagination" aria-label="Paginação">
                 <span>{result.totalElements} {result.totalElements === 1 ? 'laboratório' : 'laboratórios'} · página {page + 1} de {Math.max(totalPages, 1)}</span>
                 <div>
-                  <button className="button secondary" type="button" disabled={page === 0 || status === 'loading'} onClick={() => setPage(page - 1)}><ChevronLeft size={16} aria-hidden="true" />Anterior</button>
-                  <button className="button secondary" type="button" disabled={page + 1 >= totalPages || status === 'loading'} onClick={() => setPage(page + 1)}>Próxima<ChevronRight size={16} aria-hidden="true" /></button>
+                  <button className="button secondary" type="button" disabled={page === 0 || status === 'loading'} onClick={() => { direction.current = 'previous'; setPage(page - 1); }}><ChevronLeft size={16} aria-hidden="true" />Anterior</button>
+                  <button className="button secondary" type="button" disabled={page + 1 >= totalPages || status === 'loading'} onClick={() => { direction.current = 'next'; setPage(page + 1); }}>Próxima<ChevronRight size={16} aria-hidden="true" /></button>
                 </div>
               </nav>
             </div>}

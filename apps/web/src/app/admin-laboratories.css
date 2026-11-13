@@ -48,10 +48,22 @@
 /* Espaço no fim da página, abaixo da paginação. */
 .labs-app .admin-labs { padding-bottom: 48px; }
 
-/* Tabela ao trocar filtro, busca ou página (skill animate): são dados que a pessoa lê, então nada se mexe de lugar.
-   Enquanto carrega, a lista atual esmaece um pouco; quando chega a nova, as linhas aparecem com opacidade (180ms). */
+/* Tabela ao trocar filtro, busca ou página (skill animate).
+   Sem piscar: só esmaece se o carregamento passar de 150ms (carregamentos rápidos não mudam nada).
+   Linhas novas entram em cascata (25ms entre elas), 220ms ease-out, só opacity + transform:
+   da direita em "Próxima", da esquerda em "Anterior", de baixo ao filtrar ou buscar. */
 .admin-results { transition: opacity 150ms ease; }
-.admin-results.is-loading { opacity: .55; }
-.admin-rows { animation: admin-rows-in 180ms cubic-bezier(0.23, 1, 0.32, 1); }
-@keyframes admin-rows-in { from { opacity: 0; } }
-@media (prefers-reduced-motion: reduce) { .admin-results { transition: none; } }
+.admin-results.is-loading { opacity: .55; transition-delay: 150ms; }
+.admin-rows tr { animation: admin-row-up 220ms cubic-bezier(0.23, 1, 0.32, 1) both; animation-delay: calc(var(--row, 0) * 25ms); }
+.admin-rows.is-next tr { animation-name: admin-row-next; }
+.admin-rows.is-previous tr { animation-name: admin-row-previous; }
+@keyframes admin-row-up { from { opacity: 0; translate: 0 6px; } }
+@keyframes admin-row-next { from { opacity: 0; translate: 12px 0; } }
+@keyframes admin-row-previous { from { opacity: 0; translate: -12px 0; } }
+@media (prefers-reduced-motion: reduce) {
+  .admin-results { transition: none; }
+  .admin-rows tr,.admin-rows.is-next tr,.admin-rows.is-previous tr { animation: admin-row-fade 180ms ease both; animation-delay: 0ms; }
+  @keyframes admin-row-fade { from { opacity: 0; } }
+}
+/* Recarregar no mesmo lugar (depois de desativar/reativar): sem animação. */
+.admin-rows.is-none tr { animation: none; }
