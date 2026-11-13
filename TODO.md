@@ -122,12 +122,13 @@ Nada é commitado até o fim da sequência.
 
 ### 2.5 Revisão dos fluxos (2026-11-08 a 2026-11-12)
 - [x] Diagnóstico de todos os fluxos e os 10 itens aprovados pelo dono, mesclados em `dev` (ver `docs/revisao-fluxos.md`)
-- [ ] Aceitar convite direto pelo sino de notificações (fluxo 16)
-- [ ] Hora do clique nas células reenviadas sem internet: hoje o histórico mostra a hora do reenvio
-- [ ] Nota explicando que os percentuais de anormalidades podem somar mais de 100% (célula com mais de um tipo)
-- [ ] Textos menores: confirmação de cadastro (fluxo 2), botão que sobra na recuperação de senha (4), erro que fica na tela em Minha conta (5), confirmação de sair do laboratório (12), frase no cartão de laboratório desativado (15)
-- [ ] Painel do admin geral com o mesmo cabeçalho do resto (sino, modo escuro, menu)
-- [ ] Contador da aba "Membros" não atualiza quando alguém aceita um convite
+- [x] Aceitar convite direto pelo sino de notificações (fluxo 16) — laboratório e orientação (#101)
+- [x] Hora do clique nas células reenviadas sem internet: o histórico mostra a hora do clique e "enviada às" (#102)
+- [x] Nota explicando que os percentuais de anormalidades podem somar mais de 100% (célula com mais de um tipo) (#99)
+- [x] Textos menores (#98): confirmação de cadastro (fluxo 2), botão que sobra na recuperação de senha (4), erro que fica na tela em Minha conta (5), confirmação de sair do laboratório (12), frase no cartão de laboratório desativado (15)
+- [x] Painel do admin geral com o mesmo cabeçalho do resto (sino, modo escuro, menu) (#91)
+- [x] Contador da aba "Membros" não atualiza quando alguém aceita um convite — relê ao voltar à aba e ao abrir "Membros" (#100)
+- [ ] ⚠️ Avisar o admin quando alguém aceita um convite (notificação nova; decisão do dono)
 
 ---
 
