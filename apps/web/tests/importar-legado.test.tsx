@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { render, screen, waitFor, within } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router';
 import type { LaboratorioResponseDTO } from '../src/api/contracts/laboratorio';
@@ -21,7 +21,7 @@ async function escolher(user: ReturnType<typeof userEvent.setup>, file: File) {
   await user.click(await botaoMenu());
   await user.click(screen.getByRole('menuitem', { name: 'Importar backup antigo' }));
   const dialogo = await screen.findByRole('dialog');
-  await user.upload(within(dialogo).getByLabelText(/Arquivo de backup/), file);
+  await user.upload(within(dialogo).getByLabelText(/arquivo de backup/i), file);
   return dialogo;
 }
 
@@ -105,7 +105,7 @@ describe('importar backup antigo na lista de lâminas', () => {
     preparar();
     const dialogo = await escolher(user, arquivo('quebrado.json', '{ nada'));
     expect((await within(dialogo).findByRole('alert')).textContent).toContain('não é um JSON válido');
-    await user.upload(within(dialogo).getByLabelText(/Arquivo de backup/), arquivo('backup_ciclo_celular.json'));
+    await user.upload(within(dialogo).getByLabelText(/arquivo de backup/i), arquivo('backup_ciclo_celular.json'));
     expect(await within(dialogo).findByText(/2 lâminas podem ser importadas/)).toBeTruthy();
   });
 
@@ -143,5 +143,19 @@ describe('importar backup antigo na lista de lâminas', () => {
     expect(within(dialogo).getByText(/foi excluída no sistema; não foi importada de novo/)).toBeTruthy();
     expect(within(dialogo).getByText(/1 célula foi alterada no arquivo depois da primeira importação/)).toBeTruthy();
     expect(within(dialogo).getByText('Ficou valendo o que já está no sistema.')).toBeTruthy();
+  });
+
+  it('aceita o arquivo arrastado para a área de escolher', async () => {
+    const user = userEvent.setup();
+    preparar({ laboratory: LAB });
+    await user.click(await botaoMenu());
+    await user.click(screen.getByRole('menuitem', { name: 'Importar backup antigo' }));
+    const dialogo = await screen.findByRole('dialog');
+    const area = within(dialogo).getByText('ou arraste o arquivo para cá').closest('label')!;
+    fireEvent.dragOver(area, { dataTransfer: { files: [] } });
+    expect(area.className).toContain('is-dragging');
+    fireEvent.drop(area, { dataTransfer: { files: [arquivo('backup_meiose.json')] } });
+    expect(await within(dialogo).findByText(/2 lâminas podem ser importadas/)).toBeTruthy();
+    expect(area.className).not.toContain('is-dragging');
   });
 });

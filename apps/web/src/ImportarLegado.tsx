@@ -1,4 +1,5 @@
-import { useEffect, useRef, useState, type ChangeEvent } from 'react';
+import { useEffect, useRef, useState, type ChangeEvent, type DragEvent } from 'react';
+import { FileJson } from 'lucide-react';
 import type { ContagemApi } from './api/contagem-api';
 import type { ProtocoloDTO } from './api/contracts/contagem';
 import { mensagemDeErro } from './contagem-utils';
@@ -42,10 +43,22 @@ export function ImportarLegado({ api, laboratorioNome, laboratorioId, usuarioId,
     onClose();
   }
 
-  async function escolher(event: ChangeEvent<HTMLInputElement>) {
+  const [arrastando, setArrastando] = useState(false);
+
+  function escolher(event: ChangeEvent<HTMLInputElement>) {
     const arquivo = event.target.files?.[0];
     event.target.value = '';
-    if (!arquivo) return;
+    if (arquivo) void ler(arquivo);
+  }
+
+  function soltar(event: DragEvent<HTMLLabelElement>) {
+    event.preventDefault();
+    setArrastando(false);
+    const arquivo = event.dataTransfer.files?.[0];
+    if (arquivo && fase !== 'lendo') void ler(arquivo);
+  }
+
+  async function ler(arquivo: File) {
     setErro(''); setFase('lendo'); setNomeArquivo(arquivo.name);
     try {
       const lida = await lerBackupLegado(arquivo);
@@ -88,8 +101,12 @@ export function ImportarLegado({ api, laboratorioNome, laboratorioId, usuarioId,
       <div className="importar-legado">
         {fase === 'escolher' || fase === 'lendo' ? <>
           <p className="modal-description">Escolha o arquivo de backup (.json) baixado dos registros antigos. As lâminas dele serão importadas {destino}. Importar o mesmo arquivo de novo não duplica nada.</p>
-          <label className="importar-arquivo">Arquivo de backup (.json)
-            <input type="file" accept=".json,application/json" disabled={fase === 'lendo'} onChange={event => void escolher(event)} aria-describedby={erro ? 'importar-erro' : undefined} />
+          <label className={`importar-arquivo${arrastando ? ' is-dragging' : ''}${fase === 'lendo' ? ' is-busy' : ''}`}
+            onDragOver={event => { event.preventDefault(); setArrastando(true); }} onDragLeave={() => setArrastando(false)} onDrop={soltar}>
+            <FileJson size={26} aria-hidden="true" />
+            <strong>Escolher arquivo de backup (.json)</strong>
+            <span>ou arraste o arquivo para cá</span>
+            <input className="sr-only" type="file" accept=".json,application/json" disabled={fase === 'lendo'} onChange={escolher} aria-describedby={erro ? 'importar-erro' : undefined} />
           </label>
           {fase === 'lendo' && <p role="status">Lendo {nomeArquivo}…</p>}
           {erro && <p className="select-error" id="importar-erro" role="alert">{erro}</p>}
