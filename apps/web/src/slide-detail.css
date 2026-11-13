@@ -1,5 +1,14 @@
 /* Lâmina aberta numa página só, no fluxo dos registros antigos: cartões por fase → resumo → IM → observações → histórico. */
 .detail .detail-actions { align-items: center; }
+/* Ações da lâmina com cor: verde suave em Exportar/Editar, vermelho suave na lixeira (ação perigosa). Cor no hover = 150ms ease. */
+.labs-app .detail .detail-actions .button.secondary { border-color: var(--lab-tint-line); background: var(--lab-tint); color: var(--lab-tint-ink); transition: background-color 150ms ease, border-color 150ms ease; }
+.labs-app .detail .detail-actions .button.secondary svg { color: currentColor; }
+.labs-app .detail .detail-actions .button.secondary.is-danger { border-color: var(--lab-bad-line); background: var(--lab-bad-bg); color: var(--lab-bad-ink); }
+@media (hover: hover) and (pointer: fine) {
+  .labs-app .detail .detail-actions .button.secondary:not(:disabled):hover { background: var(--lab-tint-hover); }
+  .labs-app .detail .detail-actions .button.secondary.is-danger:not(:disabled):hover { background: var(--lab-bad-bg-strong); }
+}
+.labs-app .detail .detail-actions .action-menu-chevron { color: currentColor; }
 .detail section + section,.detail .history-section { margin-top: 36px; }
 .detail .count-section { margin-top: 32px; }
 .detail .count-section .section-heading { margin-bottom: 14px; }

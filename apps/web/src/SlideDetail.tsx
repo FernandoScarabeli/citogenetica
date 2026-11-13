@@ -600,7 +600,7 @@ export function SlideDetail({ api, laminaId, usuarioId, readOnly, protocolos, on
         <ActionMenu rotulo="Exportar" Icone={Download} ocupado={baixando ? 'Baixando…' : null}
           itens={EXPORTACOES.map(({ kind, rotulo, Icone }) => ({ tipo: 'acao' as const, id: kind, rotulo, Icone, aoEscolher: () => void exportar(kind) }))} />
         {canEdit && <><button className="button secondary" type="button" disabled={guardadas > 0} title={guardadas > 0 ? DICA_FILA : undefined} onClick={openEditSlide}><Pencil size={15} /> Editar lâmina</button>
-        <button className="button icon-only secondary" type="button" title={guardadas > 0 ? DICA_FILA : 'Excluir lâmina'} disabled={guardadas > 0} aria-label="Excluir lâmina" onClick={() => setModal('delete')}><Trash2 size={17} /></button></>}
+        <button className="button icon-only secondary is-danger" type="button" title={guardadas > 0 ? DICA_FILA : 'Excluir lâmina'} disabled={guardadas > 0} aria-label="Excluir lâmina" onClick={() => setModal('delete')}><Trash2 size={17} /></button></>}
       </div>
     </div>
     {!readOnly && lamina.donoUsuarioId !== usuarioId && <p className="owner-note">Esta lâmina é de {lamina.donoNome}. Você pode consultar a contagem, mas só quem a criou pode alterá-la.</p>}

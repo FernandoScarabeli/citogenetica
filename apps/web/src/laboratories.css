@@ -13,6 +13,11 @@
   --lab-tint: #e9f0eb;
   --lab-tint-line: #c6d2c9;
   --lab-tint-ink: #2b4d37;
+  --lab-tint-hover: #dde9e0;
+  --lab-bad-ink: #963e34;
+  --lab-bad-bg: #fbf3f1;
+  --lab-bad-bg-strong: #f6e4e0;
+  --lab-bad-line: #e3c3bd;
   min-height: 100dvh;
   color: var(--lab-ink);
   background: var(--lab-background);
@@ -43,6 +48,7 @@ html[data-appearance="dark"] .labs-app {
   --lab-tint: #1d2b23;
   --lab-tint-line: #2f4a3a;
   --lab-tint-ink: #9fd6b4;
+  --lab-tint-hover: #233a2c;
 }
 
 /* Botões de contagem e erros têm cores próprias; no escuro usam tons que mantêm o contraste. */
