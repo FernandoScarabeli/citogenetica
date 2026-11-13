@@ -131,3 +131,75 @@ export function createNotificacaoSseClient(options: NotificacaoSseClientOptions 
     },
   };
 }
+
+const POLLING_INTERVAL_MS = 30_000;
+
+export interface NotificacaoPollingClientOptions {
+  intervalMs?: number;
+  setInterval?: typeof globalThis.setInterval;
+  clearInterval?: typeof globalThis.clearInterval;
+  document?: Pick<Document, 'hidden' | 'addEventListener' | 'removeEventListener'>;
+}
+
+/**
+ * Alternativa ao SSE para ambientes cujo proxy não mantém conexões longas (ex.: Netlify + túnel
+ * temporário da Cloudflare). Consulta a sessão a cada intervalo e avisa que as notificações podem
+ * ter mudado; com a aba oculta não consulta, e consulta de novo assim que ela volta a aparecer.
+ */
+export function createNotificacaoPollingClient(options: NotificacaoPollingClientOptions = {}): NotificacaoSseClient {
+  const intervalMs = options.intervalMs ?? POLLING_INTERVAL_MS;
+  const startInterval = options.setInterval ?? globalThis.setInterval;
+  const cancelInterval = options.clearInterval ?? globalThis.clearInterval;
+  const doc = options.document ?? (typeof document === 'undefined' ? undefined : document);
+
+  let stopCurrent: (() => void) | null = null;
+
+  return {
+    start(onChange, verifySession) {
+      stopCurrent?.();
+      let active = true;
+      let checking = false;
+
+      function tick(): void {
+        if (!active || checking || doc?.hidden) return;
+        checking = true;
+        void verifySession()
+          .then(valid => {
+            if (!active) return;
+            if (valid) onChange();
+            else stop();
+          })
+          .catch(() => undefined)
+          .finally(() => {
+            checking = false;
+          });
+      }
+
+      function onVisibilityChange(): void {
+        if (!doc?.hidden) tick();
+      }
+
+      const timer = startInterval(tick, intervalMs);
+      doc?.addEventListener('visibilitychange', onVisibilityChange);
+
+      function stop(): void {
+        if (!active) return;
+        active = false;
+        cancelInterval(timer);
+        doc?.removeEventListener('visibilitychange', onVisibilityChange);
+        if (stopCurrent === stop) stopCurrent = null;
+      }
+
+      stopCurrent = stop;
+      onChange();
+      return stop;
+    },
+  };
+}
+
+/** Escolhe SSE ou consulta periódica conforme `VITE_NOTIFICACOES_POR_CONSULTA` no build. */
+export function createNotificacaoRealtimeClient(): NotificacaoSseClient {
+  return import.meta.env.VITE_NOTIFICACOES_POR_CONSULTA === 'true'
+    ? createNotificacaoPollingClient()
+    : createNotificacaoSseClient();
+}
