@@ -6,7 +6,7 @@ Sistema web para registrar e resumir contagens de células em lâminas de citoge
 
 ## Status
 
-O sistema está em desenvolvimento. A API inclui autenticação por sessão, gestão de usuários e laboratórios, convites, notificações em tempo real e armazenamento com URLs assinadas. A aplicação web usa a API para autenticação, laboratórios e notificações; lâminas e contagens de pesquisa continuam armazenadas localmente no navegador (`localStorage`).
+O sistema está em desenvolvimento. A API inclui autenticação por sessão, gestão de usuários e laboratórios, convites, notificações em tempo real e armazenamento privado de fotos (servidas só pela API). A aplicação web usa a API para autenticação, laboratórios e notificações; lâminas e contagens de pesquisa continuam armazenadas localmente no navegador (`localStorage`).
 
 O Docker Compose inicia a API, o banco, o armazenamento, o Mailpit e o frontend servido pelo Nginx. Para desenvolvimento, o frontend também pode ser iniciado separadamente com Vite.
 
@@ -64,6 +64,10 @@ docker compose down
 ```
 
 `docker compose down -v` também apaga os dados locais do banco e do armazenamento de arquivos.
+
+### Ambiente de testes do cliente
+
+Front no Netlify, API e dados num PC servidor atrás de um túnel da Cloudflare, sem portas abertas: veja [`docs/deploy-testes.md`](docs/deploy-testes.md).
 
 ## Testes
 

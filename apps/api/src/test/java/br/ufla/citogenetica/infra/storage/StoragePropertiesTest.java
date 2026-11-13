@@ -14,18 +14,15 @@ class StoragePropertiesTest {
         try (ValidatorFactory factory = Validation.buildDefaultValidatorFactory()) {
             StorageProperties properties = new StorageProperties(
                     "ftp://storage",
-                    "http://storage/base",
                     "bad region",
                     true,
                     "BadBucket",
                     new SecretValue("invalid/key"),
-                    new SecretValue("short"),
-                    0);
+                    new SecretValue("short"));
 
             assertThat(factory.getValidator().validate(properties))
                     .extracting(violation -> violation.getPropertyPath().toString())
-                    .contains("endpointsValid", "region", "bucket", "accessKeyFormatValid", "secretKey",
-                            "presignedUrlValiditySeconds");
+                    .contains("endpointsValid", "region", "bucket", "accessKeyFormatValid", "secretKey");
         }
     }
 }
