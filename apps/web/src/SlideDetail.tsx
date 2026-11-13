@@ -654,6 +654,7 @@ export function SlideDetail({ api, laminaId, usuarioId, readOnly, protocolos, on
         <tbody>{shown.fases.map(fase => <tr key={fase.faseId}><td>{fase.nome}</td><td>{num(fase.normais)}</td><td>{num(fase.anormais)}</td><td>{num(fase.total)}</td><td>{fase.total ? pct(fase.anormais, fase.total) : '—'}</td><td className="summary-types">{fase.tipos.length ? fase.tipos.map(tipo => <span key={tipo.tipoId}>{tipo.nome}: {num(tipo.contagem)} ({pct(tipo.percentual, 100)})</span>) : '—'}</td></tr>)}</tbody>
         <tfoot><tr><th scope="row">Total</th><td>{num(normal)}</td><td>{num(shown.anormais)}</td><td>{num(shown.total)}</td><td>{shown.total ? pct(shown.anormais, shown.total) : '—'}</td><td /></tr></tfoot>
       </table></div>
+      {shown.fases.some(fase => fase.tipos.length > 0) && <p className="summary-note">Uma célula pode ter mais de um tipo de anormalidade; por isso os percentuais dos tipos podem somar mais que o % de anormais.</p>}
       {(isMitosis || goal !== null) && <div className="index-box">
         {isMitosis && <p className="index-formula">Índice mitótico (IM) = {num(divisao)} / {num(shown.total)} = {indice.toLocaleString('pt-BR', { minimumFractionDigits: 4, maximumFractionDigits: 4 })} ({pct(divisao, shown.total)})</p>}
         {goal !== null && <p>Meta de contagem: {num(shown.total)} / {num(goal)} células nesta lâmina</p>}
