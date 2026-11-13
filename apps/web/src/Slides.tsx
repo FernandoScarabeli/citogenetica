@@ -158,7 +158,7 @@ export function Slides({ laboratory, onBack, readOnly, usuarioId, api = contagem
     <div className={`page-container slide-navigation${readOnly ? ' labs-read-only' : ''}`}>
       <nav className="lab-scope-nav" aria-label="Caminho de navegação">
         <button className="text-button" type="button" onClick={onBack}>Meus laboratórios</button><ChevronRight size={14} aria-hidden="true" />
-        {slide ? <><span>{scopeName}</span><ChevronRight size={14} aria-hidden="true" /><button className="text-button" type="button" onClick={() => { setNotice(''); navigate(caminhoLaminas(laboratoryId)); }}>Lâminas</button><ChevronRight size={14} aria-hidden="true" /><strong aria-current="page">{slide.nome}</strong></> : <strong aria-current="page">{scopeName}</strong>}
+        {slide ? <><button className="text-button" type="button" onClick={() => { setNotice(''); navigate(caminhoLaminas(laboratoryId)); }}>{scopeName}</button><ChevronRight size={14} aria-hidden="true" /><strong aria-current="page">{slide.nome}</strong></> : <strong aria-current="page">{scopeName}</strong>}
       </nav>
     </div>
     {readOnly && <p className="page-container lab-muted">Este laboratório está desativado. Os registros estão disponíveis somente para leitura.</p>}

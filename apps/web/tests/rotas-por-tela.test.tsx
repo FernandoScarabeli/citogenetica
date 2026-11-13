@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter, useLocation, useNavigate } from 'react-router';
 import { ApiError } from '../src/api/errors';
@@ -224,7 +224,9 @@ describe('observações ao sair da lâmina pela navegação', () => {
     abrir('/laboratorios/lab-1/laminas/lamina-1');
     await screen.findByRole('heading', { name: 'L1 planta A' });
     await user.type(screen.getByLabelText('Observações da lâmina'), ' e mais');
-    await user.click(screen.getByRole('button', { name: 'Lâminas' }));
+    const caminhoTopo = screen.getByRole('navigation', { name: 'Caminho de navegação' });
+    expect(caminhoTopo.textContent).toBe('Meus laboratóriosCitogenética VegetalL1 planta A');
+    await user.click(within(caminhoTopo).getByRole('button', { name: 'Citogenética Vegetal' }));
     expect(await screen.findByRole('heading', { name: 'Lâminas' })).toBeTruthy();
     expect(caminho()).toBe('/laboratorios/lab-1/laminas');
     await waitFor(() => expect(contagem.atualizarLamina).toHaveBeenCalledWith('lamina-1', expect.objectContaining({ observacoes: 'Nota salva e mais' })));
