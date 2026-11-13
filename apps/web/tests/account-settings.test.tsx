@@ -1,5 +1,5 @@
 import { StrictMode } from 'react';
-import { act, render, screen } from '@testing-library/react';
+import { act, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { App } from '../src/app/App';
@@ -88,10 +88,15 @@ async function openProfile(options: AccountOptions = {}) {
   return { ...mocked, user };
 }
 
+/** Campo "Senha atual" do bloco pedido (os blocos Senha e E-mail têm um cada). */
+const senhaAtual = (bloco: 'Senha' | 'E-mail') => within(screen.getByRole('region', { name: bloco })).getByLabelText('Senha atual');
+
+/** Senha e e-mail ficam fechados na página: abre os dois blocos. */
 async function openSecurity(options: AccountOptions = {}) {
   const opened = await openProfile(options);
-  await opened.user.click(screen.getByRole('button', { name: 'Segurança' }));
-  await screen.findByRole('heading', { name: 'Alterar senha' });
+  await opened.user.click(screen.getByRole('button', { name: 'Alterar senha' }));
+  await opened.user.click(screen.getByRole('button', { name: 'Trocar e-mail' }));
+  await screen.findByLabelText('Novo e-mail');
   return opened;
 }
 
@@ -111,7 +116,7 @@ describe('Minha conta', () => {
 
     await user.clear(screen.getByRole('textbox', { name: 'Nome' }));
     await user.type(screen.getByRole('textbox', { name: 'Nome' }), 'Beatriz Pesquisadora');
-    await user.click(screen.getByRole('button', { name: 'Salvar alterações' }));
+    await user.click(screen.getByRole('button', { name: 'Salvar nome' }));
 
     expect((await screen.findByRole('status')).textContent).toContain('Nome atualizado.');
     expect(screen.getByRole('button', { name: 'Menu do perfil' }).textContent).toContain('Beatriz Pesquisadora');
@@ -125,7 +130,7 @@ describe('Minha conta', () => {
     });
     await user.clear(screen.getByRole('textbox', { name: 'Nome' }));
     await user.type(screen.getByRole('textbox', { name: 'Nome' }), 'Nome inválido');
-    await user.click(screen.getByRole('button', { name: 'Salvar alterações' }));
+    await user.click(screen.getByRole('button', { name: 'Salvar nome' }));
 
     expect(await screen.findByText('O nome é obrigatório.')).toBeTruthy();
     expect(screen.getByRole('textbox', { name: 'Nome' }).getAttribute('aria-invalid')).toBe('true');
@@ -133,10 +138,10 @@ describe('Minha conta', () => {
 
   it('troca a senha e informa que as outras sessões foram encerradas', async () => {
     const { calls, user } = await openSecurity();
-    await user.type(screen.getAllByLabelText('Senha atual')[0], 'SenhaAtual123!');
+    await user.type(senhaAtual('Senha'), 'SenhaAtual123!');
     await user.type(screen.getByLabelText('Nova senha'), 'NovaSegura-489!');
     await user.type(screen.getByLabelText('Confirme sua nova senha'), 'NovaSegura-489!');
-    await user.click(screen.getByRole('button', { name: 'Alterar senha' }));
+    await user.click(screen.getByRole('button', { name: 'Salvar nova senha' }));
 
     expect((await screen.findByRole('status')).textContent).toContain('Senha alterada. As outras sessões desta conta foram encerradas.');
     expect(calls.find((call) => call.path === '/api/v1/usuarios/me/senha')?.body).toEqual({
@@ -149,28 +154,28 @@ describe('Minha conta', () => {
     const { user } = await openSecurity({
       updatePassword: () => apiError(409, 'A senha atual está incorreta.'),
     });
-    await user.type(screen.getAllByLabelText('Senha atual')[0], 'incorreta');
+    await user.type(senhaAtual('Senha'), 'incorreta');
     await user.type(screen.getByLabelText('Nova senha'), 'NovaSegura-489!');
     await user.type(screen.getByLabelText('Confirme sua nova senha'), 'NovaSegura-489!');
-    await user.click(screen.getByRole('button', { name: 'Alterar senha' }));
+    await user.click(screen.getByRole('button', { name: 'Salvar nova senha' }));
 
     expect(await screen.findByText('A senha atual está incorreta.')).toBeTruthy();
-    expect(screen.getAllByLabelText('Senha atual')[0].getAttribute('aria-invalid')).toBe('true');
+    expect(senhaAtual('Senha').getAttribute('aria-invalid')).toBe('true');
   });
 
   it('reaproveita a política de senha e valida a confirmação antes da chamada', async () => {
     const { calls, user } = await openSecurity();
-    await user.type(screen.getAllByLabelText('Senha atual')[0], 'SenhaAtual123!');
+    await user.type(senhaAtual('Senha'), 'SenhaAtual123!');
     await user.type(screen.getByLabelText('Nova senha'), 'curta');
     await user.type(screen.getByLabelText('Confirme sua nova senha'), 'curta');
-    await user.click(screen.getByRole('button', { name: 'Alterar senha' }));
+    await user.click(screen.getByRole('button', { name: 'Salvar nova senha' }));
     expect(screen.getByText('A senha deve ter entre 8 e 64 caracteres.')).toBeTruthy();
 
     await user.clear(screen.getByLabelText('Nova senha'));
     await user.type(screen.getByLabelText('Nova senha'), 'NovaSegura-489!');
     await user.clear(screen.getByLabelText('Confirme sua nova senha'));
     await user.type(screen.getByLabelText('Confirme sua nova senha'), 'OutraSegura-489!');
-    await user.click(screen.getByRole('button', { name: 'Alterar senha' }));
+    await user.click(screen.getByRole('button', { name: 'Salvar nova senha' }));
     expect(screen.getByText('As senhas não coincidem.')).toBeTruthy();
     expect(calls.some((call) => call.path === '/api/v1/usuarios/me/senha')).toBe(false);
   });
@@ -180,10 +185,10 @@ describe('Minha conta', () => {
     const { user } = await openSecurity({
       updatePassword: () => apiError(400, message, ['novaSenha: ' + message]),
     });
-    await user.type(screen.getAllByLabelText('Senha atual')[0], 'SenhaAtual123!');
+    await user.type(senhaAtual('Senha'), 'SenhaAtual123!');
     await user.type(screen.getByLabelText('Nova senha'), 'SenhaPopular-123!');
     await user.type(screen.getByLabelText('Confirme sua nova senha'), 'SenhaPopular-123!');
-    await user.click(screen.getByRole('button', { name: 'Alterar senha' }));
+    await user.click(screen.getByRole('button', { name: 'Salvar nova senha' }));
 
     expect(await screen.findByText(message)).toBeTruthy();
     expect(screen.getByLabelText('Nova senha').getAttribute('aria-invalid')).toBe('true');
@@ -192,7 +197,7 @@ describe('Minha conta', () => {
   it('solicita a troca de e-mail com o payload do contrato e mantém a mensagem neutra', async () => {
     const { calls, user } = await openSecurity();
     await user.type(screen.getByLabelText('Novo e-mail'), 'beatriz@ufla.br');
-    await user.type(screen.getAllByLabelText('Senha atual')[1], 'SenhaAtual123!');
+    await user.type(senhaAtual('E-mail'), 'SenhaAtual123!');
     await user.click(screen.getByRole('button', { name: 'Enviar link de confirmação' }));
 
     expect((await screen.findByRole('status')).textContent).toContain(
@@ -209,7 +214,7 @@ describe('Minha conta', () => {
       requestEmailChange: () => apiError(409, 'A senha atual está incorreta.'),
     });
     await user.type(screen.getByLabelText('Novo e-mail'), 'beatriz@ufla.br');
-    const currentPassword = screen.getAllByLabelText('Senha atual')[1];
+    const currentPassword = senhaAtual('E-mail');
     await user.type(currentPassword, 'incorreta');
     await user.click(screen.getByRole('button', { name: 'Enviar link de confirmação' }));
 
@@ -222,7 +227,7 @@ describe('Minha conta', () => {
       requestEmailChange: () => apiError(400, 'Erro de validação', ['novoEmail: Informe um endereço institucional.']),
     });
     await user.type(screen.getByLabelText('Novo e-mail'), 'beatriz@ufla.br');
-    await user.type(screen.getAllByLabelText('Senha atual')[1], 'SenhaAtual123!');
+    await user.type(senhaAtual('E-mail'), 'SenhaAtual123!');
     await user.click(screen.getByRole('button', { name: 'Enviar link de confirmação' }));
 
     const newEmail = await screen.findByLabelText('Novo e-mail');
@@ -235,7 +240,7 @@ describe('Minha conta', () => {
       requestEmailChange: () => apiError(429, 'Muitas solicitações.', undefined, { 'Retry-After': '2' }),
     });
     await user.type(screen.getByLabelText('Novo e-mail'), 'beatriz@ufla.br');
-    await user.type(screen.getAllByLabelText('Senha atual')[1], 'SenhaAtual123!');
+    await user.type(senhaAtual('E-mail'), 'SenhaAtual123!');
     await user.click(screen.getByRole('button', { name: 'Enviar link de confirmação' }));
 
     expect((await screen.findByRole('alert')).textContent).toContain('Tente novamente em 2 segundos.');
@@ -292,5 +297,22 @@ describe('Minha conta', () => {
     expect(screen.getByRole('link', { name: 'Minha conta' })).toBeTruthy();
     expect(screen.queryByRole('button', { name: /reenviar/i })).toBeNull();
     expect(calls.filter((call) => call.path === '/api/v1/auth/confirmar-troca-email')).toHaveLength(1);
+  });
+
+  it('e-mail e senha começam fechados, abrem no lugar e o olho mostra a senha', async () => {
+    const { user } = await openProfile();
+    expect(screen.queryByLabelText('Nova senha')).toBeNull();
+    const alterar = screen.getByRole('button', { name: 'Alterar senha' });
+    expect(alterar.getAttribute('aria-expanded')).toBe('false');
+    await user.click(alterar);
+    const nova = screen.getByLabelText('Nova senha') as HTMLInputElement;
+    expect(nova.type).toBe('password');
+    const olhos = screen.getAllByRole('button', { name: 'Mostrar senha' });
+    expect(olhos).toHaveLength(3);
+    await user.click(olhos[1]);
+    expect(nova.type).toBe('text');
+    expect(screen.getByRole('button', { name: 'Ocultar senha' }).getAttribute('aria-pressed')).toBe('true');
+    await user.click(screen.getByRole('button', { name: 'Cancelar' }));
+    expect(screen.queryByLabelText('Nova senha')).toBeNull();
   });
 });

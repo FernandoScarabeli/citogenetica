@@ -1,0 +1,151 @@
+/* Lâmina aberta numa página só, no fluxo dos registros antigos: cartões por fase → resumo → IM → observações → histórico. */
+.detail .detail-actions { align-items: center; }
+/* Ações da lâmina com cor: verde suave em Exportar/Editar, vermelho suave na lixeira (ação perigosa). Cor no hover = 150ms ease. */
+.labs-app .detail .detail-actions .button.secondary { border-color: var(--lab-tint-line); background: var(--lab-tint); color: var(--lab-tint-ink); transition: background-color 150ms ease, border-color 150ms ease; }
+.labs-app .detail .detail-actions .button.secondary svg { color: currentColor; }
+.labs-app .detail .detail-actions .button.secondary.is-danger { border-color: var(--lab-bad-line); background: var(--lab-bad-bg); color: var(--lab-bad-ink); }
+@media (hover: hover) and (pointer: fine) {
+  .labs-app .detail .detail-actions .button.secondary:not(:disabled):hover { background: var(--lab-tint-hover); }
+  .labs-app .detail .detail-actions .button.secondary.is-danger:not(:disabled):hover { background: var(--lab-bad-bg-strong); }
+}
+.labs-app .detail .detail-actions .action-menu-chevron { color: currentColor; }
+.detail section + section,.detail .history-section { margin-top: 36px; }
+.detail .count-section { margin-top: 32px; }
+.detail .count-section .section-heading { margin-bottom: 14px; }
+
+/* Cartões de fase */
+.phase-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; }
+.phase-card { display: grid; gap: 12px; min-width: 0; padding: 14px; border: 1px solid var(--lab-line, #e3e8e3); border-radius: 6px; background: var(--lab-surface, #fff); }
+.phase-card.is-adjusting { border-color: var(--lab-accent, #263d32); }
+.phase-card-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; min-height: 28px; }
+.phase-card-head h3 { margin: 0; overflow-wrap: anywhere; color: var(--lab-ink, #212924); font-size: var(--fs-body); line-height: var(--lh-body); font-weight: 600; }
+.detail .phase-card .phase-adjust { flex: none; width: 32px; height: 32px; margin: -4px -6px -4px 0; border-radius: 4px; color: var(--lab-muted, #59675e); }
+.detail .phase-card .phase-adjust:hover:not(:disabled),.detail .phase-card .phase-adjust[aria-expanded="true"] { background: var(--lab-ground, #edf1ed); color: var(--lab-ink, #212924); }
+
+.phase-counts,.phase-buttons { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.phase-count { display: grid; justify-items: center; gap: 2px; padding: 8px 6px 7px; border-radius: 4px; font-variant-numeric: tabular-nums; }
+.phase-count strong { font-size: 22px; line-height: 28px; font-weight: 600; }
+.phase-count span { font-size: var(--fs-micro); line-height: var(--lh-micro); opacity: .8; }
+.phase-count.is-normal { background: #e7f1ea; color: #2b5239; }
+.phase-count.is-abnormal { background: #f7e8e5; color: #83392f; }
+
+/* Contar é a ação mais repetida do sistema: o botão responde na hora, sem animação (só a cor ao apertar). */
+.detail .phase-card .count-button { display: inline-flex; align-items: center; justify-content: center; gap: 4px; width: 100%; min-width: 0; height: 40px; min-height: 0; padding: 0 6px; border: 1px solid; border-radius: 4px; background: var(--lab-surface, #fff); font-size: var(--fs-caption); line-height: var(--lh-caption); font-weight: 550; white-space: nowrap; touch-action: manipulation; transition: none; }
+.detail .phase-card .count-button.is-normal { border-color: #8db59a; color: #2b5239; }
+.detail .phase-card .count-button.is-abnormal { border-color: #d6a29a; color: #83392f; }
+@media (hover: hover) and (pointer: fine) {
+  .detail .phase-card .count-button.is-normal:hover { background: #f1f7f2; }
+  .detail .phase-card .count-button.is-abnormal:hover { background: #fbf3f1; }
+}
+.detail .phase-card .count-button.is-normal:active { background: #dcebe0; }
+.detail .phase-card .count-button.is-abnormal:active { background: #f3dfdb; }
+
+.detail .batch-editor { margin-top: 12px; border: 1px solid var(--lab-accent, #263d32); }
+
+/* Ajuste de quantidade: ação ocasional, então pode ter movimento (skill animate).
+   Entrada do painel e das partes que surgem nele: opacidade + 6px, 200ms, ease-out forte. */
+.detail .batch-editor,.detail .batch-editor :is(.combo-list, .type-checklist) { animation: batch-in 200ms cubic-bezier(0.23, 1, 0.32, 1); }
+@keyframes batch-in { from { opacity: 0; translate: 0 -6px; } }
+
+/* Seletores Adicionar/Remover e Normal/Anormal: um fundo desliza até a opção escolhida
+   (movimento na tela = ease-in-out forte, 220ms). O peso da letra fica fixo para o texto não pular. */
+.detail .batch-choice { position: relative; isolation: isolate; }
+.detail .batch-choice::before { content: ""; position: absolute; z-index: -1; top: 3px; bottom: 3px; left: 3px; width: calc(50% - 4px); border-radius: 3px; background: #e5eee6; transition: translate 220ms cubic-bezier(0.77, 0, 0.175, 1); }
+.detail .batch-choice:has(> button:nth-child(2)[aria-pressed="true"])::before { translate: calc(100% + 2px) 0; }
+.detail .batch-choice:not(:has(> button[aria-pressed="true"]))::before { opacity: 0; }
+.detail .batch-choice button { font-weight: 550; transition: color 220ms ease; }
+.detail .batch-choice button[aria-pressed="true"] { background: transparent; font-weight: 550; }
+html[data-appearance="dark"] .detail .batch-choice::before { background: var(--lab-good-bg-strong); }
+html[data-appearance="dark"] .labs-app .detail .batch-choice button[aria-pressed="true"] { background: transparent; }
+
+/* Botão final troca de verde (adicionar) para vermelho (remover) suavemente. */
+.detail .batch-submit { transition: background-color 200ms ease, border-color 200ms ease; }
+
+
+/* Resumo */
+.report-section h2,.history-section summary > span { margin: 0 0 14px; }
+.summary-table tfoot :is(th, td) { border-top: 1px solid var(--lab-line, #e3e8e3); border-bottom: 0; color: var(--lab-ink, #212924); font-weight: 600; }
+.summary-table tfoot th { text-align: left; font-size: var(--fs-caption); line-height: var(--lh-caption); }
+.summary-table td:first-child { color: var(--lab-ink, #212924); }
+.summary-table :is(th, td):last-child { text-align: left; }
+.summary-table .summary-types { min-width: 200px; color: var(--lab-muted, #59675e); }
+.summary-table .summary-types span { display: block; }
+.summary-table .summary-types span + span { margin-top: 2px; }
+.index-box { display: grid; gap: 4px; margin-top: 12px; padding: 14px 18px; border: 1px solid var(--lab-line, #e3e8e3); border-radius: 6px; background: var(--lab-ground, #edf1ed); color: var(--lab-muted, #59675e); font-size: var(--fs-caption); line-height: var(--lh-caption); }
+.index-box p { margin: 0; }
+.index-box .index-formula { color: var(--lab-ink, #212924); font-size: var(--fs-body); line-height: var(--lh-body); font-weight: 600; font-variant-numeric: tabular-nums; }
+
+/* Observações */
+.notes-section { display: grid; gap: 12px; }
+.notes-section > label { color: var(--lab-ink, #212924); font-weight: 550; }
+.notes-section textarea { width: 100%; min-height: 110px; padding: 12px; border: 1px solid var(--lab-line, #e3e8e3); border-radius: 6px; background: var(--lab-surface, #fff); color: var(--lab-ink, #212924); font: inherit; font-size: var(--fs-body); line-height: var(--lh-body); resize: vertical; }
+.notes-section .notes-status { min-height: 18px; margin: -4px 0 0; color: var(--lab-muted, #59675e); font-size: var(--fs-micro); line-height: var(--lh-micro); }
+
+/* Histórico: fica recolhido; abrir é ocasional, então a seta gira e o conteúdo aparece com um fade curto. */
+.history-section { border-top: 1px solid var(--lab-line, #e3e8e3); padding-top: 4px; }
+.history-section summary { display: flex; align-items: center; justify-content: space-between; min-height: 52px; color: var(--lab-ink, #212924); cursor: pointer; list-style: none; }
+.history-section summary::-webkit-details-marker { display: none; }
+.history-section summary > span { margin: 0; }
+.history-section summary svg { color: var(--lab-muted, #59675e); transition: rotate 200ms cubic-bezier(0.23, 1, 0.32, 1); }
+.history-section[open] summary svg { rotate: 180deg; }
+.history-section[open] .history-content { animation: history-in 200ms cubic-bezier(0.23, 1, 0.32, 1); }
+@keyframes history-in { from { opacity: 0; translate: 0 -4px; } }
+
+/* Modo escuro: mesmas cores em tons escuros. */
+html[data-appearance="dark"] .phase-count.is-normal { background: var(--lab-good-bg); color: var(--lab-good-ink); }
+html[data-appearance="dark"] .phase-count.is-abnormal { background: var(--lab-bad-bg); color: var(--lab-bad-ink); }
+html[data-appearance="dark"] .detail .phase-card .count-button { background: var(--lab-surface); }
+html[data-appearance="dark"] .detail .phase-card .count-button.is-normal { border-color: var(--lab-good-line); color: var(--lab-good-ink); }
+html[data-appearance="dark"] .detail .phase-card .count-button.is-abnormal { border-color: var(--lab-bad-line); color: var(--lab-bad-ink); }
+html[data-appearance="dark"] .detail .phase-card .count-button.is-normal:active { background: var(--lab-good-bg-strong); }
+html[data-appearance="dark"] .detail .phase-card .count-button.is-abnormal:active { background: var(--lab-bad-bg-strong); }
+@media (hover: hover) and (pointer: fine) {
+  html[data-appearance="dark"] .detail .phase-card .count-button.is-normal:hover { background: var(--lab-good-bg); }
+  html[data-appearance="dark"] .detail .phase-card .count-button.is-abnormal:hover { background: var(--lab-bad-bg); }
+}
+
+@media (max-width: 1000px) { .phase-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+@media (max-width: 760px) { .phase-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+/* No celular continuam 2 cartões por linha, para ver mais fases sem rolar enquanto se conta ao microscópio. */
+@media (max-width: 480px) {
+  .phase-grid { gap: 8px; }
+  .phase-card { gap: 8px; padding: 10px; }
+  .phase-counts,.phase-buttons { gap: 6px; }
+  .phase-count strong { font-size: 20px; line-height: 26px; }
+  .detail .phase-card .count-button { height: 44px; gap: 2px; padding: 0 2px; font-size: 13px; }
+  .detail .phase-card .count-button svg { width: 13px; height: 13px; }
+  .detail .detail-actions { width: 100%; }
+  .detail .detail-actions .action-menu { flex: 1; }
+  .detail .detail-actions .action-menu-trigger { width: 100%; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .detail .batch-editor,.detail .batch-editor :is(.combo-list, .type-checklist) { animation: batch-fade 200ms ease; }
+  @keyframes batch-fade { from { opacity: 0; } }
+  .detail .batch-choice::before { transition: none; }
+  .history-section summary svg { transition: none; }
+  .history-section[open] .history-content { animation: history-fade 200ms ease; }
+  @keyframes history-fade { from { opacity: 0; } }
+}
+
+/* Janela de célula anormal: abre a cada célula anormal (dezenas de vezes por dia), então não anima ao abrir.
+   Todas as opções aparecem de uma vez, sem rolagem interna; a fase vai no título. */
+dialog.abnormal-dialog { width: min(560px, calc(100% - 32px)); }
+.abnormal-dialog .type-checklist { margin-top: 4px; }
+.abnormal-dialog .type-checklist legend { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; }
+.abnormal-dialog .modal-description { margin-bottom: 14px; }
+.abnormal-dialog .type-buttons,.abnormal-dialog .type-options { max-height: none; overflow: visible; }
+.abnormal-dialog .type-buttons { grid-template-columns: repeat(2, minmax(0, 1fr)); padding: 0; }
+.abnormal-dialog .type-button { touch-action: manipulation; }
+.abnormal-dialog .type-button-other { display: inline-flex; align-items: center; gap: 6px; border-style: dashed; border-color: var(--lab-accent, #263d32); background: var(--lab-surface, #fff); color: var(--lab-accent, #263d32); font-weight: 550; }
+.abnormal-dialog .type-button-other[aria-expanded="true"] { border-style: solid; background: var(--lab-ground, #edf1ed); }
+.abnormal-dialog .multi-hint { margin: 14px 0 0; color: var(--lab-muted, #59675e); font-size: var(--fs-caption); line-height: var(--lh-caption); }
+.abnormal-dialog .multi-hint .multi-toggle { margin: 0; padding: 0; font-size: inherit; }
+html[data-appearance="dark"] .abnormal-dialog .type-button-other { border-color: var(--lab-accent); color: var(--lab-accent); }
+
+/* No celular vira uma folha presa embaixo da tela, na altura do polegar, com as opções em 2 colunas. */
+@media (max-width: 600px) {
+  dialog.abnormal-dialog { width: 100%; max-width: 100%; max-height: 92dvh; margin: auto 0 0; padding: 20px 16px calc(16px + env(safe-area-inset-bottom)); border-width: 1px 0 0; border-radius: 12px 12px 0 0; overflow-y: auto; }
+  .abnormal-dialog .type-button { min-height: 52px; padding: 8px 10px; font-size: 14px; line-height: 18px; }
+  .abnormal-dialog .modal-actions { margin-top: 18px; }
+  .abnormal-dialog .modal-actions .button { flex: 1; height: 44px; }
+}

@@ -1,7 +1,3 @@
-.labs-app .admin-account { gap: 14px; }
-.labs-app .admin-identity { display: grid; min-width: 0; gap: 2px; text-align: right; }
-.labs-app .admin-identity strong { max-width: 220px; overflow: hidden; font-size: 13px; font-weight: 550; text-overflow: ellipsis; white-space: nowrap; }
-.labs-app .admin-identity small { max-width: 220px; overflow: hidden; color: var(--lab-muted); font-size: 12px; text-overflow: ellipsis; white-space: nowrap; }
 .labs-app .admin-back { display: inline-flex; align-items: center; gap: 4px; min-height: 40px; margin-bottom: 8px; color: var(--lab-muted); font-size: 13px; text-decoration: none; }
 .labs-app .admin-back:hover { color: var(--lab-ink); text-decoration: underline; text-underline-offset: 3px; }
 .labs-app .admin-forbidden { align-content: center; justify-items: start; display: grid; gap: 12px; max-width: 640px; }
@@ -11,13 +7,6 @@
 .admin-filters { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px 20px; margin-bottom: 16px; }
 .admin-search { display: flex; flex: 1 1 320px; max-width: 480px; gap: 8px; }
 .admin-search .laboratory-search { flex: 1; width: auto; margin: 0; }
-.admin-state-filter { display: inline-flex; border: 1px solid var(--lab-line); border-radius: 5px; background: var(--lab-surface); }
-.admin-state-filter button:first-child { border-radius: 4px 0 0 4px; }
-.admin-state-filter button:last-child { border-radius: 0 4px 4px 0; }
-.admin-state-filter button { min-height: 40px; padding: 0 14px; border: 0; border-right: 1px solid var(--lab-line); background: transparent; color: var(--lab-ink); font-size: 13px; }
-.admin-state-filter button:last-child { border-right: 0; }
-.admin-state-filter button:hover { background: var(--lab-ground); }
-.admin-state-filter button.selected { background: var(--lab-accent); color: var(--lab-surface); font-weight: 550; }
 .admin-table-wrap { border: 1px solid var(--lab-line); border-radius: 6px; background: var(--lab-surface); }
 .labs-app .admin-table { width: 100%; table-layout: fixed; border-collapse: collapse; }
 .labs-app .admin-table th,.labs-app .admin-table td { padding: 14px 18px; border-bottom: 1px solid var(--lab-line); color: var(--lab-ink); font-size: 13px; line-height: 20px; text-align: left; vertical-align: top; overflow-wrap: anywhere; }
@@ -41,9 +30,8 @@
   .admin-search { max-width: none; }
 }
 @media (max-width: 700px) {
-  .labs-app .admin-identity { display: none; }
-  .admin-state-filter { width: 100%; }
-  .admin-state-filter button { flex: 1; min-height: 44px; }
+  .admin-state-filter { display: flex; width: 100%; }
+  .admin-state-filter .segmented-option { flex: 1; min-height: 44px; }
 }
 @media (max-width: 900px) {
   .admin-table-wrap { border: 0; background: transparent; }
@@ -56,3 +44,26 @@
   .admin-pagination { align-items: stretch; flex-direction: column; }
   .admin-pagination div .button { flex: 1; }
 }
+
+/* Espaço no fim da página, abaixo da paginação. */
+.labs-app .admin-labs { padding-bottom: 48px; }
+
+/* Tabela ao trocar filtro, busca ou página (skill animate).
+   Sem piscar: só esmaece se o carregamento passar de 150ms (carregamentos rápidos não mudam nada).
+   Linhas novas entram em cascata (25ms entre elas), 220ms ease-out, só opacity + transform:
+   da direita em "Próxima", da esquerda em "Anterior", de baixo ao filtrar ou buscar. */
+.admin-results { transition: opacity 150ms ease; }
+.admin-results.is-loading { opacity: .55; transition-delay: 150ms; }
+.admin-rows tr { animation: admin-row-up 220ms cubic-bezier(0.23, 1, 0.32, 1) both; animation-delay: calc(var(--row, 0) * 25ms); }
+.admin-rows.is-next tr { animation-name: admin-row-next; }
+.admin-rows.is-previous tr { animation-name: admin-row-previous; }
+@keyframes admin-row-up { from { opacity: 0; translate: 0 6px; } }
+@keyframes admin-row-next { from { opacity: 0; translate: 12px 0; } }
+@keyframes admin-row-previous { from { opacity: 0; translate: -12px 0; } }
+@media (prefers-reduced-motion: reduce) {
+  .admin-results { transition: none; }
+  .admin-rows tr,.admin-rows.is-next tr,.admin-rows.is-previous tr { animation: admin-row-fade 180ms ease both; animation-delay: 0ms; }
+  @keyframes admin-row-fade { from { opacity: 0; } }
+}
+/* Recarregar no mesmo lugar (depois de desativar/reativar): sem animação. */
+.admin-rows.is-none tr { animation: none; }

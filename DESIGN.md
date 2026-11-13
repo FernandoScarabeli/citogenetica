@@ -120,8 +120,31 @@ a opacidade muda.
 
 ## Movimento entre abas
 
-As abas de gestão usam os tokens de Fluid Functionalism em `src/lib/springs.ts`,
-com entrada `moderate` de 160ms e saída de 120ms, sem quique. O conteúdo combina
-fade com deslocamento curto. Abas em saída ficam inertes e fora da árvore de
-acessibilidade. A preferência por movimento reduzido mantém somente o fade.
-Motion carrega seus recursos de animação em um arquivo separado, sob demanda.
+As abas de gestão usam só CSS (`src/components/ui/tab-transition.css`), sem
+biblioteca de animação. A linha da aba ativa desliza até a aba escolhida em
+220ms (`cubic-bezier(0.77, 0, 0.175, 1)`), com `translateX` + `scaleX`. O
+conteúdo antigo sai na hora, sem sobrepor; o novo entra em 200ms
+(`cubic-bezier(0.23, 1, 0.32, 1)`) com opacidade e 8px vindo do lado da aba
+escolhida. Com movimento reduzido, a linha pula direto e o conteúdo só esmaece.
+
+## Modo escuro
+
+Fundos e linhas em cinza neutro (grafite); o verde aparece só nos detalhes:
+ações principais, abas, links, foco e a contagem normal. As cores ficam em
+tokens no começo de `src/laboratories.css` (`.labs-app` para o claro e
+`html[data-appearance="dark"] .labs-app` para o escuro); as telas usam só os
+tokens, nunca cores escritas direto.
+
+| Token | Escuro | Uso |
+|---|---|---|
+| `--lab-background` | `#141517` | fundo da página |
+| `--lab-surface` | `#1c1d20` | cartões, tabelas, janelas |
+| `--lab-ground` | `#26282c` | preenchimentos e passar o mouse |
+| `--lab-line` / `--lab-line-strong` | `#34363b` / `#4a4d53` | divisórias / bordas de campos e botões |
+| `--lab-ink` / `--lab-muted` | `#ececee` / `#a3a6ad` | texto / texto secundário |
+| `--lab-accent` | `#6dbf8f` | detalhes em verde (links, abas, foco) |
+| `--lab-primary` | `#2f7a52` | fundo dos botões principais (texto branco) |
+| `--lab-good-*` / `--lab-bad-*` / `--lab-tint*` | verdes e vermelhos escuros | contagem normal/anormal, erros, etiquetas |
+
+Contraste conferido: texto 14:1, texto secundário 6,9:1, verde 7,6:1 sobre as
+superfícies, texto branco 5,2:1 sobre o botão principal.

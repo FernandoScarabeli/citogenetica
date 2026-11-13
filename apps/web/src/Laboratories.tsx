@@ -1,5 +1,5 @@
 import { Fragment, useCallback, useEffect, useRef, useState, type FormEvent, type ReactNode } from 'react';
-import { ArrowRight, ChevronDown, ChevronRight, LogOut, Moon, Microscope, Plus, Search, ShieldCheck, UserRound, X } from 'lucide-react';
+import { ArrowRight, ChevronRight, LogOut, Microscope, Plus, Search, Settings, X } from 'lucide-react';
 import { Link, useLocation, useNavigate } from 'react-router';
 import { isConflict, isForbidden, isNotFound, isUnauthorized } from './api/errors';
 import type { LaboratorioResponseDTO, PapelLaboratorio, ParticipacaoResponseDTO } from './api/contracts/laboratorio';
@@ -15,11 +15,12 @@ import { typeClass } from './lib/type-scale';
 import './laboratories.css';
 import './laboratory-management.css';
 import { FloatingNotice } from './components/ui/floating-notice';
-import { TabTransition } from './components/ui/tab-transition';
+import { TabIndicator, TabTransition } from './components/ui/tab-transition';
 import { loadPreferences, savePreferences } from './preferences';
 import type { UsuarioResponseDTO } from './api/contracts/usuario';
 import { ProfileSettings } from './app/ProfileSettings';
 import { NotificationCenter } from './NotificationCenter';
+import { AccountMenu } from './app/AccountMenu';
 
 const initialPreferences = loadPreferences();
 type Confirmation = { kind: 'leave' } | { kind: 'remove'; participation: ParticipacaoResponseDTO };
@@ -32,60 +33,28 @@ function hasRole(papeis: PapelLaboratorio[], papel: PapelLaboratorio): boolean {
   return papeis.includes(papel);
 }
 
-function isCurrentUser(participation: ParticipacaoResponseDTO, email: string): boolean {
-  return !!participation.email && participation.email.trim().toLocaleLowerCase('pt-BR') === email.trim().toLocaleLowerCase('pt-BR');
+/** Ordem das abas de Gerenciar, para a troca entrar do lado certo. */
+const ORDEM_ABAS: AbaGerenciar[] = ['membros', 'orientacao', 'convites', 'configuracoes'];
+
+/** Todo laboratório tem o papel Membro; ele só aparece quando é o único. */
+function papeisPrincipais(papeis: PapelLaboratorio[]): string {
+  const principais = (['ADMIN', 'ORIENTADOR'] as const).filter(papel => papeis.includes(papel));
+  return (principais.length ? principais : ['MEMBRO' as const]).map(papel => PAPEL_LABEL[papel]).join(', ');
 }
 
-function AccountMenu({ name, email, photo, dark, platformAdmin, onProfile, onAppearance, onLogout }: {
-  name: string;
-  email: string;
-  photo?: string;
-  dark: boolean;
-  platformAdmin: boolean;
-  onProfile: () => void;
-  onAppearance: () => void;
-  onLogout: () => void;
-}) {
-  const [open, setOpen] = useState(false);
-  const root = useRef<HTMLDivElement>(null);
-  const trigger = useRef<HTMLButtonElement>(null);
+function porNome(a: LaboratorioResponseDTO, b: LaboratorioResponseDTO): number {
+  return a.nome.localeCompare(b.nome, 'pt-BR', { sensitivity: 'base', numeric: true });
+}
 
-  useEffect(() => {
-    if (!open) return;
-    function outside(event: PointerEvent) {
-      if (!root.current?.contains(event.target as Node)) setOpen(false);
-    }
-    function key(event: KeyboardEvent) {
-      if (event.key === 'Escape') {
-        setOpen(false);
-        trigger.current?.focus();
-      }
-    }
-    document.addEventListener('pointerdown', outside);
-    document.addEventListener('keydown', key);
-    return () => {
-      document.removeEventListener('pointerdown', outside);
-      document.removeEventListener('keydown', key);
-    };
-  }, [open]);
+/** undefined = ainda carregando; null = não foi possível saber. */
+function SlideCount({ total }: { total: number | null | undefined }) {
+  if (total === undefined) return <span className="laboratory-count-skeleton" aria-label="Carregando" />;
+  if (total === null) return <span aria-label="Não disponível">—</span>;
+  return <>{total}<span className="laboratory-count-unit"> {total === 1 ? 'lâmina' : 'lâminas'}</span></>;
+}
 
-  const initial = name.charAt(0).toLocaleUpperCase('pt-BR');
-  return <div className="account-menu" ref={root}>
-    <button ref={trigger} type="button" className="account-trigger" aria-label="Menu do perfil" aria-expanded={open} aria-controls={open ? 'account-panel' : undefined} onClick={() => setOpen(value => !value)}>
-      <span className="account-initial" aria-hidden="true">{photo ? <img src={photo} alt="" /> : initial}</span>
-      <span className="account-trigger-identity"><span className="account-trigger-name">{name}</span><span className="account-trigger-email">{email}</span></span>
-      <ChevronDown size={16} aria-hidden="true" />
-    </button>
-    {open && <div className="account-panel" id="account-panel" role="group" aria-label="Menu do perfil">
-      <div className="account-panel-identity"><span className="account-initial" aria-hidden="true">{photo ? <img src={photo} alt="" /> : initial}</span><div><strong>{name}</strong><small>{email}</small></div></div>
-      <div className="account-panel-actions">
-        <button type="button" onClick={() => { setOpen(false); onProfile(); }}><UserRound size={18} aria-hidden="true" />Configurações do perfil</button>
-        {platformAdmin && <Link to="/admin/laboratorios" onClick={() => setOpen(false)}><ShieldCheck size={18} aria-hidden="true" />Administração da plataforma</Link>}
-        <button type="button" aria-pressed={dark} onClick={onAppearance}><Moon size={18} aria-hidden="true" /><span>Modo escuro</span><span className="account-switch" aria-hidden="true"><span /></span></button>
-      </div>
-      <div className="account-panel-footer"><button type="button" onClick={() => { setOpen(false); onLogout(); }}><LogOut size={18} aria-hidden="true" />Sair</button></div>
-    </div>}
-  </div>;
+function isCurrentUser(participation: ParticipacaoResponseDTO, email: string): boolean {
+  return !!participation.email && participation.email.trim().toLocaleLowerCase('pt-BR') === email.trim().toLocaleLowerCase('pt-BR');
 }
 
 function CreateLaboratoryDialog({ name, error, busy, onName, onClose, onSubmit }: {
@@ -171,6 +140,7 @@ export function Laboratories({ user, onLogout, onUserUpdate, renderSlides, api =
   const [slidesStatus, setSlidesStatus] = useState<'loading' | 'ready' | 'error'>('loading');
   const [slidesRetry, setSlidesRetry] = useState(0);
   const [migrationTick, setMigrationTick] = useState(0);
+  const [slideTotals, setSlideTotals] = useState<Map<string, number> | null>(null);
   const [query, setQuery] = useState('');
   const [memberQuery, setMemberQuery] = useState('');
   const [pageError, setPageError] = useState('');
@@ -236,6 +206,17 @@ export function Laboratories({ user, onLogout, onUserUpdate, renderSlides, api =
       setMigrationTick(value => value + 1);
     });
   }, [listStatus, labs, api, user.id]);
+
+  // O número de lâminas é um extra da lista: se falhar, a coluna fica com um traço e o resto da tela segue normal.
+  useEffect(() => {
+    if (listStatus !== 'ready' || labs.length === 0) return;
+    const controller = new AbortController();
+    setSlideTotals(null);
+    api.contarLaminasPorLaboratorio(labs.map(lab => lab.id), controller.signal)
+      .then(totals => { if (!controller.signal.aborted) setSlideTotals(totals); })
+      .catch(() => { if (!controller.signal.aborted) setSlideTotals(new Map()); });
+    return () => controller.abort();
+  }, [listStatus, labs, api, migrationTick]);
 
   const returnToListForMissingLab = useCallback((message = 'Este laboratório não está mais disponível para sua participação.') => {
     setCurrentLab(null);
@@ -514,7 +495,7 @@ export function Laboratories({ user, onLogout, onUserUpdate, renderSlides, api =
   const section = requestedSection === 'convites' && !(currentLab?.estado === 'ATIVO' && hasRole(currentLab.papeis, 'ADMIN')) ? 'membros' : requestedSection;
   const slidesReady = slidesStatus === 'ready' && (selectedId === null || slidesLab?.id === selectedId);
   const admin = currentLab?.estado === 'ATIVO' && hasRole(currentLab.papeis, 'ADMIN');
-  const visibleLabs = labs.filter(lab => lab.nome.toLocaleLowerCase('pt-BR').includes(query.trim().toLocaleLowerCase('pt-BR')));
+  const visibleLabs = labs.filter(lab => lab.nome.toLocaleLowerCase('pt-BR').includes(query.trim().toLocaleLowerCase('pt-BR'))).sort(porNome);
   const visibleMembers = members.filter(participation => `${participation.nome} ${participation.email ?? ''}`
     .toLocaleLowerCase('pt-BR').includes(memberQuery.trim().toLocaleLowerCase('pt-BR')));
 
@@ -540,14 +521,19 @@ export function Laboratories({ user, onLogout, onUserUpdate, renderSlides, api =
         : view === 'list' ? <>
           <div className="page-heading"><div><h1 className={typeClass('display')}>Meus laboratórios</h1><p>{listStatus === 'ready' && labs.length === 0 ? 'Aqui ficam os laboratórios de que você participa.' : 'Escolha onde você vai continuar sua pesquisa.'}</p></div><button className="button primary" type="button" onClick={() => { setCreateName(''); setPageError(''); setCreateOpen(true); }}><Plus size={17} aria-hidden="true" />Criar laboratório</button></div>
           <section className="laboratory-list-section" aria-labelledby="laboratory-list-title">
-            <div className="section-heading"><h2 id="laboratory-list-title">Laboratórios</h2><label className="laboratory-search"><Search size={16} aria-hidden="true" /><span className="sr-only">Buscar laboratório</span><input type="search" value={query} onChange={event => setQuery(event.target.value)} placeholder="Buscar laboratório" /></label></div>
-            {listStatus === 'loading' ? <div className="laboratory-loading" aria-live="polite"><p>Carregando laboratórios…</p><span /><span /><span /></div>
+            <div className="section-heading"><h2 id="laboratory-list-title">Laboratórios{listStatus === 'ready' && labs.length > 0 && <span className="count-badge laboratory-total">{labs.length}</span>}</h2><label className="laboratory-search"><Search size={16} aria-hidden="true" /><span className="sr-only">Buscar laboratório</span><input type="search" value={query} onChange={event => setQuery(event.target.value)} placeholder="Buscar laboratório" /></label></div>
+            {listStatus === 'loading' ? <div className="laboratory-table laboratory-table-skeleton" role="status" aria-busy="true"><span className="sr-only">Carregando laboratórios…</span>{[0, 1, 2, 3].map(row => <div className="laboratory-skeleton-row" key={row} aria-hidden="true"><span /><span /><span /><span /></div>)}</div>
               : listStatus === 'error' ? <div className="laboratory-empty"><p>{listError}</p><button className="button secondary" type="button" onClick={() => void loadLabs()}>Tentar novamente</button></div>
-                : visibleLabs.length ? <div className="laboratory-grid">{visibleLabs.map(lab => <article className="laboratory-card" key={lab.id}>
-                  <div className="laboratory-card-heading"><h3>{lab.nome}</h3><span className={`laboratory-state ${lab.estado === 'ATIVO' ? 'is-active' : 'is-disabled'}`}>{lab.estado === 'ATIVO' ? 'Ativo' : 'Desativado'}</span></div>
-                  <div className="laboratory-card-meta"><span>Seus papéis</span><div className="role-chips">{lab.papeis.map(role => <span className="role-chip" key={role}>{PAPEL_LABEL[role]}</span>)}</div></div>
-                  <div className="laboratory-card-actions"><button className="text-button laboratory-card-open" type="button" onClick={() => openSlides(lab)}>Abrir lâminas <ArrowRight size={15} aria-hidden="true" /></button><button className="text-button laboratory-card-manage" type="button" onClick={() => openManage(lab)}>Gerenciar</button></div>
-                </article>)}</div>
+                : visibleLabs.length ? <table className="laboratory-table">
+                  <thead><tr><th scope="col" aria-sort="ascending">Laboratório</th><th scope="col">Seu papel</th><th scope="col" className="is-number">Lâminas</th><th scope="col" colSpan={2}><span className="sr-only">Ações</span></th></tr></thead>
+                  <tbody>{visibleLabs.map(lab => <tr key={lab.id} className={lab.estado === 'DESATIVADO' ? 'is-disabled' : undefined}>
+                    <th scope="row"><button className="laboratory-row-open" type="button" onClick={() => openSlides(lab)}>{lab.nome}</button>{lab.estado === 'DESATIVADO' && <span className="laboratory-state is-disabled">Desativado</span>}</th>
+                    <td className="laboratory-row-role">{papeisPrincipais(lab.papeis)}<span className="laboratory-row-separator" aria-hidden="true">·</span></td>
+                    <td className="is-number laboratory-row-count"><SlideCount total={slideTotals === null ? undefined : slideTotals.get(lab.id) ?? null} /></td>
+                    <td className="laboratory-row-actions"><button className="icon-button laboratory-row-manage" type="button" aria-label={`Gerenciar ${lab.nome}`} title="Gerenciar" onClick={() => openManage(lab)}><Settings size={17} aria-hidden="true" /></button></td>
+                    <td className="laboratory-row-chevron" aria-hidden="true"><ChevronRight size={18} /></td>
+                  </tr>)}</tbody>
+                </table>
                   : <div className="laboratory-empty"><h3>{query ? 'Nenhum laboratório encontrado' : 'Nenhum laboratório ainda'}</h3><p>{query ? 'Tente outro nome.' : 'Você ainda não participa de nenhum laboratório. Se alguém vai te convidar, o convite chega por e-mail. Você também pode criar um laboratório ou usar lâminas avulsas.'}</p>{query && <button className="text-button" type="button" onClick={() => setQuery('')}>Limpar busca</button>}</div>}
           </section>
           <section className="loose-slides"><div><h2>Lâminas avulsas</h2><p>Lâminas que não pertencem a nenhum laboratório.</p></div><button className="text-button" type="button" onClick={() => openSlides(null)}>Abrir lâminas avulsas <ArrowRight size={16} aria-hidden="true" /></button></section>
@@ -557,8 +543,8 @@ export function Laboratories({ user, onLogout, onUserUpdate, renderSlides, api =
               : detailStatus === 'loading' || currentLab?.id !== selectedId ? <div className="laboratory-loading" aria-live="polite"><p>Carregando laboratório e membros…</p><span /><span /></div>
               : currentLab && <>
                 <div className="page-heading laboratory-detail-heading"><div><h1>{currentLab.nome}</h1><div className="laboratory-detail-meta"><span className={`laboratory-state ${currentLab.estado === 'ATIVO' ? 'is-active' : 'is-disabled'}`}>{currentLab.estado === 'ATIVO' ? 'Ativo' : 'Desativado'}</span>{currentLab.estado === 'DESATIVADO' && <span>Somente leitura</span>}</div></div><button className="button primary" type="button" onClick={() => openSlides(currentLab)}>Acessar lâminas <ArrowRight size={16} aria-hidden="true" /></button></div>
-                <div className="laboratory-management-panel"><nav className="tabs laboratory-tabs" aria-label="Gestão do laboratório"><button type="button" className={section === 'membros' ? 'selected' : ''} aria-current={section === 'membros' ? 'page' : undefined} onClick={() => openSection('membros')}>Membros <span>{members.length}</span></button><button type="button" className={section === 'orientacao' ? 'selected' : ''} aria-current={section === 'orientacao' ? 'page' : undefined} onClick={() => openSection('orientacao')}>Orientação</button>{admin && <button type="button" className={section === 'convites' ? 'selected' : ''} aria-current={section === 'convites' ? 'page' : undefined} onClick={() => openSection('convites')}>Convites</button>}<button type="button" className={section === 'configuracoes' ? 'selected' : ''} aria-current={section === 'configuracoes' ? 'page' : undefined} onClick={() => openSection('configuracoes')}>Configurações</button></nav>
-                <TabTransition tab={section}>
+                <div className="laboratory-management-panel"><nav className="tabs laboratory-tabs" aria-label="Gestão do laboratório"><button type="button" className={section === 'membros' ? 'selected' : ''} aria-current={section === 'membros' ? 'page' : undefined} onClick={() => openSection('membros')}>Membros <span>{members.length}</span></button><button type="button" className={section === 'orientacao' ? 'selected' : ''} aria-current={section === 'orientacao' ? 'page' : undefined} onClick={() => openSection('orientacao')}>Orientação</button>{admin && <button type="button" className={section === 'convites' ? 'selected' : ''} aria-current={section === 'convites' ? 'page' : undefined} onClick={() => openSection('convites')}>Convites</button>}<button type="button" className={section === 'configuracoes' ? 'selected' : ''} aria-current={section === 'configuracoes' ? 'page' : undefined} onClick={() => openSection('configuracoes')}>Configurações</button><TabIndicator active={section} /></nav>
+                <TabTransition tab={section} index={ORDEM_ABAS.indexOf(section)}>
                 {section === 'membros' ? <section className="members-section" aria-labelledby="members-title">
                   <div className="members-toolbar"><div><h2 id="members-title">Equipe do laboratório</h2></div><label className="members-search"><Search size={16} aria-hidden="true" /><span className="sr-only">Buscar membro por nome ou e-mail</span><input type="search" value={memberQuery} onChange={event => setMemberQuery(event.target.value)} placeholder="Buscar membro" /></label></div>
                   <div className="members-table-wrap"><table className="members-table"><thead><tr><th scope="col">Pessoa</th><th scope="col">Papéis</th>{admin && <th scope="col"><span className="sr-only">Ações</span></th>}</tr></thead><tbody>

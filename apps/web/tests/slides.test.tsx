@@ -97,6 +97,11 @@ async function openSlide(user: ReturnType<typeof userEvent.setup>, name = /L1 pl
 
 const normalButton = () => screen.getByRole('button', { name: /Registrar Prófase normal/ });
 const abnormalButton = () => screen.getByRole('button', { name: /Registrar Prófase anormal/ });
+/** Número mostrado no cartão da fase (o botão de contar não mostra mais o número). */
+const contagemProfase = (status: 'normal' | 'anormal' = 'normal') =>
+  screen.getByRole('article', { name: 'Prófase' }).querySelector(`.phase-count.is-${status === 'normal' ? 'normal' : 'abnormal'} strong`)!.textContent;
+const abrirHistorico = (user: ReturnType<typeof userEvent.setup>) => user.click(screen.getByText('Histórico de registros'));
+const historico = () => within(screen.getByRole('group', { name: 'Histórico de registros' }));
 
 beforeEach(() => {
   localStorage.clear();
@@ -221,7 +226,8 @@ describe('quem edita', () => {
     expect(screen.queryByRole('button', { name: /Desfazer último/ })).toBeNull();
     expect((container.querySelector('textarea') as HTMLTextAreaElement).readOnly).toBe(true);
     expect(api.listarTiposPersonalizados).not.toHaveBeenCalled();
-    expect(screen.getByText(/1 normais · 1 anormais/)).toBeTruthy();
+    expect(contagemProfase('normal')).toBe('1');
+    expect(contagemProfase('anormal')).toBe('1');
   });
 
   it('mostra tentar de novo se o detalhe falhar', async () => {
@@ -250,10 +256,10 @@ describe('contagem rápida', () => {
     const user = userEvent.setup();
     renderSlides();
     await openSlide(user);
-    expect(normalButton().textContent).toContain('1');
+    expect(contagemProfase()).toBe('1');
 
     await user.click(normalButton());
-    expect(normalButton().textContent).toContain('2');
+    expect(contagemProfase()).toBe('2');
     expect(api.criarRegistro).toHaveBeenCalledTimes(1);
     expect(api.criarRegistro).toHaveBeenCalledWith('lamina-1', expect.objectContaining({
       id: expect.stringMatching(/^[0-9a-f-]{36}$/), faseId: PROFASE, status: 'NORMAL', quantidade: 1,
@@ -264,7 +270,7 @@ describe('contagem rápida', () => {
     api.buscarResumo.mockResolvedValue({ ...RESUMO, total: 4, fases: [RESUMO.fases[0], { ...RESUMO.fases[1], normais: 2, total: 3 }] });
     resolve({});
     await waitFor(() => expect(api.buscarResumo).toHaveBeenCalledTimes(2));
-    await waitFor(() => expect(normalButton().textContent).toContain('2'));
+    await waitFor(() => expect(contagemProfase()).toBe('2'));
   });
 
   it('vários cliques rápidos viram envios em fila e um único recarregamento', async () => {
@@ -277,7 +283,7 @@ describe('contagem rápida', () => {
     await user.click(normalButton());
     await user.click(normalButton());
     await user.click(normalButton());
-    expect(normalButton().textContent).toContain('4');
+    expect(contagemProfase()).toBe('4');
     expect(api.criarRegistro).toHaveBeenCalledTimes(1);
 
     resolvers[0]({});
@@ -290,7 +296,7 @@ describe('contagem rápida', () => {
     api.buscarResumo.mockResolvedValue({ ...RESUMO, total: 6, fases: [RESUMO.fases[0], { ...RESUMO.fases[1], normais: 4, total: 5 }] });
     resolvers[2]({});
     await waitFor(() => expect(api.buscarResumo).toHaveBeenCalledTimes(2));
-    await waitFor(() => expect(normalButton().textContent).toContain('4'));
+    await waitFor(() => expect(contagemProfase()).toBe('4'));
     expect(api.buscarLamina).toHaveBeenCalledTimes(2);
   });
 
@@ -333,6 +339,7 @@ describe('anormalidades', () => {
     renderSlides();
     await openSlide(user);
     await user.click(abnormalButton());
+    expect(screen.getByRole('heading', { name: 'Célula anormal · Prófase' })).toBeTruthy();
     await user.click(screen.getByRole('button', { name: 'Stickiness' }));
 
     await waitFor(() => expect(api.criarRegistro).toHaveBeenCalledTimes(1));
@@ -347,7 +354,7 @@ describe('anormalidades', () => {
     renderSlides();
     await openSlide(user);
     await user.click(abnormalButton());
-    await user.click(screen.getByRole('button', { name: 'Outro (especificar)' }));
+    await user.click(screen.getByRole('button', { name: 'Outro…' }));
     await user.type(screen.getByLabelText('Descreva a anormalidade'), 'Fragmento');
     await user.click(screen.getByRole('button', { name: /Registrar célula/ }));
 
@@ -589,12 +596,12 @@ describe('histórico', () => {
     const user = userEvent.setup();
     renderSlides();
     await openSlide(user);
-    await user.click(screen.getByRole('tab', { name: 'Histórico' }));
+    await abrirHistorico(user);
 
-    expect(screen.getAllByRole('heading', { level: 3 }).length).toBe(1);
+    expect(historico().getAllByRole('heading', { level: 3 }).length).toBe(1);
     expect(screen.getByText(/3 células · Micronúcleo, Stickiness/)).toBeTruthy();
     await user.click(screen.getByRole('button', { name: 'Carregar mais' }));
-    await waitFor(() => expect(screen.getAllByRole('heading', { level: 3 }).length).toBe(2));
+    await waitFor(() => expect(historico().getAllByRole('heading', { level: 3 }).length).toBe(2));
     expect(api.listarRegistros).toHaveBeenLastCalledWith('lamina-1', expect.objectContaining({ page: 1 }));
     expect(screen.queryByRole('button', { name: 'Carregar mais' })).toBeNull();
   });
@@ -604,7 +611,7 @@ describe('histórico', () => {
     const user = userEvent.setup();
     renderSlides();
     await openSlide(user);
-    await user.click(screen.getByRole('tab', { name: 'Histórico' }));
+    await abrirHistorico(user);
     await user.click(screen.getAllByRole('button', { name: /^Editar\s*registro/ })[0]);
     const quantity = screen.getByLabelText('Quantidade de células');
     await user.clear(quantity);
@@ -621,7 +628,7 @@ describe('histórico', () => {
     const user = userEvent.setup();
     renderSlides();
     await openSlide(user);
-    await user.click(screen.getByRole('tab', { name: 'Histórico' }));
+    await abrirHistorico(user);
     await user.click(screen.getAllByRole('button', { name: /^Editar\s*registro/ })[0]);
     await user.click(screen.getByRole('button', { name: 'Salvar alteração' }));
 
@@ -658,7 +665,7 @@ describe('editar e excluir a lâmina', () => {
       renderSlides();
       await openSlide(user);
       expect(screen.queryByRole('button', { name: 'Salvar observações' })).toBeNull();
-      await user.type(screen.getByLabelText('Observações'), ' e mais');
+      await user.type(screen.getByLabelText('Observações da lâmina'), ' e mais');
       expect(api.atualizarLamina).not.toHaveBeenCalled();
 
       await waitFor(() => expect(api.atualizarLamina).toHaveBeenCalledTimes(1), { timeout: 3000 });
@@ -671,7 +678,7 @@ describe('editar e excluir a lâmina', () => {
       const user = userEvent.setup();
       renderSlides();
       await openSlide(user);
-      await user.type(screen.getByLabelText('Observações'), ' e mais');
+      await user.type(screen.getByLabelText('Observações da lâmina'), ' e mais');
       await user.tab();
       await waitFor(() => expect(api.atualizarLamina).toHaveBeenCalledTimes(1));
     });
@@ -681,7 +688,7 @@ describe('editar e excluir a lâmina', () => {
       const user = userEvent.setup();
       const { unmount } = renderSlides();
       await openSlide(user);
-      await user.type(screen.getByLabelText('Observações'), ' e mais');
+      await user.type(screen.getByLabelText('Observações da lâmina'), ' e mais');
       unmount();
       await waitFor(() => expect(api.atualizarLamina).toHaveBeenCalledWith('lamina-1', expect.objectContaining({ observacoes: 'Nota salva e mais' })));
     });
@@ -691,7 +698,7 @@ describe('editar e excluir a lâmina', () => {
       const user = userEvent.setup();
       renderSlides();
       await openSlide(user);
-      const campo = screen.getByLabelText('Observações') as HTMLTextAreaElement;
+      const campo = screen.getByLabelText('Observações da lâmina') as HTMLTextAreaElement;
       await user.type(campo, ' e mais');
       await user.tab();
 
@@ -733,7 +740,6 @@ describe('percentuais', () => {
     renderSlides();
     await openSlide(user);
     expect(screen.getByText('66,67%')).toBeTruthy();
-    await user.click(screen.getByRole('tab', { name: 'Resumo' }));
     expect(screen.getByText('33,33% do total')).toBeTruthy();
     expect(screen.getByText('Micronúcleo: 1 (50,00%)')).toBeTruthy();
     expect(screen.getAllByText('50,00%').length).toBeGreaterThan(0);
@@ -753,7 +759,7 @@ describe('células guardadas sem conexão', () => {
     await user.click(normalButton());
 
     expect(await screen.findByText(/Sem internet\. 2 células guardadas neste aparelho/)).toBeTruthy();
-    expect(normalButton().textContent).toContain('3');
+    expect(contagemProfase()).toBe('3');
     expect(screen.queryByRole('alert')).toBeNull();
     const salvas = guardadas();
     expect(salvas.map(item => [item.usuarioId, item.laminaId])).toEqual([[ME, 'lamina-1'], [ME, 'lamina-1']]);
@@ -783,7 +789,7 @@ describe('células guardadas sem conexão', () => {
 
     expect((await screen.findByRole('alert')).textContent).toContain('Fase inválida.');
     expect(guardadas()).toEqual([]);
-    await waitFor(() => expect(normalButton().textContent).toContain('1'));
+    await waitFor(() => expect(contagemProfase()).toBe('1'));
   });
 
   it('reenvia em ordem, um por vez, ao voltar a conexão e limpa a fila', async () => {
@@ -875,7 +881,7 @@ describe('células guardadas sem conexão', () => {
     expect(travado(screen.getAllByRole('button', { name: /Ajustar quantidade/ })[0])).toBe(true);
     expect(travado(normalButton())).toBe(false);
     expect(travado(abnormalButton())).toBe(false);
-    await user.click(screen.getByRole('tab', { name: 'Histórico' }));
+    await abrirHistorico(user);
     expect(travado(screen.getAllByRole('button', { name: /Editar/ })[0])).toBe(true);
   });
 });
@@ -891,14 +897,17 @@ describe('exportação da lâmina', () => {
   async function abrirResumo(user: ReturnType<typeof userEvent.setup>) {
     renderSlides();
     await openSlide(user);
-    await user.click(screen.getByRole('tab', { name: 'Resumo' }));
+  }
+  async function exportar(user: ReturnType<typeof userEvent.setup>, rotulo: string) {
+    await user.click(screen.getByRole('button', { name: 'Exportar' }));
+    await user.click(screen.getByRole('menuitem', { name: rotulo }));
   }
 
   it.each(botoes)('"%s" baixa da API e entrega o arquivo', async (rotulo, funcao) => {
     api[funcao].mockResolvedValue(ARQUIVO);
     const user = userEvent.setup();
     await abrirResumo(user);
-    await user.click(screen.getByRole('button', { name: rotulo }));
+    await exportar(user, rotulo);
     await waitFor(() => expect(salvarArquivo).toHaveBeenCalledWith(ARQUIVO));
     expect(api[funcao]).toHaveBeenCalledWith('lamina-1');
     expect(screen.queryByRole('button', { name: /Imprimir/ })).toBeNull();
@@ -909,38 +918,55 @@ describe('exportação da lâmina', () => {
     api.baixarLaminaRelatorioPdf.mockReturnValue(new Promise(resolve => { concluir = resolve; }));
     const user = userEvent.setup();
     await abrirResumo(user);
-    await user.click(screen.getByRole('button', { name: 'Relatório (PDF)' }));
+    await exportar(user, 'Relatório (PDF)');
     const ativo = await screen.findByRole('button', { name: 'Baixando…' });
     expect(ativo.getAttribute('aria-busy')).toBe('true');
-    for (const rotulo of ['Resumo (CSV)', 'Registros (CSV)', 'Dados completos (JSON)']) {
-      expect((screen.getByRole('button', { name: rotulo }) as HTMLButtonElement).disabled).toBe(true);
-    }
+    expect((ativo as HTMLButtonElement).disabled).toBe(true);
     concluir(ARQUIVO);
-    expect(await screen.findByRole('button', { name: 'Relatório (PDF)' })).toBeTruthy();
-    expect((screen.getByRole('button', { name: 'Resumo (CSV)' }) as HTMLButtonElement).disabled).toBe(false);
+    expect(((await screen.findByRole('button', { name: 'Exportar' })) as HTMLButtonElement).disabled).toBe(false);
   });
 
   it('mostra o erro da API e não entrega arquivo', async () => {
     api.baixarLaminaRegistrosCsv.mockRejectedValue(apiError(500, 'Falha ao gerar o arquivo.'));
     const user = userEvent.setup();
     await abrirResumo(user);
-    await user.click(screen.getByRole('button', { name: 'Registros (CSV)' }));
+    await exportar(user, 'Registros (CSV)');
     expect((await screen.findByRole('alert')).textContent).toContain('Falha ao gerar o arquivo.');
     expect(salvarArquivo).not.toHaveBeenCalled();
-    expect((screen.getByRole('button', { name: 'Registros (CSV)' }) as HTMLButtonElement).disabled).toBe(false);
+    expect((screen.getByRole('button', { name: 'Exportar' }) as HTMLButtonElement).disabled).toBe(false);
   });
 
   it('explica a falta de conexão', async () => {
     api.baixarLaminaJson.mockRejectedValue(new NetworkError());
     const user = userEvent.setup();
     await abrirResumo(user);
-    await user.click(screen.getByRole('button', { name: 'Dados completos (JSON)' }));
+    await exportar(user, 'Dados completos (JSON)');
     expect((await screen.findByRole('alert')).textContent).toContain('Sem conexão');
   });
 });
 
 describe('exportação das listas de lâminas', () => {
-  const grupo = () => screen.queryByRole('group', { name: 'Exportar todas as lâminas' });
+  const menu = () => screen.queryByRole('button', { name: /exportar/i });
+  async function exportar(user: ReturnType<typeof userEvent.setup>, rotulo: string) {
+    await user.click(menu()!);
+    await user.click(screen.getByRole('menuitem', { name: rotulo }));
+  }
+
+  it('um botão só abre o menu com importar e as três exportações; Esc fecha e devolve o foco', async () => {
+    const user = userEvent.setup();
+    renderSlides({ laboratory: ACTIVE_LAB });
+    await screen.findByRole('button', { name: /L1 planta A/ });
+    expect(menu()!.textContent).toBe('Importar e exportar');
+    await user.click(menu()!);
+    expect(screen.getAllByRole('menuitem').map(item => item.textContent))
+      .toEqual(['Importar backup antigo', 'Resumo (CSV)', 'Registros (CSV)', 'Dados (JSON)']);
+    expect(document.activeElement?.textContent).toBe('Importar backup antigo');
+    await user.keyboard('{ArrowDown}');
+    expect(document.activeElement?.textContent).toBe('Resumo (CSV)');
+    await user.keyboard('{Escape}');
+    expect(screen.queryByRole('menu')).toBeNull();
+    expect(document.activeElement).toBe(menu());
+  });
 
   it('baixa as três opções com o laboratório da lista', async () => {
     api.baixarLaminasResumoCsv.mockResolvedValue(ARQUIVO);
@@ -949,10 +975,11 @@ describe('exportação das listas de lâminas', () => {
     const user = userEvent.setup();
     renderSlides({ laboratory: ACTIVE_LAB });
     await screen.findByRole('button', { name: /L1 planta A/ });
-    const exportar = within(grupo()!);
-    await user.click(exportar.getByRole('button', { name: 'Resumo (CSV)' }));
-    await user.click(exportar.getByRole('button', { name: 'Registros (CSV)' }));
-    await user.click(exportar.getByRole('button', { name: 'Dados (JSON)' }));
+    await exportar(user, 'Resumo (CSV)');
+    await waitFor(() => expect(salvarArquivo).toHaveBeenCalledTimes(1));
+    await exportar(user, 'Registros (CSV)');
+    await waitFor(() => expect(salvarArquivo).toHaveBeenCalledTimes(2));
+    await exportar(user, 'Dados (JSON)');
     await waitFor(() => expect(salvarArquivo).toHaveBeenCalledTimes(3));
     for (const funcao of ['baixarLaminasResumoCsv', 'baixarLaminasRegistrosCsv', 'baixarLaminasJson'] as const) {
       expect(api[funcao]).toHaveBeenCalledWith({ laboratorioId: 'lab-1' });
@@ -964,15 +991,16 @@ describe('exportação das listas de lâminas', () => {
     const user = userEvent.setup();
     renderSlides();
     await screen.findByRole('button', { name: /L1 planta A/ });
-    await user.click(within(grupo()!).getByRole('button', { name: 'Dados (JSON)' }));
+    await exportar(user, 'Dados (JSON)');
     await waitFor(() => expect(api.baixarLaminasJson).toHaveBeenCalledWith({ laboratorioId: null }));
   });
 
-  it('não aparece sem lâminas', async () => {
+  it('sem lâminas, o menu não oferece exportar', async () => {
     api.listarLaminas.mockResolvedValue(page([]));
     renderSlides();
     await screen.findByText('Comece pela primeira lâmina');
-    expect(grupo()).toBeNull();
+    expect(menu()).toBeNull();
+    expect(screen.getByRole('button', { name: 'Importar' })).toBeTruthy();
   });
 
   it('mostra o erro de acesso negado', async () => {
@@ -980,7 +1008,7 @@ describe('exportação das listas de lâminas', () => {
     const user = userEvent.setup();
     renderSlides({ laboratory: ACTIVE_LAB });
     await screen.findByRole('button', { name: /L1 planta A/ });
-    await user.click(within(grupo()!).getByRole('button', { name: 'Resumo (CSV)' }));
+    await exportar(user, 'Resumo (CSV)');
     expect((await screen.findByRole('alert')).textContent).toContain('permissão');
   });
 });

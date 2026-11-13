@@ -43,7 +43,7 @@ const page = <T,>(content: T[]) => ({ content, currentPage: 0, totalPages: 1, to
 
 const contagem = {
   listarProtocolos: vi.fn(), buscarVersaoProtocolo: vi.fn(), listarTiposPersonalizados: vi.fn(), criarTipoPersonalizado: vi.fn(),
-  listarLaminas: vi.fn(), buscarLamina: vi.fn(), criarLamina: vi.fn(), atualizarLamina: vi.fn(), excluirLamina: vi.fn(),
+  listarLaminas: vi.fn(), contarLaminasPorLaboratorio: vi.fn(), buscarLamina: vi.fn(), criarLamina: vi.fn(), atualizarLamina: vi.fn(), excluirLamina: vi.fn(),
   criarRegistro: vi.fn(), listarRegistros: vi.fn(), atualizarRegistro: vi.fn(), desfazerRegistros: vi.fn(), buscarResumo: vi.fn(),
 };
 
@@ -78,6 +78,7 @@ beforeEach(() => {
   Object.defineProperty(HTMLDialogElement.prototype, 'showModal', { configurable: true, value(this: HTMLDialogElement) { this.setAttribute('open', ''); } });
   Object.defineProperty(HTMLDialogElement.prototype, 'close', { configurable: true, value(this: HTMLDialogElement) { this.removeAttribute('open'); } });
   labApi.listarMeus.mockResolvedValue([LAB]);
+  contagem.contarLaminasPorLaboratorio.mockResolvedValue(new Map());
   labApi.buscar.mockResolvedValue(LAB);
   labApi.listarParticipacoes.mockResolvedValue([SELF]);
   conviteApi.listar.mockResolvedValue([]);
@@ -135,7 +136,7 @@ describe('cada tela com endereço próprio', () => {
   it('trocar de aba atualiza o endereço sem empilhar histórico', async () => {
     const user = userEvent.setup();
     abrir('/laboratorios');
-    await user.click(await screen.findByRole('button', { name: 'Gerenciar' }));
+    await user.click(await screen.findByRole('button', { name: /^Gerenciar/ }));
     await screen.findByRole('heading', { name: 'Equipe do laboratório' });
     await user.click(screen.getByRole('button', { name: 'Configurações' }));
     expect(caminho()).toBe('/laboratorios/lab-1/gerenciar?aba=configuracoes');
@@ -154,7 +155,7 @@ describe('navegação empilha e o Voltar do navegador volta uma tela', () => {
   it('lista -> lâminas -> lâmina -> Voltar -> Voltar', async () => {
     const user = userEvent.setup();
     abrir('/laboratorios');
-    await user.click(await screen.findByRole('button', { name: 'Abrir lâminas' }));
+    await user.click(await screen.findByRole('button', { name: LAB.nome }));
     expect(caminho()).toBe('/laboratorios/lab-1/laminas');
 
     await user.click(await screen.findByRole('button', { name: /L1 planta A/ }));
@@ -222,7 +223,7 @@ describe('observações ao sair da lâmina pela navegação', () => {
     contagem.atualizarLamina.mockResolvedValue({ ...LAMINA, versao: 4, observacoes: 'Nota salva e mais' });
     abrir('/laboratorios/lab-1/laminas/lamina-1');
     await screen.findByRole('heading', { name: 'L1 planta A' });
-    await user.type(screen.getByLabelText('Observações'), ' e mais');
+    await user.type(screen.getByLabelText('Observações da lâmina'), ' e mais');
     await user.click(screen.getByRole('button', { name: 'Lâminas' }));
     expect(await screen.findByRole('heading', { name: 'Lâminas' })).toBeTruthy();
     expect(caminho()).toBe('/laboratorios/lab-1/laminas');

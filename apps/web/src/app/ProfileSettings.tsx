@@ -1,12 +1,12 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react';
-import { ChevronRight, Pencil, UserRound } from 'lucide-react';
+import { ChevronLeft, Eye, EyeOff, UserRound } from 'lucide-react';
+import './profile.css';
 import { ApiError, NetworkError } from '../api/errors';
 import { usuarioApi } from '../api/usuario-api';
 import type { UsuarioResponseDTO } from '../api/contracts/usuario';
 import { passwordPolicyError, validateResendEmail } from './registration-validation';
 import { retryCountdownMessage, useRetryCountdown } from './useRetryCountdown';
 
-type ProfileTab = 'profile' | 'security';
 type Feedback = { kind: 'success' | 'error'; message: string };
 type PasswordField = 'currentPassword' | 'newPassword' | 'confirmation';
 type PasswordErrors = Partial<Record<PasswordField, string>>;
@@ -26,6 +26,17 @@ function requestErrorMessage(error: unknown, fallback: string): string {
   return fallback;
 }
 
+/** Campo de senha com o botão de mostrar/ocultar (recomendação de UX para formulários de senha). */
+function PasswordInput({ inputRef, ...props }: React.InputHTMLAttributes<HTMLInputElement> & { inputRef: React.RefObject<HTMLInputElement | null>; id: string }) {
+  const [visible, setVisible] = useState(false);
+  return <div className="profile-password">
+    <input ref={inputRef} {...props} type={visible ? 'text' : 'password'}/>
+    <button className="profile-password-toggle" type="button" aria-label={visible ? 'Ocultar senha' : 'Mostrar senha'} aria-pressed={visible} aria-controls={props.id} onClick={() => setVisible(value => !value)}>
+      {visible ? <EyeOff size={18} aria-hidden="true"/> : <Eye size={18} aria-hidden="true"/>}
+    </button>
+  </div>;
+}
+
 function FeedbackMessage({ feedback }: { feedback: Feedback | null }) {
   if (!feedback) return null;
   return <p className={`profile-feedback${feedback.kind === 'error' ? ' error' : ''}`} role={feedback.kind === 'error' ? 'alert' : 'status'}>
@@ -34,7 +45,8 @@ function FeedbackMessage({ feedback }: { feedback: Feedback | null }) {
 }
 
 export function ProfileSettings({ user, photo, onBack, onPhotoChange, onUserUpdate }: ProfileSettingsProps) {
-  const [tab, setTab] = useState<ProfileTab>('profile');
+  const [emailOpen, setEmailOpen] = useState(false);
+  const [passwordOpen, setPasswordOpen] = useState(false);
   const [name, setName] = useState(user.nome);
   const [nameError, setNameError] = useState<string | null>(null);
   const [nameFeedback, setNameFeedback] = useState<Feedback | null>(null);
@@ -247,36 +259,22 @@ export function ProfileSettings({ user, photo, onBack, onPhotoChange, onUserUpda
       : 'Muitas solicitações. Tente novamente mais tarde.';
 
   return <div className="profile-page">
-    <button className="back-link profile-back" type="button" onClick={onBack}><ChevronRight size={16} aria-hidden="true"/> Meus laboratórios</button>
-    <div className="profile-layout">
-      <div className="profile-heading">
-        <h1>Seu perfil</h1>
-        <nav className="profile-tabs" aria-label="Perfil">
-          {([['profile', 'Dados pessoais'], ['security', 'Segurança']] as const).map(([key, label]) => <button
-            key={key}
-            type="button"
-            className={tab === key ? 'selected' : ''}
-            aria-current={tab === key ? 'page' : undefined}
-            onClick={() => setTab(key)}
-          >{label}<ChevronRight size={16} aria-hidden="true"/></button>)}
-        </nav>
+    <button className="back-link profile-back" type="button" onClick={onBack}><ChevronLeft size={16} aria-hidden="true"/> Meus laboratórios</button>
+    <h1 className="profile-title">Seu perfil</h1>
+
+    <section className="profile-card" aria-labelledby="profile-section-title">
+      <h2 id="profile-section-title">Dados pessoais</h2>
+      <div className="profile-photo-area">
+        <div className="profile-photo">{photo ? <img src={photo} alt="Foto de perfil"/> : <UserRound size={30} strokeWidth={1.6} aria-hidden="true"/>}</div>
+        <div className="profile-photo-details">
+          <strong>Foto de perfil</strong>
+          <p>JPG, PNG ou WebP · até 2 MB</p>
+        </div>
+        <button className="button secondary" type="button" onClick={() => fileRef.current?.click()}>Trocar foto</button>
+        <input ref={fileRef} className="sr-only" type="file" accept="image/jpeg,image/png,image/webp" aria-label="Escolher foto de perfil" onChange={(event) => { selectPhoto(event.target.files?.[0]); event.target.value = ''; }}/>
       </div>
-      <div className="profile-shell">
-        {tab === 'profile' ? <section className="profile-personal" aria-labelledby="profile-section-title">
-          <div className="profile-personal-heading"><h2 id="profile-section-title">Dados pessoais</h2></div>
-          <div className="profile-photo-area">
-            <div className="profile-photo">
-              {photo ? <img src={photo} alt="Foto de perfil"/> : <UserRound size={40} strokeWidth={1.6} aria-hidden="true"/>}
-              <button className="profile-photo-edit" type="button" aria-label="Alterar foto de perfil" onClick={() => fileRef.current?.click()}><Pencil size={17} aria-hidden="true"/></button>
-            </div>
-            <div className="profile-photo-details">
-              <strong>Foto de perfil</strong>
-              <p>JPG, PNG ou WebP · até 2 MB</p>
-              {photoFeedback && <FeedbackMessage feedback={photoFeedback}/>}
-              <input ref={fileRef} className="sr-only" type="file" accept="image/jpeg,image/png,image/webp" aria-label="Escolher foto de perfil" onChange={(event) => { selectPhoto(event.target.files?.[0]); event.target.value = ''; }}/>
-            </div>
-          </div>
-          <form className="profile-form" onSubmit={saveName} noValidate>
+      {photoFeedback && <FeedbackMessage feedback={photoFeedback}/>}
+      <form className="profile-form" onSubmit={saveName} noValidate>
             <div className="profile-field">
               <label htmlFor="profile-name">Nome</label>
               <input
@@ -292,48 +290,21 @@ export function ProfileSettings({ user, photo, onBack, onPhotoChange, onUserUpda
               />
               {nameError && <span id="profile-name-error" className="profile-field-error" role="alert">{nameError}</span>}
             </div>
-            <div className="profile-field profile-field-readonly">
-              <label htmlFor="profile-email">E-mail da conta</label>
-              <input id="profile-email" type="email" value={user.email} readOnly/>
-            </div>
-            <FeedbackMessage feedback={nameFeedback}/>
-            <div className="profile-form-actions"><button className="button primary" disabled={savingName || !name.trim() || name.trim() === user.nome}>
-              {savingName ? 'Salvando…' : 'Salvar alterações'}
-            </button></div>
-          </form>
-        </section> : <div className="profile-security">
-          <section className="profile-security-section" aria-labelledby="change-password-title">
-            <div className="profile-personal-heading"><h2 id="change-password-title">Alterar senha</h2></div>
-            <form className="profile-form" onSubmit={changePassword} noValidate>
-              <div className="profile-field">
-                <label htmlFor="current-password">Senha atual</label>
-                <input ref={currentPasswordRef} id="current-password" name="senhaAtual" type="password" autoComplete="current-password" required value={password.current} aria-invalid={passwordErrors.currentPassword ? true : undefined} aria-describedby={passwordErrors.currentPassword ? 'current-password-error' : undefined} onChange={(event) => setPasswordField('current', event.target.value)}/>
-                {passwordErrors.currentPassword && <span id="current-password-error" className="profile-field-error" role="alert">{passwordErrors.currentPassword}</span>}
-              </div>
-              <div className="profile-field">
-                <label htmlFor="new-password">Nova senha</label>
-                <input ref={newPasswordRef} id="new-password" name="novaSenha" type="password" autoComplete="new-password" required maxLength={64} value={password.next} aria-invalid={passwordErrors.newPassword ? true : undefined} aria-describedby={passwordErrors.newPassword ? 'new-password-error' : 'new-password-hint'} onChange={(event) => setPasswordField('next', event.target.value)}/>
-                {passwordErrors.newPassword
-                  ? <span id="new-password-error" className="profile-field-error" role="alert">{passwordErrors.newPassword}</span>
-                  : <span id="new-password-hint" className="profile-field-hint">Use de 8 a 64 caracteres.</span>}
-              </div>
-              <div className="profile-field">
-                <label htmlFor="confirm-new-password">Confirme sua nova senha</label>
-                <input ref={confirmationRef} id="confirm-new-password" name="confirmacaoSenha" type="password" autoComplete="new-password" required maxLength={64} value={password.confirmation} aria-invalid={passwordErrors.confirmation ? true : undefined} aria-describedby={passwordErrors.confirmation ? 'confirm-new-password-error' : undefined} onChange={(event) => setPasswordField('confirmation', event.target.value)}/>
-                {passwordErrors.confirmation && <span id="confirm-new-password-error" className="profile-field-error" role="alert">{passwordErrors.confirmation}</span>}
-              </div>
-              <FeedbackMessage feedback={passwordFeedback}/>
-              <div className="profile-form-actions"><button className="button primary" disabled={savingPassword}>
-                {savingPassword ? 'Salvando…' : 'Alterar senha'}
-              </button></div>
-            </form>
-          </section>
-          <section className="profile-security-section" aria-labelledby="change-email-title">
-            <div className="profile-personal-heading">
-              <h2 id="change-email-title">Trocar e-mail</h2>
-              <p>Seu endereço atual continua ativo até você confirmar o novo.</p>
-            </div>
-            <form className="profile-form" onSubmit={requestEmailChange} noValidate>
+        <FeedbackMessage feedback={nameFeedback}/>
+        <div className="profile-form-actions"><button className="button primary" disabled={savingName || !name.trim() || name.trim() === user.nome} title={name.trim() === user.nome ? 'Mude o nome para salvar' : undefined}>
+          {savingName ? 'Salvando…' : 'Salvar nome'}
+        </button></div>
+      </form>
+    </section>
+
+    <section className="profile-card" aria-labelledby="change-email-title">
+      <div className="profile-card-row">
+        <div><h2 id="change-email-title">E-mail</h2><p className="profile-current">{user.email}</p></div>
+        <button className="button secondary" type="button" aria-expanded={emailOpen} aria-controls="profile-email-panel" onClick={() => setEmailOpen(open => !open)}>{emailOpen ? 'Cancelar' : <>Trocar <span className="sr-only">e-mail</span></>}</button>
+      </div>
+      {emailOpen && <div className="profile-panel" id="profile-email-panel">
+        <p className="profile-panel-hint">Seu endereço atual continua ativo até você confirmar o novo.</p>
+        <form className="profile-form" onSubmit={requestEmailChange} noValidate>
               <div className="profile-field">
                 <label htmlFor="new-email">Novo e-mail</label>
                 <input ref={newEmailRef} id="new-email" name="novoEmail" type="email" autoComplete="email" required maxLength={255} value={email.next} aria-invalid={emailErrors.newEmail ? true : undefined} aria-describedby={emailErrors.newEmail ? 'new-email-error' : undefined} onChange={(event) => setEmailField('next', event.target.value)}/>
@@ -341,19 +312,49 @@ export function ProfileSettings({ user, photo, onBack, onPhotoChange, onUserUpda
               </div>
               <div className="profile-field">
                 <label htmlFor="email-current-password">Senha atual</label>
-                <input ref={emailPasswordRef} id="email-current-password" name="senhaAtual" type="password" autoComplete="current-password" required value={email.currentPassword} aria-invalid={emailErrors.currentPassword ? true : undefined} aria-describedby={emailErrors.currentPassword ? 'email-current-password-error' : undefined} onChange={(event) => setEmailField('currentPassword', event.target.value)}/>
+                <PasswordInput inputRef={emailPasswordRef} id="email-current-password" name="senhaAtual" autoComplete="current-password" required value={email.currentPassword} aria-invalid={emailErrors.currentPassword ? true : undefined} aria-describedby={emailErrors.currentPassword ? 'email-current-password-error' : undefined} onChange={(event) => setEmailField('currentPassword', event.target.value)}/>
                 {emailErrors.currentPassword && <span id="email-current-password-error" className="profile-field-error" role="alert">{emailErrors.currentPassword}</span>}
               </div>
               {emailRateLimited
                 ? <p className={countdown.isWaiting ? 'profile-feedback error' : 'profile-feedback'} role={countdown.isWaiting ? 'alert' : 'status'}>{rateLimitMessage}</p>
                 : <FeedbackMessage feedback={emailFeedback}/>}
-              <div className="profile-form-actions"><button className="button primary" disabled={emailBusy || countdown.isWaiting}>
-                {emailBusy ? 'Enviando…' : 'Enviar link de confirmação'}
-              </button></div>
-            </form>
-          </section>
-        </div>}
+          <div className="profile-form-actions"><button className="button primary" disabled={emailBusy || countdown.isWaiting}>
+            {emailBusy ? 'Enviando…' : 'Enviar link de confirmação'}
+          </button></div>
+        </form>
+      </div>}
+    </section>
+
+    <section className="profile-card" aria-labelledby="change-password-title">
+      <div className="profile-card-row">
+        <div><h2 id="change-password-title">Senha</h2><p className="profile-current" aria-hidden="true">••••••••</p></div>
+        <button className="button secondary" type="button" aria-expanded={passwordOpen} aria-controls="profile-password-panel" onClick={() => setPasswordOpen(open => !open)}>{passwordOpen ? 'Cancelar' : <>Alterar <span className="sr-only">senha</span></>}</button>
       </div>
-    </div>
+      {passwordOpen && <div className="profile-panel" id="profile-password-panel">
+        <form className="profile-form" onSubmit={changePassword} noValidate>
+              <div className="profile-field">
+                <label htmlFor="current-password">Senha atual</label>
+                <PasswordInput inputRef={currentPasswordRef} id="current-password" name="senhaAtual" autoComplete="current-password" required value={password.current} aria-invalid={passwordErrors.currentPassword ? true : undefined} aria-describedby={passwordErrors.currentPassword ? 'current-password-error' : undefined} onChange={(event) => setPasswordField('current', event.target.value)}/>
+                {passwordErrors.currentPassword && <span id="current-password-error" className="profile-field-error" role="alert">{passwordErrors.currentPassword}</span>}
+              </div>
+              <div className="profile-field">
+                <label htmlFor="new-password">Nova senha</label>
+                <PasswordInput inputRef={newPasswordRef} id="new-password" name="novaSenha" autoComplete="new-password" required maxLength={64} value={password.next} aria-invalid={passwordErrors.newPassword ? true : undefined} aria-describedby={passwordErrors.newPassword ? 'new-password-error' : 'new-password-hint'} onChange={(event) => setPasswordField('next', event.target.value)}/>
+                {passwordErrors.newPassword
+                  ? <span id="new-password-error" className="profile-field-error" role="alert">{passwordErrors.newPassword}</span>
+                  : <span id="new-password-hint" className="profile-field-hint">Use de 8 a 64 caracteres.</span>}
+              </div>
+              <div className="profile-field">
+                <label htmlFor="confirm-new-password">Confirme sua nova senha</label>
+                <PasswordInput inputRef={confirmationRef} id="confirm-new-password" name="confirmacaoSenha" autoComplete="new-password" required maxLength={64} value={password.confirmation} aria-invalid={passwordErrors.confirmation ? true : undefined} aria-describedby={passwordErrors.confirmation ? 'confirm-new-password-error' : undefined} onChange={(event) => setPasswordField('confirmation', event.target.value)}/>
+                {passwordErrors.confirmation && <span id="confirm-new-password-error" className="profile-field-error" role="alert">{passwordErrors.confirmation}</span>}
+              </div>
+          <FeedbackMessage feedback={passwordFeedback}/>
+          <div className="profile-form-actions"><button className="button primary" disabled={savingPassword}>
+            {savingPassword ? 'Salvando…' : 'Salvar nova senha'}
+          </button></div>
+        </form>
+      </div>}
+    </section>
   </div>;
 }

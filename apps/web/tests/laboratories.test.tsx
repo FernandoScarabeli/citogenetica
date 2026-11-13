@@ -77,15 +77,17 @@ const PENDING_INVITATION = {
   criadoEm: '2026-11-03T18:30:00Z',
 };
 
+const contagem = vi.hoisted(() => ({ contarLaminasPorLaboratorio: vi.fn() }));
+
 function renderPage(renderSlides = vi.fn(() => <p>Lâminas</p>)) {
   return render(<MemoryRouter initialEntries={['/laboratorios']}>
-    <Laboratories user={USER} onLogout={vi.fn()} onUserUpdate={vi.fn()} renderSlides={renderSlides} />
+    <Laboratories user={USER} onLogout={vi.fn()} onUserUpdate={vi.fn()} renderSlides={renderSlides} api={contagem as never} />
   </MemoryRouter>);
 }
 
 async function openLaboratoryManagement(user: ReturnType<typeof userEvent.setup>) {
   await screen.findByRole('heading', { name: 'Meus laboratórios' });
-  await user.click(screen.getByRole('button', { name: 'Gerenciar' }));
+  await user.click(screen.getByRole('button', { name: /^Gerenciar/ }));
   await screen.findByRole('heading', { name: 'Equipe do laboratório' });
 }
 
@@ -110,6 +112,7 @@ beforeEach(() => {
   vi.resetAllMocks();
   defineDialogSupport();
   api.listarMeus.mockResolvedValue([ACTIVE_LAB]);
+  contagem.contarLaminasPorLaboratorio.mockResolvedValue(new Map());
   api.buscar.mockResolvedValue(ACTIVE_LAB);
   api.criar.mockResolvedValue(ACTIVE_LAB);
   api.atualizarNome.mockResolvedValue(ACTIVE_LAB);
@@ -432,8 +435,8 @@ describe('gestão de laboratórios reais', () => {
     const user = userEvent.setup();
     api.buscar.mockRejectedValueOnce(apiError(404, 'Laboratório não encontrado.'));
     renderPage();
-    await screen.findByRole('heading', { name: ACTIVE_LAB.nome });
-    await user.click(screen.getByRole('button', { name: 'Gerenciar' }));
+    await screen.findByRole('button', { name: ACTIVE_LAB.nome });
+    await user.click(screen.getByRole('button', { name: /^Gerenciar/ }));
 
     expect((await screen.findByRole('status')).textContent).toContain('Este laboratório não está mais disponível');
     expect(await screen.findByRole('heading', { name: 'Meus laboratórios' })).toBeTruthy();
@@ -448,16 +451,63 @@ describe('gestão de laboratórios reais', () => {
     api.listarParticipacoes.mockResolvedValue([SELF]);
     renderPage(renderSlides);
     await screen.findByRole('heading', { name: 'Meus laboratórios' });
-    await user.click(screen.getByRole('button', { name: 'Gerenciar' }));
+    await user.click(screen.getByRole('button', { name: /^Gerenciar/ }));
     await screen.findByRole('button', { name: 'Configurações' });
     await user.click(screen.getByRole('button', { name: 'Configurações' }));
 
     expect(screen.queryByLabelText('Nome do laboratório')).toBeNull();
     expect(screen.queryByRole('button', { name: 'Sair do laboratório' })).toBeNull();
     await user.click(screen.getByRole('button', { name: 'Meus laboratórios' }));
-    await user.click(screen.getAllByRole('button', { name: 'Abrir lâminas' })[0]);
+    await user.click(screen.getByRole('button', { name: disabled.nome }));
 
     expect(await screen.findByText('Consulta somente leitura')).toBeTruthy();
     expect(renderSlides).toHaveBeenCalledWith(disabled, expect.any(Function), true);
+  });
+});
+
+describe('lista de laboratórios em tabela', () => {
+  const LABS: LaboratorioResponseDTO[] = [
+    { id: 'lab-c', nome: 'Laboratório 10', estado: 'ATIVO', papeis: ['MEMBRO'], versao: 1 },
+    { id: 'lab-a', nome: 'genética animal', estado: 'ATIVO', papeis: ['MEMBRO', 'ADMIN', 'ORIENTADOR'], versao: 1 },
+    { id: 'lab-b', nome: 'Laboratório 9', estado: 'DESATIVADO', papeis: ['MEMBRO', 'ORIENTADOR'], versao: 1 },
+  ];
+
+  function rows() {
+    return screen.getAllByRole('row').slice(1).map(row => within(row).getAllByRole('cell').map(cell => cell.textContent)
+      .concat(within(row).getByRole('rowheader').textContent ?? ''));
+  }
+
+  it('ordena por nome, mostra o papel principal e o número de lâminas', async () => {
+    api.listarMeus.mockResolvedValue(LABS);
+    contagem.contarLaminasPorLaboratorio.mockResolvedValue(new Map([['lab-a', 12], ['lab-b', 1], ['lab-c', 0]]));
+    renderPage();
+    await screen.findByRole('table');
+
+    await waitFor(() => expect(rows()).toEqual([
+      ['Administrador, Orientador·', '12 lâminas', '', 'genética animal'],
+      ['Orientador·', '1 lâmina', '', 'Laboratório 9Desativado'],
+      ['Membro·', '0 lâminas', '', 'Laboratório 10'],
+    ]));
+    expect(contagem.contarLaminasPorLaboratorio).toHaveBeenCalledWith(['lab-c', 'lab-a', 'lab-b'], expect.any(AbortSignal));
+    expect(screen.queryByText('Ativo')).toBeNull();
+  });
+
+  it('clicar no nome abre as lâminas e a engrenagem abre Gerenciar', async () => {
+    const user = userEvent.setup();
+    const renderSlides = vi.fn(() => <p>Lâminas do laboratório</p>);
+    api.listarMeus.mockResolvedValue([ACTIVE_LAB]);
+    renderPage(renderSlides);
+
+    await user.click(await screen.findByRole('button', { name: ACTIVE_LAB.nome }));
+    expect(await screen.findByText('Lâminas do laboratório')).toBeTruthy();
+    expect(renderSlides).toHaveBeenCalledWith(ACTIVE_LAB, expect.any(Function), false);
+  });
+
+  it('se o número de lâminas falhar, mostra um traço e o resto segue', async () => {
+    contagem.contarLaminasPorLaboratorio.mockRejectedValue(apiError(500));
+    renderPage();
+    expect(await screen.findByLabelText('Não disponível')).toBeTruthy();
+    expect(screen.getByRole('button', { name: ACTIVE_LAB.nome })).toBeTruthy();
+    expect(screen.getByRole('button', { name: `Gerenciar ${ACTIVE_LAB.nome}` })).toBeTruthy();
   });
 });

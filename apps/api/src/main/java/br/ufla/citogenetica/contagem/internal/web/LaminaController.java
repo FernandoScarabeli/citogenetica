@@ -1,5 +1,6 @@
 package br.ufla.citogenetica.contagem.internal.web;
 
+import java.util.List;
 import java.util.UUID;
 
 import br.ufla.citogenetica.contagem.internal.application.CriacaoLamina;
@@ -9,6 +10,7 @@ import br.ufla.citogenetica.contagem.internal.application.NovaLamina;
 import br.ufla.citogenetica.contagem.internal.web.dto.request.AtualizarLaminaRequestDTO;
 import br.ufla.citogenetica.contagem.internal.web.dto.request.CriarLaminaRequestDTO;
 import br.ufla.citogenetica.contagem.internal.web.dto.response.LaminaResponseDTO;
+import br.ufla.citogenetica.contagem.internal.web.dto.response.TotalLaminasLaboratorioResponseDTO;
 import br.ufla.citogenetica.shared.pagination.PageResponseDTO;
 import br.ufla.citogenetica.shared.pagination.PageableFactory;
 import br.ufla.citogenetica.shared.pagination.PaginationConstants;
@@ -23,6 +25,7 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
+import jakarta.validation.constraints.Size;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.http.HttpStatus;
@@ -104,6 +107,28 @@ public class LaminaController {
         Page<LaminaResumo> resultado = service.listar(
                 uuidOuNulo(laboratorioId), donoUsuarioId, principal.id(), PageableFactory.criar(page, size));
         return ResponseEntity.ok(new PageResponseDTO<>(resultado, LaminaResponseDTO::de));
+    }
+
+    @GetMapping("/totais")
+    @Operation(summary = "Contar lâminas por laboratório",
+            description = "Quantas lâminas o usuário pode ver em cada laboratório pedido, com a mesma regra de "
+                    + "GET /laminas. Laboratórios que ele não enxerga ficam de fora da resposta; os que ele enxerga "
+                    + "sem nenhuma lâmina vêm com total 0. Ids repetidos contam uma vez.")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Totais retornados, na ordem pedida"),
+            @ApiResponse(responseCode = "400", description = "Nenhum laboratorioId, mais de 100 ou UUID inválido"),
+            @ApiResponse(responseCode = "401", description = "Sessão ausente ou conta não habilitada")
+    })
+    public ResponseEntity<List<TotalLaminasLaboratorioResponseDTO>> totais(
+            @Parameter(description = "UUIDv4 canônico de cada laboratório, de 1 a 100")
+            @RequestParam("laboratorioId")
+            @Size(min = 1, max = PaginationConstants.MAX_PAGE_SIZE,
+                    message = "informe de 1 a {max} laboratórios") List<@CanonicalUuidV4 String> laboratorioIds,
+            @AuthenticationPrincipal UsuarioPrincipal principal) {
+        List<UUID> ids = laboratorioIds.stream().map(UUID::fromString).toList();
+        return ResponseEntity.ok(service.totaisPorLaboratorio(ids, principal.id()).entrySet().stream()
+                .map(total -> new TotalLaminasLaboratorioResponseDTO(total.getKey(), total.getValue()))
+                .toList());
     }
 
     @GetMapping("/{id}")

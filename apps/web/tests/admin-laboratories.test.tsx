@@ -85,6 +85,15 @@ describe('menu da conta', () => {
 });
 
 describe('página de laboratórios da plataforma', () => {
+  it('usa o mesmo menu do perfil das outras telas, com Sair dentro dele', async () => {
+    const user = userEvent.setup();
+    renderAdmin();
+    await user.click(await screen.findByRole('button', { name: 'Menu do perfil' }));
+    expect(screen.getByRole('button', { name: 'Configurações do perfil' })).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Sair' })).toBeTruthy();
+    expect(screen.getByRole('button', { name: /Modo escuro/ })).toBeTruthy();
+  });
+
   it('mostra sem permissão para usuário comum e não chama a API de admin', async () => {
     renderAdmin('USER');
     expect(await screen.findByRole('heading', { name: 'Sem permissão para acessar esta página' })).toBeTruthy();

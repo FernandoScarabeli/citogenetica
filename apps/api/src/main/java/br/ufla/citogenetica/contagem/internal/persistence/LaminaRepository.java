@@ -33,6 +33,23 @@ public interface LaminaRepository extends JpaRepository<Lamina, UUID> {
             """)
     List<Long> findDonosComLaminaAtiva(@Param("laboratorioId") UUID laboratorioId);
 
+    /** Quantas lâminas ativas cada dono tem em cada laboratório pedido; o chamador garante a lista não vazia. */
+    @Query("""
+            select lamina.laboratorioId as laboratorioId, lamina.donoUsuarioId as donoUsuarioId, count(lamina) as total
+            from Lamina lamina
+            where lamina.laboratorioId in :laboratorioIds and lamina.excluidaEm is null
+            group by lamina.laboratorioId, lamina.donoUsuarioId
+            """)
+    List<TotalPorDono> contarAtivasPorDono(@Param("laboratorioIds") Collection<UUID> laboratorioIds);
+
+    interface TotalPorDono {
+        UUID getLaboratorioId();
+
+        Long getDonoUsuarioId();
+
+        long getTotal();
+    }
+
     /** O chamador garante que {@code donoIds} não está vazio. */
     @Query(value = """
             select lamina from Lamina lamina

@@ -5,7 +5,10 @@
 .labs-app .laboratory-management-page .laboratory-detail-heading h1 { font-size: 24px; line-height: 32px; overflow-wrap: anywhere; }
 .laboratory-management-page .laboratory-detail-meta { margin: 0; }
 .laboratory-management-panel { background: var(--lab-surface); border: 1px solid var(--lab-line); border-radius: 8px; }
-.labs-app .laboratory-management-panel .laboratory-tabs { margin: 0; padding: 0 24px; gap: 28px; border-bottom: 1px solid var(--lab-line); }
+.labs-app .laboratory-management-panel .laboratory-tabs { margin: 0; padding: 0 24px; gap: 28px; border-bottom: 1px solid var(--lab-line); position: relative; }
+/* A linha da aba ativa é o .tab-indicator (desliza); a borda do botão fica só como reserva de espaço, e a cor do texto troca suave. */
+.labs-app .laboratory-management-panel .laboratory-tabs button { transition: color 200ms ease; }
+.labs-app .laboratory-management-panel .laboratory-tabs:has(.tab-indicator) button.selected { border-color: transparent; }
 .laboratory-management-panel .laboratory-tabs button { padding-top: 17px; padding-bottom: 17px; font-size: 13px; white-space: nowrap; }
 .laboratory-management-panel .members-toolbar { padding: 20px 24px 12px; border: 0; border-radius: 0; background: transparent; }
 .labs-app .laboratory-management-panel h2 { font-size: 14px; line-height: 22px; font-weight: 600; }

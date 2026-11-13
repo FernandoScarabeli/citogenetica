@@ -1,14 +1,17 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react';
-import { ChevronLeft, ChevronRight, LogOut, Microscope, Search, ShieldAlert, X } from 'lucide-react';
-import { Link } from 'react-router';
+import { ChevronLeft, ChevronRight, Microscope, Search, ShieldAlert, X } from 'lucide-react';
+import { Link, useNavigate } from 'react-router';
 import { adminApi } from '../api/admin-api';
 import type { AdminLaboratorioPageDTO, AdminLaboratorioResponseDTO } from '../api/contracts/admin';
 import type { EstadoLaboratorio } from '../api/contracts/laboratorio';
 import type { UsuarioResponseDTO } from '../api/contracts/usuario';
 import { isConflict, isForbidden, isNotFound } from '../api/errors';
 import { FloatingNotice } from '../components/ui/floating-notice';
+import { SegmentedControl } from '../components/ui/segmented-control';
 import { typeClass } from '../lib/type-scale';
-import { loadPreferences } from '../preferences';
+import { loadPreferences, savePreferences } from '../preferences';
+import { NotificationCenter } from '../NotificationCenter';
+import { AccountMenu } from './AccountMenu';
 import { useSession } from './SessionProvider';
 import '../laboratories.css';
 import './admin-laboratories.css';
@@ -74,21 +77,24 @@ function AdminActionDialog({ action, busy, error, onClose, onConfirm }: {
   </dialog>;
 }
 
+/** Mesmo cabeçalho das outras telas: sino de notificações e o menu do perfil (perfil, admin, modo escuro, sair). */
 function AdminTopbar({ user, onLogout }: { user: UsuarioResponseDTO; onLogout: () => void }) {
+  const navigate = useNavigate();
+  const [preferences, setPreferences] = useState(() => loadPreferences().value);
+  useEffect(() => {
+    document.documentElement.dataset.appearance = preferences.dark ? 'dark' : 'light';
+    return () => { delete document.documentElement.dataset.appearance; };
+  }, [preferences.dark]);
+  function toggleAppearance() {
+    const next = { ...preferences, dark: !preferences.dark };
+    try { savePreferences(next); } catch { /* sem armazenamento: vale só nesta visita */ }
+    setPreferences(next);
+  }
   return <header className="topbar"><div className="topbar-inner">
     <Link className="brand" to="/laboratorios"><span className="brand-mark"><Microscope size={21} aria-hidden="true" /></span><span>citogenética<small>Laboratório de Citogenética · UFLA</small></span></Link>
-    <div className="lab-account admin-account">
-      <span className="admin-identity"><strong>{user.nome}</strong><small>{user.email}</small></span>
-      <button className="button secondary" type="button" onClick={onLogout}><LogOut size={16} aria-hidden="true" />Sair</button>
-    </div>
+    <div className="lab-account"><NotificationCenter/><AccountMenu name={user.nome} email={user.email} photo={preferences.photo} dark={preferences.dark}
+      platformAdmin={user.role.nome === 'ADMIN'} onProfile={() => navigate('/perfil')} onAppearance={toggleAppearance} onLogout={onLogout} /></div>
   </div></header>;
-}
-
-function useAppearance() {
-  useEffect(() => {
-    document.documentElement.dataset.appearance = loadPreferences().value.dark ? 'dark' : 'light';
-    return () => { delete document.documentElement.dataset.appearance; };
-  }, []);
 }
 
 export function AdminLaboratories({ user, onLogout, api = adminApi }: {
@@ -96,7 +102,6 @@ export function AdminLaboratories({ user, onLogout, api = adminApi }: {
   onLogout: () => void;
   api?: AdminApi;
 }) {
-  useAppearance();
   const isAdmin = user.role.nome === 'ADMIN';
   return <div className="labs-app">
     <AdminTopbar user={user} onLogout={onLogout} />
@@ -117,8 +122,12 @@ function AdminLaboratoriesContent({ api }: { api: AdminApi }) {
   const [draft, setDraft] = useState('');
   const [filters, setFilters] = useState<{ nome: string; estado: StateFilter }>({ nome: '', estado: '' });
   const [page, setPage] = useState(0);
+  // De onde as linhas novas entram: da direita em "Próxima", da esquerda em "Anterior", de baixo ao filtrar ou buscar.
+  const direction = useRef<'next' | 'previous' | 'filter' | 'none'>('filter');
   const [reload, setReload] = useState(0);
   const [result, setResult] = useState<AdminLaboratorioPageDTO | null>(null);
+  // Muda a cada resposta nova: as linhas animam quando os dados chegam, não no clique.
+  const [resultVersion, setResultVersion] = useState(0);
   const [status, setStatus] = useState<'loading' | 'ready' | 'error' | 'forbidden'>('loading');
   const [loadError, setLoadError] = useState('');
   const [action, setAction] = useState<Action | null>(null);
@@ -145,6 +154,7 @@ function AdminLaboratoriesContent({ api }: { api: AdminApi }) {
         return;
       }
       setResult(data);
+      setResultVersion(version => version + 1);
       setStatus('ready');
     }).catch((error: unknown) => {
       if (controller.signal.aborted) return;
@@ -160,16 +170,19 @@ function AdminLaboratoriesContent({ api }: { api: AdminApi }) {
 
   function submitSearch(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    direction.current = 'filter';
     setFilters(current => ({ ...current, nome: draft.trim() }));
     setPage(0);
   }
 
   function changeState(estado: StateFilter) {
+    direction.current = 'filter';
     setFilters(current => ({ ...current, estado }));
     setPage(0);
   }
 
   function clearFilters() {
+    direction.current = 'filter';
     setDraft('');
     setFilters({ nome: '', estado: '' });
     setPage(0);
@@ -187,6 +200,7 @@ function AdminLaboratoriesContent({ api }: { api: AdminApi }) {
         ? `${action.laboratory.nome} foi desativado.`
         : `${action.laboratory.nome} foi reativado.`);
       setAction(null);
+      direction.current = 'none';
       setReload(value => value + 1);
     } catch (error) {
       const message = actionErrorMessage(error, action.kind);
@@ -224,10 +238,7 @@ function AdminLaboratoriesContent({ api }: { api: AdminApi }) {
               <input type="search" value={draft} onChange={event => setDraft(event.target.value)} placeholder="Buscar por nome" /></label>
             <button className="button secondary" type="submit">Buscar</button>
           </form>
-          <div className="admin-state-filter" role="group" aria-label="Filtrar por estado">
-            {FILTER_OPTIONS.map(option => <button key={option.label} type="button" className={filters.estado === option.value ? 'selected' : ''}
-              aria-pressed={filters.estado === option.value} onClick={() => changeState(option.value)}>{option.label}</button>)}
-          </div>
+          <SegmentedControl className="admin-state-filter" label="Filtrar por estado" options={FILTER_OPTIONS} value={filters.estado} onChange={changeState} />
         </div>
         {status === 'loading' && !result ? <div className="laboratory-loading" aria-live="polite"><p>Carregando laboratórios…</p><span /><span /><span /></div>
           : status === 'error' ? <div className="laboratory-empty"><p>{loadError}</p><button className="button secondary" type="button" onClick={() => setReload(value => value + 1)}>Tentar de novo</button></div>
@@ -235,11 +246,11 @@ function AdminLaboratoriesContent({ api }: { api: AdminApi }) {
               <h3>{filtering ? 'Nenhum resultado para a busca' : 'Nenhum laboratório cadastrado'}</h3>
               <p>{filtering ? 'Tente outro nome ou outro estado.' : 'Os laboratórios criados na plataforma aparecem aqui.'}</p>
               {filtering && <button className="text-button" type="button" onClick={clearFilters}>Limpar busca e filtro</button>}
-            </div> : result && <div aria-busy={status === 'loading'}>
+            </div> : result && <div className={`admin-results${status === 'loading' ? ' is-loading' : ''}`} aria-busy={status === 'loading'}>
               <div className="admin-table-wrap"><table className="admin-table">
                 <caption className="sr-only">Laboratórios da plataforma</caption>
                 <thead><tr><th scope="col">Laboratório</th><th scope="col">Estado</th><th scope="col">Membros ativos</th><th scope="col">Administradores</th><th scope="col"><span className="sr-only">Ações</span></th></tr></thead>
-                <tbody>{result.content.map(lab => <tr key={lab.id}>
+                <tbody key={resultVersion} className={`admin-rows is-${direction.current}`}>{result.content.map((lab, index) => <tr key={lab.id} style={{ '--row': index } as React.CSSProperties}>
                   <td data-label="Laboratório"><strong>{lab.nome}</strong></td>
                   <td data-label="Estado"><span className={`laboratory-state ${lab.estado === 'ATIVO' ? 'is-active' : 'is-disabled'}`}>{lab.estado === 'ATIVO' ? 'Ativo' : 'Desativado'}</span></td>
                   <td data-label="Membros ativos" className="admin-count">{lab.quantidadeMembrosAtivos}</td>
@@ -255,8 +266,8 @@ function AdminLaboratoriesContent({ api }: { api: AdminApi }) {
               <nav className="admin-pagination" aria-label="Paginação">
                 <span>{result.totalElements} {result.totalElements === 1 ? 'laboratório' : 'laboratórios'} · página {page + 1} de {Math.max(totalPages, 1)}</span>
                 <div>
-                  <button className="button secondary" type="button" disabled={page === 0 || status === 'loading'} onClick={() => setPage(page - 1)}><ChevronLeft size={16} aria-hidden="true" />Anterior</button>
-                  <button className="button secondary" type="button" disabled={page + 1 >= totalPages || status === 'loading'} onClick={() => setPage(page + 1)}>Próxima<ChevronRight size={16} aria-hidden="true" /></button>
+                  <button className="button secondary" type="button" disabled={page === 0 || status === 'loading'} onClick={() => { direction.current = 'previous'; setPage(page - 1); }}><ChevronLeft size={16} aria-hidden="true" />Anterior</button>
+                  <button className="button secondary" type="button" disabled={page + 1 >= totalPages || status === 'loading'} onClick={() => { direction.current = 'next'; setPage(page + 1); }}>Próxima<ChevronRight size={16} aria-hidden="true" /></button>
                 </div>
               </nav>
             </div>}
