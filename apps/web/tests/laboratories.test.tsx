@@ -484,9 +484,9 @@ describe('lista de laboratórios em tabela', () => {
     await screen.findByRole('table');
 
     await waitFor(() => expect(rows()).toEqual([
-      ['Administrador, Orientador', '12 lâminas', '', 'genética animal'],
-      ['Orientador', '1 lâmina', '', 'Laboratório 9Desativado'],
-      ['Membro', '0 lâminas', '', 'Laboratório 10'],
+      ['Administrador, Orientador·', '12 lâminas', '', 'genética animal'],
+      ['Orientador·', '1 lâmina', '', 'Laboratório 9Desativado'],
+      ['Membro·', '0 lâminas', '', 'Laboratório 10'],
     ]));
     expect(contagem.contarLaminasPorLaboratorio).toHaveBeenCalledWith(['lab-c', 'lab-a', 'lab-b'], expect.any(AbortSignal));
     expect(screen.queryByText('Ativo')).toBeNull();

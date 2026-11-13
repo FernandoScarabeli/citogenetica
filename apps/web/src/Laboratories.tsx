@@ -44,7 +44,7 @@ function porNome(a: LaboratorioResponseDTO, b: LaboratorioResponseDTO): number {
 
 /** undefined = ainda carregando; null = não foi possível saber. */
 function SlideCount({ total }: { total: number | null | undefined }) {
-  if (total === undefined) return <span aria-label="Carregando">…</span>;
+  if (total === undefined) return <span className="laboratory-count-skeleton" aria-label="Carregando" />;
   if (total === null) return <span aria-label="Não disponível">—</span>;
   return <>{total}<span className="laboratory-count-unit"> {total === 1 ? 'lâmina' : 'lâminas'}</span></>;
 }
@@ -569,16 +569,17 @@ export function Laboratories({ user, onLogout, onUserUpdate, renderSlides, api =
         : view === 'list' ? <>
           <div className="page-heading"><div><h1 className={typeClass('display')}>Meus laboratórios</h1><p>{listStatus === 'ready' && labs.length === 0 ? 'Aqui ficam os laboratórios de que você participa.' : 'Escolha onde você vai continuar sua pesquisa.'}</p></div><button className="button primary" type="button" onClick={() => { setCreateName(''); setPageError(''); setCreateOpen(true); }}><Plus size={17} aria-hidden="true" />Criar laboratório</button></div>
           <section className="laboratory-list-section" aria-labelledby="laboratory-list-title">
-            <div className="section-heading"><h2 id="laboratory-list-title">Laboratórios</h2><label className="laboratory-search"><Search size={16} aria-hidden="true" /><span className="sr-only">Buscar laboratório</span><input type="search" value={query} onChange={event => setQuery(event.target.value)} placeholder="Buscar laboratório" /></label></div>
-            {listStatus === 'loading' ? <div className="laboratory-loading" aria-live="polite"><p>Carregando laboratórios…</p><span /><span /><span /></div>
+            <div className="section-heading"><h2 id="laboratory-list-title">Laboratórios{listStatus === 'ready' && labs.length > 0 && <span className="count-badge laboratory-total">{labs.length}</span>}</h2><label className="laboratory-search"><Search size={16} aria-hidden="true" /><span className="sr-only">Buscar laboratório</span><input type="search" value={query} onChange={event => setQuery(event.target.value)} placeholder="Buscar laboratório" /></label></div>
+            {listStatus === 'loading' ? <div className="laboratory-table laboratory-table-skeleton" role="status" aria-busy="true"><span className="sr-only">Carregando laboratórios…</span>{[0, 1, 2, 3].map(row => <div className="laboratory-skeleton-row" key={row} aria-hidden="true"><span /><span /><span /><span /></div>)}</div>
               : listStatus === 'error' ? <div className="laboratory-empty"><p>{listError}</p><button className="button secondary" type="button" onClick={() => void loadLabs()}>Tentar novamente</button></div>
                 : visibleLabs.length ? <table className="laboratory-table">
-                  <thead><tr><th scope="col">Laboratório</th><th scope="col">Seu papel</th><th scope="col" className="is-number">Lâminas</th><th scope="col"><span className="sr-only">Ações</span></th></tr></thead>
-                  <tbody>{visibleLabs.map(lab => <tr key={lab.id}>
+                  <thead><tr><th scope="col" aria-sort="ascending">Laboratório</th><th scope="col">Seu papel</th><th scope="col" className="is-number">Lâminas</th><th scope="col" colSpan={2}><span className="sr-only">Ações</span></th></tr></thead>
+                  <tbody>{visibleLabs.map(lab => <tr key={lab.id} className={lab.estado === 'DESATIVADO' ? 'is-disabled' : undefined}>
                     <th scope="row"><button className="laboratory-row-open" type="button" onClick={() => openSlides(lab)}>{lab.nome}</button>{lab.estado === 'DESATIVADO' && <span className="laboratory-state is-disabled">Desativado</span>}</th>
-                    <td className="laboratory-row-role">{papeisPrincipais(lab.papeis)}</td>
+                    <td className="laboratory-row-role">{papeisPrincipais(lab.papeis)}<span className="laboratory-row-separator" aria-hidden="true">·</span></td>
                     <td className="is-number laboratory-row-count"><SlideCount total={slideTotals === null ? undefined : slideTotals.get(lab.id) ?? null} /></td>
                     <td className="laboratory-row-actions"><button className="icon-button laboratory-row-manage" type="button" aria-label={`Gerenciar ${lab.nome}`} title="Gerenciar" onClick={() => openManage(lab)}><Settings size={17} aria-hidden="true" /></button></td>
+                    <td className="laboratory-row-chevron" aria-hidden="true"><ChevronRight size={18} /></td>
                   </tr>)}</tbody>
                 </table>
                   : <div className="laboratory-empty"><h3>{query ? 'Nenhum laboratório encontrado' : 'Nenhum laboratório ainda'}</h3><p>{query ? 'Tente outro nome.' : 'Você ainda não participa de nenhum laboratório. Se alguém vai te convidar, o convite chega por e-mail. Você também pode criar um laboratório ou usar lâminas avulsas.'}</p>{query && <button className="text-button" type="button" onClick={() => setQuery('')}>Limpar busca</button>}</div>}

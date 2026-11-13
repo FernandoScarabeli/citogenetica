@@ -94,22 +94,43 @@ html[data-appearance="dark"] .labs-app .error-banner { background: #33231f; }
 .laboratory-search input,.members-search input { width: 100%; min-width: 0; height: 36px; margin: 0; padding: 0; border: 0; outline: 0; background: transparent; color: var(--lab-ink); font-size: 13px; }
 .laboratory-search input::placeholder,.members-search input::placeholder { color: #59675e; opacity: 1; }
 /* Lista de laboratórios: a linha inteira abre as lâminas; a engrenagem leva a "Gerenciar". */
-.laboratory-table { width: 100%; border-collapse: separate; border-spacing: 0; overflow: hidden; border: 1px solid var(--lab-line); border-radius: 6px; background: var(--lab-surface); font-size: 14px; }
-.laboratory-table th,.laboratory-table td { padding: 0 16px; height: 52px; border-top: 1px solid var(--lab-line); text-align: left; vertical-align: middle; }
-.laboratory-table thead th { height: 40px; border-top: 0; color: var(--lab-muted); font-size: 12px; font-weight: 550; }
-.laboratory-table .is-number { text-align: right; font-variant-numeric: tabular-nums; }
-.laboratory-table tbody tr { position: relative; }
-.laboratory-table tbody tr:hover { background: var(--lab-ground); }
-.laboratory-table tbody th { font-weight: 550; }
-.laboratory-table tbody th .laboratory-state { margin-left: 10px; }
-.labs-app .laboratory-row-open { min-height: 0; padding: 0; border: 0; background: none; color: var(--lab-ink); font: inherit; font-size: 15px; font-weight: 550; line-height: 22px; text-align: left; overflow-wrap: anywhere; cursor: pointer; }
+.laboratory-total { margin-left: 10px; vertical-align: 2px; font-weight: 400; font-variant-numeric: tabular-nums; }
+/* Lista de laboratórios: mesmas medidas da lista de lâminas (cabeçalho 43px, linha 74px, margem 22px).
+   A linha inteira abre as lâminas; a engrenagem leva a "Gerenciar". */
+.laboratory-table { width: 100%; border: 1px solid var(--lab-line); border-collapse: separate; border-spacing: 0; border-radius: 6px; overflow: hidden; background: var(--lab-surface); color: var(--lab-muted); font-size: var(--fs-caption); line-height: var(--lh-caption); }
+.laboratory-table th,.laboratory-table td { height: 74px; padding: 12px 12px; border: 0; border-top: 1px solid var(--lab-line); text-align: left; vertical-align: middle; font-variant-numeric: tabular-nums; }
+.laboratory-table :is(th, td):first-child { padding-left: 22px; }
+.laboratory-table thead th { height: 43px; padding-top: 0; padding-bottom: 0; border-top: 0; color: var(--lab-muted); font-size: var(--fs-micro); line-height: var(--lh-micro); font-weight: 400; }
+.laboratory-table tbody tr { position: relative; transition: background-color 160ms ease; }
+@media (hover: hover) {
+  .laboratory-table tbody tr:hover { background: var(--lab-ground); }
+  .laboratory-table tbody tr:hover .laboratory-row-chevron svg { translate: 3px 0; color: var(--lab-ink); }
+}
+.laboratory-table tbody tr:active { background: var(--lab-ground); }
+.laboratory-table tbody th .laboratory-state { margin-left: 10px; vertical-align: 1px; }
+.labs-app .laboratory-row-open { min-height: 0; padding: 0; border: 0; background: none; color: var(--lab-ink); font-size: var(--fs-body); line-height: var(--lh-body); font-weight: 550; text-align: left; overflow-wrap: anywhere; cursor: pointer; }
 .laboratory-row-open::after { content: ""; position: absolute; inset: 0; }
 .laboratory-row-open:focus-visible { outline: none; }
 .laboratory-table tbody tr:has(.laboratory-row-open:focus-visible) { outline: 3px solid var(--lab-focus); outline-offset: -3px; }
-.laboratory-row-role,.laboratory-row-count { color: var(--lab-muted); }
-.laboratory-row-actions { width: 56px; text-align: right; }
-.laboratory-count-unit { display: none; }
-.labs-app .laboratory-row-manage { position: relative; z-index: 1; display: inline-flex; align-items: center; justify-content: center; vertical-align: middle; }
+.laboratory-table tbody tr.is-disabled .laboratory-row-open { color: var(--lab-muted); }
+.laboratory-table .is-number { width: 110px; }
+.laboratory-row-separator,.laboratory-count-unit { display: none; }
+.laboratory-row-actions { width: 52px; text-align: right; }
+.labs-app .laboratory-row-manage { position: relative; z-index: 1; display: inline-flex; align-items: center; justify-content: center; vertical-align: middle; transition: background-color 160ms ease, color 160ms ease; }
+.laboratory-table .laboratory-row-chevron { width: 42px; padding: 0 22px 0 0; color: var(--lab-muted); }
+.laboratory-row-chevron svg { display: block; transition: translate 160ms ease, color 160ms ease; }
+/* Esqueleto no formato da tabela, para a página não pular quando os laboratórios chegam. */
+.laboratory-table-skeleton { display: block; }
+.laboratory-skeleton-row { display: grid; grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr) 110px 94px; align-items: center; gap: 24px; height: 74px; padding: 0 22px; border-top: 1px solid var(--lab-line); }
+.laboratory-skeleton-row:first-of-type { border-top: 0; }
+.laboratory-skeleton-row span,.laboratory-count-skeleton { display: block; height: 10px; border-radius: 3px; background: var(--lab-line); animation: laboratory-pulse 1.4s ease-in-out infinite; }
+.laboratory-skeleton-row span:first-child { width: min(220px, 70%); height: 12px; }
+.laboratory-skeleton-row span:nth-child(2) { width: 100px; }
+.laboratory-skeleton-row span:nth-child(3) { width: 24px; }
+.laboratory-skeleton-row span:nth-child(4) { visibility: hidden; }
+.laboratory-count-skeleton { display: inline-block; width: 24px; vertical-align: middle; }
+@keyframes laboratory-pulse { 50% { opacity: .45; } }
+html[data-appearance="dark"] .laboratory-state.is-disabled { border-color: var(--lab-line); background: var(--lab-ground); color: var(--lab-muted); }
 .laboratory-state { display: inline-flex; flex: none; align-items: center; min-height: 24px; padding: 2px 8px; border: 1px solid transparent; border-radius: 4px; font-size: 12px; line-height: 18px; font-weight: 550; white-space: nowrap; }
 .laboratory-state.is-active { border-color: #c3d6c7; background: #e9f2eb; color: #274d35; }
 .laboratory-state.is-disabled { border-color: #d4d9d5; background: #eef0ee; color: #39453d; }
@@ -290,17 +311,21 @@ html[data-appearance="dark"] .orientation-notice { color: #a4c5b2; }
 }
 
 @media (max-width: 700px) {
-  /* No celular cada laboratório vira um bloco: nome em cima, papel e lâminas embaixo, engrenagem à direita. */
+  /* No celular cada laboratório vira um bloco (como as lâminas): nome em cima, "papel · N lâminas" embaixo, engrenagem e seta à direita. */
   .laboratory-table thead { display: none; }
   .laboratory-table,.laboratory-table tbody { display: block; }
-  .laboratory-table tbody tr { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; grid-template-areas: "nome nome manage" "papel lam manage"; align-items: center; column-gap: 12px; padding: 12px 8px 12px 16px; border-top: 1px solid var(--lab-line); }
+  .laboratory-table tbody tr { display: grid; grid-template-columns: auto minmax(0, 1fr) auto auto; grid-template-areas: "nome nome manage seta" "papel lam manage seta"; align-items: center; row-gap: 4px; min-height: 68px; padding: 14px 0 14px 14px; border-top: 1px solid var(--lab-line); }
   .laboratory-table tbody tr:first-child { border-top: 0; }
-  .laboratory-table tbody :is(th, td) { display: block; height: auto; padding: 0; border: 0; }
+  .laboratory-table tbody :is(th, td),.laboratory-table tbody :is(th, td):first-child { display: block; width: auto; height: auto; padding: 0; border: 0; }
   .laboratory-table tbody th { grid-area: nome; }
-  .laboratory-row-role { grid-area: papel; font-size: 13px; }
-  .laboratory-row-count { grid-area: lam; font-size: 13px; }
-  .laboratory-count-unit { display: inline; }
-  .laboratory-row-actions { grid-area: manage; width: auto; }
+  .laboratory-row-role { grid-area: papel; white-space: nowrap; }
+  .laboratory-row-count { grid-area: lam; }
+  .laboratory-row-separator,.laboratory-count-unit { display: inline; }
+  .laboratory-row-separator { padding: 0 6px; }
+  .laboratory-row-actions { grid-area: manage; }
+  .laboratory-table tbody .laboratory-row-chevron { grid-area: seta; padding-right: 12px; }
+  .laboratory-skeleton-row { grid-template-columns: minmax(0, 1fr) 80px; padding: 0 14px; }
+  .laboratory-skeleton-row span:nth-child(n+3) { display: none; }
   .labs-app .topbar { height: 65px; }
   .labs-app .account-trigger-identity,.labs-app .account-trigger > svg { display: none; }
   .labs-app .labs-main { width: calc(100% - 32px); min-height: calc(100dvh - 65px); padding-top: 22px; }
@@ -354,5 +379,7 @@ html[data-appearance="dark"] .orientation-notice { color: #a4c5b2; }
 
 @media (prefers-reduced-motion: reduce) {
   .labs-app .button,.labs-app .text-button,.labs-app .account-switch > span { transition: none; }
+  .laboratory-table tbody tr,.laboratory-row-chevron svg,.labs-app .laboratory-row-manage { transition: none; }
+  .laboratory-skeleton-row span,.laboratory-count-skeleton { animation: none; }
   .labs-app .button:active,.labs-app .text-button:active { translate: none; }
 }
