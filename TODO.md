@@ -77,7 +77,7 @@ Nada é commitado até o fim da sequência.
 ### 1.4 Etapas da API (seguindo o planejamento)
 - [x] **Etapa 1 · Base**: Laboratório, Participação (ATIVA/SAIU/REMOVIDA), Convite (hash do token, expiração, aceite atômico), Vínculo de orientação, regra do último administrador; `LaboratorioAccessQuery` pronta para as lâminas da Etapa 2
 - [x] **Etapa 2 · Contagem**: Protocolo, Versão (imutável quando publicada), Fase (`conta_como_divisao`), Tipo de anormalidade (fixo e personalizado, normalização), Lâmina, Registro (`quantidade`, `registrado_em`, `fuso_registro`, exclusão lógica, versão), cálculos oficiais (totais, %, IM), desfazer, edição, histórico; seed de meiose e mitose
-- [ ] **Etapa 3 · Dados**: exportação JSON versionada, importador dos backups legados (sem duplicar), CSV (resumo e uma linha por registro), PDF
+- [x] **Etapa 3 · Dados**: exportação JSON versionada (uma ou várias lâminas), CSV no padrão do Excel (resumo e uma linha por registro, uma ou várias lâminas), relatório PDF (OpenPDF 2.0.5, última para Java 17) e importador dos backups dos HTMLs antigos no site, sem duplicar
 - [ ] **Etapa 4 · Offline/sync**: operações idempotentes (`operacao_id` + hash do payload), revisões, conflitos, consulta incremental com cursor
 - [ ] **Etapa 5 · Pesquisa**: Projeto, Experimento, editor de protocolos configuráveis
 - [ ] **Etapa 6 · Colaboração**: Fotos (MinIO privado, upload em duas fases, checksum), Comentários
@@ -106,7 +106,8 @@ Nada é commitado até o fim da sequência.
 - [x] Lâminas antigas do navegador enviadas sozinhas ao abrir "Meus laboratórios", com a data original (sem tela; a lâmina só sai do navegador depois de todas as células confirmadas)
 - [x] Notificações via SSE no sino
 - [x] Painel do admin da plataforma: lista, busca, filtro, desativar e reativar laboratório
-- [ ] Importador dos backups dos HTMLs antigos (meiose e mitose)
+- [x] Importador dos backups dos HTMLs antigos (meiose e mitose), com backups de teste em `apps/web/tests/fixtures/legado/`
+- [x] Botões de exportação na lâmina (CSV, PDF, JSON) e "Exportar todas" nas listas
 
 ### 2.3 PWA e offline (Etapa 4)
 - [ ] Manifest, service worker, IndexedDB
@@ -150,6 +151,6 @@ Ver `docs/questoes-validacao.md`. As principais:
 - [x] Uma célula pode ter mais de uma anormalidade: sim (decidido em 2026-11-03)
 - [x] Limites do lote, meta configurável, casas decimais: decididos em 2026-11-08 (ver `docs/questoes-validacao.md`)
 - [x] Alcance do "desfazer" entre aparelhos: vale em qualquer aparelho (decidido em 2026-11-08)
-- [ ] Backups reais (ou fictícios) dos HTMLs antigos para testar a migração
-- [ ] Formato de CSV e PDF esperado (Excel, R, SISVAR)
+- [x] Backups dos HTMLs antigos: gerados usando os próprios HTMLs (decidido em 2026-11-12)
+- [x] Formato de CSV e PDF: CSV no padrão do Excel em português, PDF gerado pela API (decidido em 2026-11-12)
 - [ ] Hospedagem e responsável pela manutenção
