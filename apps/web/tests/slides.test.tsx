@@ -940,7 +940,27 @@ describe('exportação da lâmina', () => {
 });
 
 describe('exportação das listas de lâminas', () => {
-  const grupo = () => screen.queryByRole('group', { name: 'Exportar todas as lâminas' });
+  const menu = () => screen.queryByRole('button', { name: /exportar/i });
+  async function exportar(user: ReturnType<typeof userEvent.setup>, rotulo: string) {
+    await user.click(menu()!);
+    await user.click(screen.getByRole('menuitem', { name: rotulo }));
+  }
+
+  it('um botão só abre o menu com importar e as três exportações; Esc fecha e devolve o foco', async () => {
+    const user = userEvent.setup();
+    renderSlides({ laboratory: ACTIVE_LAB });
+    await screen.findByRole('button', { name: /L1 planta A/ });
+    expect(menu()!.textContent).toBe('Importar e exportar');
+    await user.click(menu()!);
+    expect(screen.getAllByRole('menuitem').map(item => item.textContent))
+      .toEqual(['Importar backup antigo', 'Resumo (CSV)', 'Registros (CSV)', 'Dados (JSON)']);
+    expect(document.activeElement?.textContent).toBe('Importar backup antigo');
+    await user.keyboard('{ArrowDown}');
+    expect(document.activeElement?.textContent).toBe('Resumo (CSV)');
+    await user.keyboard('{Escape}');
+    expect(screen.queryByRole('menu')).toBeNull();
+    expect(document.activeElement).toBe(menu());
+  });
 
   it('baixa as três opções com o laboratório da lista', async () => {
     api.baixarLaminasResumoCsv.mockResolvedValue(ARQUIVO);
@@ -949,10 +969,11 @@ describe('exportação das listas de lâminas', () => {
     const user = userEvent.setup();
     renderSlides({ laboratory: ACTIVE_LAB });
     await screen.findByRole('button', { name: /L1 planta A/ });
-    const exportar = within(grupo()!);
-    await user.click(exportar.getByRole('button', { name: 'Resumo (CSV)' }));
-    await user.click(exportar.getByRole('button', { name: 'Registros (CSV)' }));
-    await user.click(exportar.getByRole('button', { name: 'Dados (JSON)' }));
+    await exportar(user, 'Resumo (CSV)');
+    await waitFor(() => expect(salvarArquivo).toHaveBeenCalledTimes(1));
+    await exportar(user, 'Registros (CSV)');
+    await waitFor(() => expect(salvarArquivo).toHaveBeenCalledTimes(2));
+    await exportar(user, 'Dados (JSON)');
     await waitFor(() => expect(salvarArquivo).toHaveBeenCalledTimes(3));
     for (const funcao of ['baixarLaminasResumoCsv', 'baixarLaminasRegistrosCsv', 'baixarLaminasJson'] as const) {
       expect(api[funcao]).toHaveBeenCalledWith({ laboratorioId: 'lab-1' });
@@ -964,15 +985,16 @@ describe('exportação das listas de lâminas', () => {
     const user = userEvent.setup();
     renderSlides();
     await screen.findByRole('button', { name: /L1 planta A/ });
-    await user.click(within(grupo()!).getByRole('button', { name: 'Dados (JSON)' }));
+    await exportar(user, 'Dados (JSON)');
     await waitFor(() => expect(api.baixarLaminasJson).toHaveBeenCalledWith({ laboratorioId: null }));
   });
 
-  it('não aparece sem lâminas', async () => {
+  it('sem lâminas, o menu não oferece exportar', async () => {
     api.listarLaminas.mockResolvedValue(page([]));
     renderSlides();
     await screen.findByText('Comece pela primeira lâmina');
-    expect(grupo()).toBeNull();
+    expect(menu()).toBeNull();
+    expect(screen.getByRole('button', { name: 'Importar' })).toBeTruthy();
   });
 
   it('mostra o erro de acesso negado', async () => {
@@ -980,7 +1002,7 @@ describe('exportação das listas de lâminas', () => {
     const user = userEvent.setup();
     renderSlides({ laboratory: ACTIVE_LAB });
     await screen.findByRole('button', { name: /L1 planta A/ });
-    await user.click(within(grupo()!).getByRole('button', { name: 'Resumo (CSV)' }));
+    await exportar(user, 'Resumo (CSV)');
     expect((await screen.findByRole('alert')).textContent).toContain('permissão');
   });
 });

@@ -4,25 +4,25 @@ import type { ContagemApi } from './api/contagem-api';
 import { mensagemDeErro } from './contagem-utils';
 import { salvarArquivo } from './salvar-arquivo';
 
-type Kind = 'resumo' | 'registros' | 'json';
-const OPCOES: { kind: Kind; rotulo: string; Icone: typeof Braces }[] = [
+export type TipoExportacao = 'resumo' | 'registros' | 'json';
+export const OPCOES_EXPORTACAO: { kind: TipoExportacao; rotulo: string; Icone: typeof Braces }[] = [
   { kind: 'resumo', rotulo: 'Resumo (CSV)', Icone: FileSpreadsheet },
   { kind: 'registros', rotulo: 'Registros (CSV)', Icone: FileSpreadsheet },
   { kind: 'json', rotulo: 'Dados (JSON)', Icone: Braces },
 ];
 
 /** Baixa todas as lâminas do laboratório (ou as avulsas, sem laboratório) que a lista mostra. */
-export function ExportarLaminas({ api, laboratorioId, donoUsuarioId, onError }: {
+export function useExportarLaminas({ api, laboratorioId, donoUsuarioId, onError }: {
   api: ContagemApi;
   laboratorioId: string | null;
   donoUsuarioId?: number | null;
   onError: (message: string) => void;
 }) {
-  const [baixando, setBaixando] = useState<Kind | null>(null);
+  const [baixando, setBaixando] = useState<TipoExportacao | null>(null);
   const mounted = useRef(true);
   useEffect(() => { mounted.current = true; return () => { mounted.current = false; }; }, []);
 
-  async function exportar(kind: Kind) {
+  async function exportar(kind: TipoExportacao) {
     if (baixando) return;
     setBaixando(kind);
     const filtros = { laboratorioId, ...(donoUsuarioId == null ? {} : { donoUsuarioId }) };
@@ -38,8 +38,5 @@ export function ExportarLaminas({ api, laboratorioId, donoUsuarioId, onError }: 
     }
   }
 
-  return <div className="export-group" role="group" aria-label="Exportar todas as lâminas">
-    <span className="export-label">Exportar todas:</span>
-    {OPCOES.map(({ kind, rotulo, Icone }) => <button key={kind} className="button secondary" type="button" disabled={baixando !== null} aria-busy={baixando === kind} onClick={() => void exportar(kind)}><Icone size={16} aria-hidden="true" /> {baixando === kind ? 'Baixando…' : rotulo}</button>)}
-  </div>;
+  return { baixando, exportar };
 }

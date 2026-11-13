@@ -1,13 +1,14 @@
 import { useCallback, useEffect, useRef, useState, type FormEvent } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router';
-import { ArrowRight, ChevronRight, FlaskConical, Microscope, Plus, Search, X } from 'lucide-react';
+import { ArrowRight, ChevronRight, FlaskConical, Microscope, Plus, Search, Upload, X } from 'lucide-react';
 import { typeClass } from '@/lib/type-scale';
 import { contagemApi, type ContagemApi } from './api/contagem-api';
 import type { LaminaDTO, ProtocoloDTO } from './api/contracts/contagem';
 import type { LaboratorioResponseDTO } from './api/contracts/laboratorio';
 import { caminhoLamina, caminhoLaminas, telaDaRota } from './app/rotas';
 import { formatarData, mensagemDeErro } from './contagem-utils';
-import { ExportarLaminas } from './ExportarLaminas';
+import { ActionMenu, type ActionMenuHandle, type ItemMenu } from './components/ui/action-menu';
+import { OPCOES_EXPORTACAO, useExportarLaminas } from './ExportarLaminas';
 import { ImportarLegado } from './ImportarLegado';
 import { SlideDetail } from './SlideDetail';
 import { Modal, ProtocolSelect, type ProtocolOption } from './SlideWidgets';
@@ -56,6 +57,8 @@ export function Slides({ laboratory, onBack, readOnly, usuarioId, api = contagem
   const [creating, setCreating] = useState(false);
   const [saving, setSaving] = useState(false);
   const [createError, setCreateError] = useState('');
+  const [importing, setImporting] = useState(false);
+  const dataMenu = useRef<ActionMenuHandle>(null);
   const newSlideId = useRef('');
   const [form, setForm] = useState({ nome: '', protocolo: 'mitose', especie: '', tratamento: '', meta: DEFAULT_MITOSIS_GOAL });
 
@@ -136,6 +139,17 @@ export function Slides({ laboratory, onBack, readOnly, usuarioId, api = contagem
     navigate(caminhoLaminas(laboratoryId), { replace: true });
   }
 
+  const exportacao = useExportarLaminas({ api, laboratorioId: laboratoryId, onError: setError });
+  // Importar e exportar ficam num menu só, para não encher o cabeçalho da lista de botões.
+  const dataItems: ItemMenu[] = [
+    ...(canCreate ? [{ tipo: 'acao' as const, id: 'importar', rotulo: 'Importar backup antigo', Icone: Upload, aoEscolher: () => setImporting(true) }] : []),
+    ...(slides.length ? [
+      { tipo: 'titulo' as const, texto: 'Exportar todas as lâminas' },
+      ...OPCOES_EXPORTACAO.map(({ kind, rotulo, Icone }) => ({ tipo: 'acao' as const, id: kind, rotulo, Icone, aoEscolher: () => void exportacao.exportar(kind) })),
+    ] : []),
+  ];
+  const dataLabel = canCreate && slides.length ? 'Importar e exportar' : canCreate ? 'Importar' : 'Exportar';
+
   const matched = slides.filter(item => `${item.nome} ${item.especie} ${item.tratamento}`.toLocaleLowerCase('pt-BR').includes(query.toLocaleLowerCase('pt-BR')));
   const totalCells = slides.reduce((sum, item) => sum + item.totalCelulas, 0);
   const scopeName = laboratory?.nome ?? 'Lâminas avulsas';
@@ -156,12 +170,13 @@ export function Slides({ laboratory, onBack, readOnly, usuarioId, api = contagem
       : !slide ? <main className="page-container home">
         <div className="page-heading"><div><h1 className={typeClass('display')}>Lâminas</h1><p>Organize suas lâminas e acompanhe a contagem de células.</p></div>{canCreate && <button className="button primary" type="button" onClick={openNew}><Plus size={17} /> Nova lâmina</button>}</div>
         <section className="overview" aria-label="Visão geral"><div className="overview-intro"><span className="overview-symbol"><FlaskConical size={22} /></span><div><h2 className={typeClass('title')}>Resumo</h2><p>Totais das lâminas e células registradas.</p></div></div><div className="overview-stat"><span>Lâminas registradas</span><strong>{slides.length}</strong></div><div className="overview-stat"><span>Células contadas</span><strong>{totalCells.toLocaleString('pt-BR')}</strong></div></section>
-        <section className="list-section"><div className="section-heading"><div><h2 className={typeClass('title')}>Registros</h2></div>{canCreate && <ImportarLegado api={api} laboratorioNome={laboratory?.nome ?? null} laboratorioId={laboratoryId} usuarioId={usuarioId} protocolos={protocolos} onFinished={reloadSlides} />}{slides.length > 0 && <ExportarLaminas api={api} laboratorioId={laboratoryId} onError={setError} />}<label className="search"><Search size={17} /><span className="sr-only">Buscar lâminas</span><input placeholder="Buscar lâmina" value={query} onChange={event => setQuery(event.target.value)} /></label></div>
+        <section className="list-section"><div className="section-heading"><div><h2 className={typeClass('title')}>Registros</h2></div><div className="list-tools">{dataItems.length > 0 && <ActionMenu ref={dataMenu} rotulo={dataLabel} itens={dataItems} ocupado={exportacao.baixando ? 'Baixando…' : null} />}<label className="search"><Search size={17} /><span className="sr-only">Buscar lâminas</span><input placeholder="Buscar lâmina" value={query} onChange={event => setQuery(event.target.value)} /></label></div></div>
           {matched.length ? <div className="slide-list"><div className="list-labels"><span>Identificação</span><span>Protocolo</span><span>Células</span><span>Criada por</span><span>Criada em</span><span /></div>{matched.map(item => <button className="slide-row" type="button" key={item.id} onClick={() => { setNotice(''); navigate(caminhoLamina(laboratoryId, item.id)); }}><span className="slide-identity"><span><strong>{item.nome}</strong>{(item.especie || item.tratamento) && <small>{[item.especie, item.tratamento].filter(Boolean).join(' · ')}</small>}</span></span><span><span className="protocol-tag">{protocolOf(item)?.nome ?? 'Protocolo'}</span></span><span className="numeric">{item.totalCelulas.toLocaleString('pt-BR')}</span><span className="slide-creator"><span className="creator-label">Criada por: </span>{item.donoNome}</span><span className="date">{formatarData(item.criadaEm)}</span><ChevronRight size={17} className="row-arrow" /></button>)}</div>
             : <div className="empty-state"><span className="empty-symbol"><Microscope size={25} /></span><h3>{query ? 'Nenhuma lâmina encontrada' : 'Comece pela primeira lâmina'}</h3><p>{query ? 'Tente buscar por outra identificação, espécie ou tratamento.' : canCreate ? 'Crie uma lâmina para registrar suas observações e acompanhar a contagem de células.' : 'Ainda não há lâminas neste laboratório.'}</p>{!query && canCreate && <button className="button secondary" type="button" onClick={openNew}><Plus size={16} /> Nova lâmina</button>}</div>}</section>
       </main>
         : <SlideDetail key={slide.id} api={api} laminaId={slide.id} usuarioId={usuarioId} readOnly={readOnly} protocolos={protocolos} onError={setError} onGone={message => { setSlides(current => current.filter(item => item.id !== slide.id)); leaveDetail(message); }} onLaminaChanged={upsert} onDeleted={id => { setSlides(current => current.filter(item => item.id !== id)); leaveDetail(); }} />}
     <footer className="footer page-container"><span>Laboratório de Citogenética · UFLA</span></footer>
+    {importing && <ImportarLegado api={api} laboratorioNome={laboratory?.nome ?? null} laboratorioId={laboratoryId} usuarioId={usuarioId} protocolos={protocolos} onFinished={reloadSlides} onClose={() => { setImporting(false); dataMenu.current?.focar(); }} />}
     {creating && <Modal title="Nova lâmina" onClose={() => setCreating(false)}><form onSubmit={event => void create(event)}>
       <p className="modal-description">Identifique a lâmina e escolha o protocolo da análise.</p>
       <label>Identificação da lâmina<input autoFocus required maxLength={120} placeholder="Ex.: L1 – planta A" value={form.nome} onChange={event => setForm({ ...form, nome: event.target.value })} /></label>

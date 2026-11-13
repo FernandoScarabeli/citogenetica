@@ -1,5 +1,4 @@
 import { useEffect, useRef, useState, type ChangeEvent } from 'react';
-import { Upload } from 'lucide-react';
 import type { ContagemApi } from './api/contagem-api';
 import type { ProtocoloDTO } from './api/contracts/contagem';
 import { mensagemDeErro } from './contagem-utils';
@@ -15,8 +14,9 @@ const rotuloProtocolo = (codigo: LaminaLegada['protocolo']) => (codigo === 'mito
 /**
  * Traz para o sistema as lâminas dos backups JSON dos registros antigos (HTML solto).
  * A lâmina vai para a lista onde a pessoa está (um laboratório ou as avulsas). Nada fica guardado no navegador.
+ * É só o diálogo: monte o componente para abrir e desmonte em onClose.
  */
-export function ImportarLegado({ api, laboratorioNome, laboratorioId, usuarioId, protocolos, onFinished }: {
+export function ImportarLegado({ api, laboratorioNome, laboratorioId, usuarioId, protocolos, onFinished, onClose }: {
   api: ContagemApi;
   laboratorioNome: string | null;
   laboratorioId: string | null;
@@ -24,8 +24,8 @@ export function ImportarLegado({ api, laboratorioNome, laboratorioId, usuarioId,
   protocolos: ProtocoloDTO[];
   /** Chamado quando uma importação termina (com ou sem falhas) para a lista recarregar. */
   onFinished: () => void;
+  onClose: () => void;
 }) {
-  const [aberto, setAberto] = useState(false);
   const [fase, setFase] = useState<Fase>('escolher');
   const [erro, setErro] = useState('');
   const [leitura, setLeitura] = useState<LeituraLegado | null>(null);
@@ -33,20 +33,13 @@ export function ImportarLegado({ api, laboratorioNome, laboratorioId, usuarioId,
   const [progresso, setProgresso] = useState<ProgressoImportacao | null>(null);
   const [resultado, setResultado] = useState<ResultadoImportacao | null>(null);
   const mounted = useRef(true);
-  const botao = useRef<HTMLButtonElement>(null);
   useEffect(() => { mounted.current = true; return () => { mounted.current = false; }; }, []);
 
   const destino = laboratorioNome ? `no laboratório ${laboratorioNome}` : 'como lâminas avulsas';
 
-  function abrir() {
-    setFase('escolher'); setErro(''); setLeitura(null); setResultado(null); setProgresso(null); setNomeArquivo('');
-    setAberto(true);
-  }
   function fechar() {
     if (fase === 'importando' || fase === 'lendo') return;
-    setAberto(false);
-    // Devolve o foco ao botão que abriu o diálogo.
-    queueMicrotask(() => botao.current?.focus());
+    onClose();
   }
 
   async function escolher(event: ChangeEvent<HTMLInputElement>) {
@@ -91,9 +84,7 @@ export function ImportarLegado({ api, laboratorioNome, laboratorioId, usuarioId,
   const conflitos = importadas.reduce((soma, item) => soma + item.celulasEmConflito, 0);
   const incompleta = !!resultado && (resultado.falhas.length > 0 || resultado.interrupcao !== null || resultado.naoTentadas > 0);
 
-  return <>
-    <button ref={botao} className="button secondary" type="button" onClick={abrir}><Upload size={16} aria-hidden="true" /> Importar backup antigo</button>
-    {aberto && <Modal title="Importar backup antigo" onClose={fechar} locked={fase === 'importando' || fase === 'lendo'}>
+  return <Modal title="Importar backup antigo" onClose={fechar} locked={fase === 'importando' || fase === 'lendo'}>
       <div className="importar-legado">
         {fase === 'escolher' || fase === 'lendo' ? <>
           <p className="modal-description">Escolha o arquivo de backup (.json) baixado dos registros antigos. As lâminas dele serão importadas {destino}. Importar o mesmo arquivo de novo não duplica nada.</p>
@@ -152,6 +143,5 @@ export function ImportarLegado({ api, laboratorioNome, laboratorioId, usuarioId,
           </div>
         </> : null}
       </div>
-    </Modal>}
-  </>;
+    </Modal>;
 }

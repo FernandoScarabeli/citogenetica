@@ -15,10 +15,11 @@ function preparar(props: { laboratory?: LaboratorioResponseDTO | null; readOnly?
   return { falsa, listar };
 }
 const arquivo = (nome: string, conteudo = lerFixture(nome)) => new File([conteudo], nome, { type: 'application/json' });
-const botaoImportar = () => screen.findByRole('button', { name: /Importar backup antigo/ });
+const botaoMenu = () => screen.findByRole('button', { name: /^Importar/ });
 
 async function escolher(user: ReturnType<typeof userEvent.setup>, file: File) {
-  await user.click(await botaoImportar());
+  await user.click(await botaoMenu());
+  await user.click(screen.getByRole('menuitem', { name: 'Importar backup antigo' }));
   const dialogo = await screen.findByRole('dialog');
   await user.upload(within(dialogo).getByLabelText(/Arquivo de backup/), file);
   return dialogo;
@@ -31,17 +32,20 @@ beforeEach(() => {
 });
 
 describe('importar backup antigo na lista de lâminas', () => {
-  it('mostra o botão mesmo com a lista vazia, e só para quem pode criar lâminas', async () => {
+  it('com a lista vazia, o menu só oferece importar, e só para quem pode criar lâminas', async () => {
+    const user = userEvent.setup();
     const { falsa } = preparar();
-    expect(await botaoImportar()).toBeTruthy();
+    const menu = await botaoMenu();
+    expect(menu.textContent).toBe('Importar');
     expect(falsa.laminas.size).toBe(0);
-    expect(screen.queryByRole('group', { name: /Exportar/ })).toBeNull();
+    await user.click(menu);
+    expect(screen.getAllByRole('menuitem').map(item => item.textContent)).toEqual(['Importar backup antigo']);
   });
 
   it('não mostra o botão em laboratório desativado (somente leitura)', async () => {
     preparar({ laboratory: { ...LAB, estado: 'DESATIVADO' }, readOnly: true });
     await screen.findByRole('heading', { name: 'Lâminas' });
-    expect(screen.queryByRole('button', { name: /Importar backup antigo/ })).toBeNull();
+    expect(screen.queryByRole('button', { name: /Importar/ })).toBeNull();
   });
 
   it('prévia, importação e resultado, com a lista recarregada no fim (laboratório)', async () => {
