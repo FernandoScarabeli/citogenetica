@@ -1,6 +1,5 @@
 import { ApiError, NetworkError, isForbidden } from './api/errors';
-import type { RegistroDTO, ResumoLaminaDTO } from './api/contracts/contagem';
-import { pct } from './domain';
+import type { RegistroDTO } from './api/contracts/contagem';
 
 /**
  * Instante que a tela de histórico mostra para um registro.
@@ -40,29 +39,6 @@ export const fusoDoAparelho = (): string | null => {
     return null;
   }
 };
-
-/** Impede que o Excel e similares executem como fórmula um texto digitado por pessoas. */
-export function neutralizarFormula(value: string): string {
-  return /^[=+\-@]/.test(value) ? `'${value}` : value;
-}
-
-/** CSV do resumo oficial da lâmina, no formato de colunas usado desde o início. */
-export function resumoCsv(resumo: ResumoLaminaDTO, observacoes: string): string {
-  const rows: (string | number)[][] = [
-    ['Fase', 'Normais', 'Anormais', 'Total', '% anormais', 'Tipos de anormalidade'],
-    ...resumo.fases.map(fase => [
-      fase.nome, fase.normais, fase.anormais, fase.total, pct(fase.percentualAnormais, 100),
-      fase.tipos.map(tipo => `${tipo.nome}: ${tipo.contagem} (${pct(tipo.percentual, 100)})`).join('; '),
-    ]),
-    [],
-    ['Observações', observacoes],
-  ];
-  const cell = (value: string | number) => {
-    const text = typeof value === 'string' ? neutralizarFormula(value) : String(value);
-    return `"${text.replace(/"/g, '""')}"`;
-  };
-  return '﻿' + rows.map(row => row.map(cell).join(';')).join('\n');
-}
 
 export const MENSAGEM_SEM_CONEXAO = 'Esta célula não foi registrada. Verifique a internet e tente de novo.';
 

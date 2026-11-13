@@ -30,6 +30,8 @@
         <aws.sdk.version>2.57.12</aws.sdk.version>
         <testcontainers.version>1.21.4</testcontainers.version>
         <archunit.version>1.5.1</archunit.version>
+        <!-- OpenPDF (LGPL/MPL): 2.0.5 é a última linha compilada para Java 17; da 2.1.0 em diante exige Java 21. -->
+        <openpdf.version>2.0.5</openpdf.version>
     </properties>
 
     <dependencyManagement>
@@ -57,6 +59,11 @@
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-validation</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>com.github.librepdf</groupId>
+            <artifactId>openpdf</artifactId>
+            <version>${openpdf.version}</version>
         </dependency>
         <dependency>
             <groupId>org.springframework.boot</groupId>

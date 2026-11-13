@@ -4,6 +4,57 @@ import {
   type ErrorResponseDTO,
 } from './errors.js';
 
+function decodeExtended(value: string): string | undefined {
+  // RFC 5987: charset'idioma'valor com percent-encoding.
+  const match = /^([^']*)'[^']*'(.*)$/.exec(value);
+  const raw = match ? match[2] : value;
+  const charset = match ? match[1].toLowerCase() : 'utf-8';
+  if (charset !== 'utf-8' && charset !== '') return undefined;
+  try {
+    return decodeURIComponent(raw);
+  } catch {
+    return undefined;
+  }
+}
+
+function unquote(value: string): string {
+  const trimmed = value.trim();
+  if (trimmed.startsWith('"')) {
+    const end = trimmed.lastIndexOf('"');
+    return trimmed.slice(1, end > 0 ? end : undefined).replace(/\\(.)/g, '$1');
+  }
+  return trimmed;
+}
+
+/** Separa o nome sugerido pelo servidor, ignorando qualquer parte de caminho. */
+function limparNome(name: string): string | undefined {
+  const base = name.split(/[\\/]/).pop()?.replace(/[\u0000-\u001f]/g, '').trim();
+  return base ? base : undefined;
+}
+
+/** Nome do arquivo em `Content-Disposition`: prefere `filename*` (UTF-8), depois `filename`. */
+export function nomeDeContentDisposition(header: string | null): string | undefined {
+  if (!header) return undefined;
+
+  // Divide nos ";" que ficam fora de aspas.
+  const parts = header.match(/(?:[^;"]|"(?:[^"\\]|\\.)*")+/g) ?? [];
+  let simple: string | undefined;
+  for (const part of parts.slice(1)) {
+    const separator = part.indexOf('=');
+    if (separator < 0) continue;
+    const key = part.slice(0, separator).trim().toLowerCase();
+    const value = part.slice(separator + 1);
+    if (key === 'filename*') {
+      const decoded = decodeExtended(value.trim());
+      const name = decoded ? limparNome(decoded) : undefined;
+      if (name) return name;
+    } else if (key === 'filename' && simple === undefined) {
+      simple = limparNome(unquote(value));
+    }
+  }
+  return simple;
+}
+
 const CSRF_PATH = '/api/v1/auth/csrf';
 const CSRF_ERROR_MESSAGE = 'Token CSRF ausente ou inválido.';
 const MUTATING_METHODS = new Set(['POST', 'PUT', 'PATCH', 'DELETE']);
@@ -19,8 +70,15 @@ export interface HttpClientOptions {
   fetch?: typeof globalThis.fetch;
 }
 
+export interface ArquivoBaixado {
+  blob: Blob;
+  nome: string;
+}
+
 export interface HttpClient {
   request<T = void>(path: string, options?: HttpRequestOptions): Promise<T>;
+  /** Baixa um arquivo (GET) com o nome sugerido pela API, ou `nomePadrao` quando ela não indica um. */
+  download(path: string, nomePadrao: string, options?: Pick<HttpRequestOptions, 'signal'>): Promise<ArquivoBaixado>;
   renewCsrf(options?: Pick<HttpRequestOptions, 'signal'>): Promise<void>;
   onUnauthorized(listener: () => void): () => void;
 }
@@ -222,8 +280,21 @@ export function createHttpClient(options: HttpClientOptions = {}): HttpClient {
     }
   }
 
+  async function download(path: string, nomePadrao: string, requestOptions: Pick<HttpRequestOptions, 'signal'> = {}): Promise<ArquivoBaixado> {
+    const response = await fetchResponse(path, {
+      method: 'GET',
+      credentials: 'include',
+      headers: { Accept: '*/*' },
+      signal: requestOptions.signal,
+    });
+    if (!response.ok) throw await throwIfUnauthorized(response, path);
+    const blob = await response.blob();
+    return { blob, nome: nomeDeContentDisposition(response.headers.get('content-disposition')) ?? nomePadrao };
+  }
+
   return {
     request,
+    download,
     renewCsrf,
     onUnauthorized(listener) {
       unauthorizedListeners.add(listener);

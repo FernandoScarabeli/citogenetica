@@ -4,7 +4,7 @@ import { transformWithOxc } from 'vite';
 import { readFileSync } from 'node:fs';
 const source = readFileSync(new URL('../src/domain.ts', import.meta.url), 'utf8');
 const { code: compiled } = await transformWithOxc(source, 'domain.ts');
-const { emptyState, isState, normalize, pct, summary, slideGoal, removeMatching, slideCsv } = await import(`data:text/javascript;base64,${Buffer.from(compiled).toString('base64')}`);
+const { emptyState, isState, normalize, pct, summary, slideGoal, removeMatching } = await import(`data:text/javascript;base64,${Buffer.from(compiled).toString('base64')}`);
 const slide = {id:'1',name:'L1',protocol:'mitose',species:'',treatment:'',notes:'',createdAt:'2026-10-27T12:00:00Z',entries:[
  {id:'a',phase:'Interfase',status:'normal',type:'',createdAt:'2026-10-27T12:00:00Z'},
  {id:'b',phase:'Prófase',status:'anormal',type:'Micronúcleo',createdAt:'2026-10-27T12:01:00Z'},
@@ -17,5 +17,3 @@ test('backup reconhece estrutura válida e rejeita protocolo ou fase inválidos'
 
 test('metas antigas e novas preservam o significado no backup',()=>{assert.equal(slideGoal(slide),1000);assert.equal(slideGoal({...slide,goal:null}),null);assert.equal(slideGoal({...slide,goal:250}),250);assert.equal(slideGoal({...slide,protocol:'meiose'}),null);assert.equal(isState({...emptyState(),slides:[{...slide,goal:-1}]}),false);assert.equal(isState({...emptyState(),slides:[{...slide,goal:250}]}),true)});
 test('correção remove somente a fase e tipo escolhidos, sem alterar os demais registros',()=>{const before=[...slide.entries,{...slide.entries[1],id:'d',type:'Ponte'}];const after=removeMatching(before,'Prófase','anormal','Micronúcleo',1);assert.deepEqual(after.map(e=>e.id),['a','c','d']);assert.throws(()=>removeMatching(before,'Prófase','anormal','Micronúcleo',2));assert.throws(()=>removeMatching(before,'Prófase','normal','',0));assert.equal(before.length,4)});
-
-test('CSV preserva observações com quebras de linha, ponto e vírgula e aspas',()=>{const csv=slideCsv({...slide,notes:'linha 1; "nota"\nlinha 2'});assert.ok(csv.includes('"Observações";"linha 1; ""nota""\nlinha 2"'));assert.ok(csv.includes('"Prófase";"1";"1";"2"'))});

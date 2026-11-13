@@ -3,7 +3,8 @@ import { createContagemApi } from '../src/api/contagem-api';
 
 function setup() {
   const request = vi.fn().mockResolvedValue({});
-  return { api: createContagemApi({ request } as never), request };
+  const download = vi.fn().mockResolvedValue({ blob: new Blob(), nome: 'a.csv' });
+  return { api: createContagemApi({ request, download } as never), request, download };
 }
 
 const SIGNAL = new AbortController().signal;
@@ -65,5 +66,31 @@ describe('cliente da contagem', () => {
     expect(request).toHaveBeenNthCalledWith(1, '/api/v1/tipos-anormalidade/personalizados?versaoId=v1', {});
     expect(request).toHaveBeenNthCalledWith(2, '/api/v1/tipos-anormalidade/personalizados?versaoId=v1&laboratorioId=lab-1', {});
     expect(request).toHaveBeenNthCalledWith(3, '/api/v1/tipos-anormalidade/personalizados', { method: 'POST', json: tipo });
+  });
+});
+
+describe('exportação', () => {
+  it('baixa os arquivos de uma lâmina, com nome padrão e sinal', async () => {
+    const { api, download } = setup();
+    await api.baixarLaminaJson('l 1', SIGNAL);
+    await api.baixarLaminaResumoCsv('l1');
+    await api.baixarLaminaRegistrosCsv('l1');
+    await api.baixarLaminaRelatorioPdf('l1');
+    expect(download).toHaveBeenNthCalledWith(1, '/api/v1/laminas/l%201/exportacao.json', 'lamina.json', { signal: SIGNAL });
+    expect(download).toHaveBeenNthCalledWith(2, '/api/v1/laminas/l1/resumo.csv', 'lamina-resumo.csv', {});
+    expect(download).toHaveBeenNthCalledWith(3, '/api/v1/laminas/l1/registros.csv', 'lamina-registros.csv', {});
+    expect(download).toHaveBeenNthCalledWith(4, '/api/v1/laminas/l1/relatorio.pdf', 'lamina-relatorio.pdf', {});
+  });
+
+  it('baixa várias lâminas com os filtros da listagem', async () => {
+    const { api, download } = setup();
+    await api.baixarLaminasJson();
+    await api.baixarLaminasResumoCsv({ laboratorioId: 'lab-1' });
+    await api.baixarLaminasRegistrosCsv({ laboratorioId: 'lab-1', donoUsuarioId: 7, signal: SIGNAL });
+    await api.baixarLaminasJson({ laboratorioId: null, donoUsuarioId: 0 });
+    expect(download).toHaveBeenNthCalledWith(1, '/api/v1/laminas/exportacao.json', 'laminas.json', {});
+    expect(download).toHaveBeenNthCalledWith(2, '/api/v1/laminas/resumo.csv?laboratorioId=lab-1', 'laminas-resumo.csv', {});
+    expect(download).toHaveBeenNthCalledWith(3, '/api/v1/laminas/registros.csv?laboratorioId=lab-1&donoUsuarioId=7', 'laminas-registros.csv', { signal: SIGNAL });
+    expect(download).toHaveBeenNthCalledWith(4, '/api/v1/laminas/exportacao.json?donoUsuarioId=0', 'laminas.json', {});
   });
 });

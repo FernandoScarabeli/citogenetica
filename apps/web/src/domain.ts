@@ -50,9 +50,3 @@ export function removeMatching(entries: Entry[], phase: string, status: Entry['s
  const ids = new Set(candidates.slice(-quantity).map(e => e.id));
  return entries.filter(e => !ids.has(e.id));
 }
-
-export function slideCsv(slide: Slide): string {
- const stats = summary(slide);
- const rows: (string | number)[][] = [['Fase','Normais','Anormais','Total','% anormais','Tipos de anormalidade'], ...stats.phases.map(p => [p.name,p.normal,p.abnormal,p.total,pct(p.abnormal,p.total),Object.entries(p.types).map(([t,n]) => `${t}: ${n} (${pct(n,p.total)})`).join('; ')]), [], ['Observações',slide.notes]];
- return '\ufeff'+rows.map(row=>row.map(value=>`"${String(value).replace(/"/g,'""')}"`).join(';')).join('\n');
-}

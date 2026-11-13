@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
-import { Check, Download, FileText, Pencil, Plus, Trash2, Undo2, X } from 'lucide-react';
+import { Braces, Check, FileSpreadsheet, FileText, Pencil, Plus, Trash2, Undo2, X } from 'lucide-react';
 import { typeClass } from '@/lib/type-scale';
 import type { ContagemApi } from './api/contagem-api';
 import type {
@@ -10,11 +10,11 @@ import { NetworkError, isConflict, isNotFound } from './api/errors';
 import { mensagemFilaEnviando, mensagemFilaGuardada } from './contagem/fila-registros';
 import { useFilaRegistros } from './contagem/useFilaRegistros';
 import {
-  agruparPorDia, descricaoDesfazer, formatarData, formatarHora, fusoDoAparelho, instanteExibido, mensagemDeErro, normalizarNomeTipo, resumoCsv, rotuloDesfazer,
+  agruparPorDia, descricaoDesfazer, formatarData, formatarHora, fusoDoAparelho, instanteExibido, mensagemDeErro, normalizarNomeTipo, rotuloDesfazer,
 } from './contagem-utils';
 import { pct } from './domain';
 import { EntrySelect, Modal, TypeButtons, TypeChecklist, type TypeChoice } from './SlideWidgets';
-import { download } from './storage';
+import { salvarArquivo } from './salvar-arquivo';
 import { useNotesAutosave } from './useNotesAutosave';
 
 const HISTORY_PAGE_SIZE = 20;
@@ -27,6 +27,13 @@ type Loaded = { lamina: LaminaDTO; versao: VersaoProtocoloDTO; resumo: ResumoLam
 type History = { items: RegistroHistoricoDTO[]; page: number; totalPages: number };
 type Pending = { key: string; faseId: string; status: StatusRegistro };
 type Combo = { key: string; tipoIds: string[]; nome: string; quantidade: number };
+type ExportacaoKind = 'resumo' | 'registros' | 'relatorio' | 'json';
+const EXPORTACOES: { kind: ExportacaoKind; rotulo: string; Icone: typeof FileText }[] = [
+  { kind: 'resumo', rotulo: 'Resumo (CSV)', Icone: FileSpreadsheet },
+  { kind: 'registros', rotulo: 'Registros (CSV)', Icone: FileSpreadsheet },
+  { kind: 'relatorio', rotulo: 'Relatório (PDF)', Icone: FileText },
+  { kind: 'json', rotulo: 'Dados completos (JSON)', Icone: Braces },
+];
 type ModalKind = 'abnormal' | 'edit-record' | 'edit-slide' | 'delete' | 'undo' | null;
 
 const SEM_TIPO = 'Sem tipo informado';
@@ -81,6 +88,7 @@ export function SlideDetail({ api, laminaId, usuarioId, readOnly, protocolos, on
   const [tab, setTab] = useState<'contagem' | 'resumo' | 'historico'>('contagem');
   const [modal, setModal] = useState<ModalKind>(null);
   const [busy, setBusy] = useState(false);
+  const [baixando, setBaixando] = useState<ExportacaoKind | null>(null);
   const [retry, setRetry] = useState(0);
   const notes = useNotesAutosave(saveNotesText);
 
@@ -542,8 +550,22 @@ export function SlideDetail({ api, laminaId, usuarioId, readOnly, protocolos, on
     }
   }
 
-  function exportCsv() {
-    if (lamina && loaded) download(`${lamina.nome}.csv`, resumoCsv(loaded.resumo, lamina.observacoes), 'text/csv;charset=utf-8');
+  async function exportar(kind: ExportacaoKind) {
+    if (baixando) return;
+    setBaixando(kind);
+    try {
+      const arquivo = await (kind === 'resumo' ? api.baixarLaminaResumoCsv(laminaId)
+        : kind === 'registros' ? api.baixarLaminaRegistrosCsv(laminaId)
+        : kind === 'relatorio' ? api.baixarLaminaRelatorioPdf(laminaId)
+        : api.baixarLaminaJson(laminaId));
+      if (mounted.current) salvarArquivo(arquivo);
+    } catch (error) {
+      if (!mounted.current) return;
+      if (isNotFound(error)) onGone('Esta lâmina não está mais disponível.');
+      else onError(mensagemDeErro(error, 'Não foi possível baixar o arquivo. Tente de novo.'));
+    } finally {
+      if (mounted.current) setBaixando(null);
+    }
   }
 
   // Tela --------------------------------------------------------------------------------------------------------------
@@ -619,7 +641,7 @@ export function SlideDetail({ api, laminaId, usuarioId, readOnly, protocolos, on
       {canEdit && <p className="notes-status" role="status">{notes.state === 'saving' ? 'Salvando…' : notes.state === 'saved' ? 'Salvo' : notes.state === 'error' ? <>Não foi possível salvar. <button className="text-button" type="button" onClick={() => void notes.flush()}>Tentar de novo</button></> : ''}</p>}
     </div></section></div>}
 
-    {tab === 'resumo' && <section className="tab-content"><div className="section-heading"><div><h2 className={typeClass('title')}>Resumo da análise</h2><p>Distribuição das células e anormalidades por fase.</p></div><div className="action-group"><button className="button secondary" type="button" onClick={exportCsv}><Download size={16} /> Exportar CSV</button><button className="button secondary" type="button" onClick={() => window.print()}><FileText size={16} /> Imprimir / PDF</button></div></div>
+    {tab === 'resumo' && <section className="tab-content"><div className="section-heading"><div><h2 className={typeClass('title')}>Resumo da análise</h2><p>Distribuição das células e anormalidades por fase.</p></div><div className="action-group" role="group" aria-label="Exportar lâmina">{EXPORTACOES.map(({ kind, rotulo, Icone }) => <button key={kind} className="button secondary" type="button" disabled={baixando !== null} aria-busy={baixando === kind} onClick={() => void exportar(kind)}><Icone size={16} aria-hidden="true" /> {baixando === kind ? 'Baixando…' : rotulo}</button>)}</div></div>
       <div className="table-wrap"><table><thead><tr><th>Fase</th><th>Normais</th><th>Anormais</th><th>Total</th><th>% anormais</th></tr></thead><tbody>{shown.fases.map(fase => <tr key={fase.faseId}><td><strong>{fase.nome}</strong>{fase.tipos.map(tipo => <small key={tipo.tipoId}>{tipo.nome}: {tipo.contagem} ({pct(tipo.percentual, 100)})</small>)}</td><td>{fase.normais}</td><td>{fase.anormais}</td><td>{fase.total}</td><td>{pct(fase.percentualAnormais, 100)}</td></tr>)}</tbody></table></div>
       {lamina.observacoes && <div className="report-notes typeset"><h3>Observações</h3><p>{lamina.observacoes}</p></div>}</section>}
 

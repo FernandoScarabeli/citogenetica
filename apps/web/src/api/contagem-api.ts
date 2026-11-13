@@ -1,4 +1,4 @@
-import type { HttpClient } from './http-client';
+import type { ArquivoBaixado, HttpClient } from './http-client';
 import { httpClient } from './http-client';
 import type {
   AtualizarLaminaRequestDTO,
@@ -35,11 +35,25 @@ export interface ListarRegistrosOptions {
   signal?: AbortSignal;
 }
 
+export interface ExportarLaminasOptions {
+  laboratorioId?: string | null;
+  donoUsuarioId?: number | null;
+  signal?: AbortSignal;
+}
+
 function withSignal(signal?: AbortSignal) {
   return signal ? { signal } : {};
 }
 
-export function createContagemApi(client: Pick<HttpClient, 'request'> = httpClient) {
+function urlExportacaoVarias(arquivo: string, options: ExportarLaminasOptions): string {
+  const query = new URLSearchParams();
+  if (options.laboratorioId) query.set('laboratorioId', options.laboratorioId);
+  if (options.donoUsuarioId != null) query.set('donoUsuarioId', String(options.donoUsuarioId));
+  const texto = query.toString();
+  return `${LAMINAS}/${arquivo}${texto ? `?${texto}` : ''}`;
+}
+
+export function createContagemApi(client: Pick<HttpClient, 'request' | 'download'> = httpClient) {
   return {
     listarProtocolos(signal?: AbortSignal): Promise<ProtocoloDTO[]> {
       return client.request<ProtocoloDTO[]>(PROTOCOLOS, withSignal(signal));
@@ -117,6 +131,34 @@ export function createContagemApi(client: Pick<HttpClient, 'request'> = httpClie
 
     buscarResumo(laminaId: string, signal?: AbortSignal): Promise<ResumoLaminaDTO> {
       return client.request<ResumoLaminaDTO>(`${LAMINAS}/${encodeURIComponent(laminaId)}/resumo`, withSignal(signal));
+    },
+
+    baixarLaminaJson(laminaId: string, signal?: AbortSignal): Promise<ArquivoBaixado> {
+      return client.download(`${LAMINAS}/${encodeURIComponent(laminaId)}/exportacao.json`, 'lamina.json', withSignal(signal));
+    },
+
+    baixarLaminaResumoCsv(laminaId: string, signal?: AbortSignal): Promise<ArquivoBaixado> {
+      return client.download(`${LAMINAS}/${encodeURIComponent(laminaId)}/resumo.csv`, 'lamina-resumo.csv', withSignal(signal));
+    },
+
+    baixarLaminaRegistrosCsv(laminaId: string, signal?: AbortSignal): Promise<ArquivoBaixado> {
+      return client.download(`${LAMINAS}/${encodeURIComponent(laminaId)}/registros.csv`, 'lamina-registros.csv', withSignal(signal));
+    },
+
+    baixarLaminaRelatorioPdf(laminaId: string, signal?: AbortSignal): Promise<ArquivoBaixado> {
+      return client.download(`${LAMINAS}/${encodeURIComponent(laminaId)}/relatorio.pdf`, 'lamina-relatorio.pdf', withSignal(signal));
+    },
+
+    baixarLaminasJson(options: ExportarLaminasOptions = {}): Promise<ArquivoBaixado> {
+      return client.download(urlExportacaoVarias('exportacao.json', options), 'laminas.json', withSignal(options.signal));
+    },
+
+    baixarLaminasResumoCsv(options: ExportarLaminasOptions = {}): Promise<ArquivoBaixado> {
+      return client.download(urlExportacaoVarias('resumo.csv', options), 'laminas-resumo.csv', withSignal(options.signal));
+    },
+
+    baixarLaminasRegistrosCsv(options: ExportarLaminasOptions = {}): Promise<ArquivoBaixado> {
+      return client.download(urlExportacaoVarias('registros.csv', options), 'laminas-registros.csv', withSignal(options.signal));
     },
   };
 }

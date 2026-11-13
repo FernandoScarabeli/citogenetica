@@ -134,22 +134,32 @@ public class LaminaService {
      */
     @Transactional(readOnly = true)
     public Page<LaminaResumo> listar(UUID laboratorioId, Long donoFiltro, Long usuarioId, Pageable pageable) {
-        Page<Lamina> pagina;
+        return resumir(selecionarVisiveis(laboratorioId, donoFiltro, usuarioId, pageable));
+    }
+
+    /**
+     * Mesmo conjunto, mesmos filtros e mesma ordem de {@link #listar}, mas todas as lâminas, sem paginação
+     * (exportação). Reaproveita a seleção da listagem, então as duas nunca divergem.
+     */
+    @Transactional(readOnly = true)
+    public List<Lamina> listarTodasVisiveis(UUID laboratorioId, Long donoFiltro, Long usuarioId) {
+        return selecionarVisiveis(laboratorioId, donoFiltro, usuarioId, Pageable.unpaged()).getContent();
+    }
+
+    private Page<Lamina> selecionarVisiveis(UUID laboratorioId, Long donoFiltro, Long usuarioId, Pageable pageable) {
         if (laboratorioId == null) {
-            pagina = donoFiltro != null && !donoFiltro.equals(usuarioId)
+            return donoFiltro != null && !donoFiltro.equals(usuarioId)
                     ? Page.empty(pageable)
                     : laminaRepository.findAvulsasAtivas(usuarioId, pageable);
-        } else {
-            acesso.exigirVisibilidadePropria(laboratorioId, usuarioId);
-            List<Long> permitidos = laminaRepository.findDonosComLaminaAtiva(laboratorioId).stream()
-                    .filter(dono -> donoFiltro == null || dono.equals(donoFiltro))
-                    .filter(dono -> laboratorioAccessQuery.podeVerDadosDoPesquisador(laboratorioId, dono, usuarioId))
-                    .toList();
-            pagina = permitidos.isEmpty()
-                    ? Page.empty(pageable)
-                    : laminaRepository.findAtivasDoLaboratorio(laboratorioId, permitidos, pageable);
         }
-        return resumir(pagina);
+        acesso.exigirVisibilidadePropria(laboratorioId, usuarioId);
+        List<Long> permitidos = laminaRepository.findDonosComLaminaAtiva(laboratorioId).stream()
+                .filter(dono -> donoFiltro == null || dono.equals(donoFiltro))
+                .filter(dono -> laboratorioAccessQuery.podeVerDadosDoPesquisador(laboratorioId, dono, usuarioId))
+                .toList();
+        return permitidos.isEmpty()
+                ? Page.empty(pageable)
+                : laminaRepository.findAtivasDoLaboratorio(laboratorioId, permitidos, pageable);
     }
 
     @Transactional(readOnly = true)

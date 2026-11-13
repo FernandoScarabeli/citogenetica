@@ -15,7 +15,7 @@ import { load, save } from './storage';
  * - uma lâmina com erro fica no navegador e pode ser reenviada.
  */
 
-type MigracaoApi = Pick<ContagemApi, 'listarProtocolos' | 'listarTiposPersonalizados' | 'criarTipoPersonalizado' | 'criarLamina' | 'criarRegistro' | 'buscarResumo'>;
+export type MigracaoApi = Pick<ContagemApi, 'listarProtocolos' | 'listarTiposPersonalizados' | 'criarTipoPersonalizado' | 'criarLamina' | 'criarRegistro' | 'buscarResumo'>;
 
 const UUID_V4 = /^[\da-f]{8}-[\da-f]{4}-4[\da-f]{3}-[89ab][\da-f]{3}-[\da-f]{12}$/;
 const TIPO_NAO_INFORMADO = 'Não informado';
@@ -40,7 +40,7 @@ export type ResultadoMigracao = {
 };
 
 /** Falha prevista de uma lâmina, com mensagem pronta para a pessoa. */
-class FalhaDeEnvio extends Error {}
+export class FalhaDeEnvio extends Error {}
 
 /** UUIDv4 canônico (minúsculo), derivado de forma determinística do SHA-256 do texto. */
 export async function uuidDeterministico(texto: string): Promise<string> {
@@ -57,15 +57,15 @@ export async function idEstavel(idLocal: string, texto: string): Promise<string>
   return UUID_V4.test(idLocal) ? idLocal : uuidDeterministico(texto);
 }
 
-const interrompe = (error: unknown) => error instanceof NetworkError || isUnauthorized(error);
+export const interrompe = (error: unknown) => error instanceof NetworkError || isUnauthorized(error);
 
-function motivoDe(error: unknown): string {
+export function motivoDe(error: unknown): string {
   if (error instanceof FalhaDeEnvio) return error.message;
   if (error instanceof ApiError && error.status === 401) return 'Sua sessão terminou. Entre de novo para continuar.';
   return mensagemDeErro(error, 'Erro inesperado ao enviar.');
 }
 
-function exigirResposta(resposta: unknown, oQue: string): void {
+export function exigirResposta(resposta: unknown, oQue: string): void {
   if (!resposta || typeof resposta !== 'object') throw new FalhaDeEnvio(`O sistema não confirmou ${oQue}.`);
 }
 
@@ -75,14 +75,15 @@ export type DestinoDaLamina = (slide: Slide) => string | null;
 /** Limites que a API aceita para a data de criação; fora deles a data original não é enviada. */
 const CRIACAO_MAIS_ANTIGA = Date.parse('2020-01-01T00:00:00Z');
 
-/** Data de criação original da lâmina, quando legível e plausível; senão `undefined` (vale o dia do envio). */
-function criadaEmOriginal(slide: Slide): string | undefined {
-  const data = new Date(slide.createdAt);
+/** Data de criação original, quando legível e plausível para a API; senão `undefined` (vale o dia do envio). */
+export function criadaEmPlausivel(data: Date): string | undefined {
   const instante = data.getTime();
   return Number.isNaN(instante) || instante < CRIACAO_MAIS_ANTIGA || instante > Date.now() ? undefined : data.toISOString();
 }
 
-type ContextoLamina = {
+const criadaEmOriginal = (slide: Slide) => criadaEmPlausivel(new Date(slide.createdAt));
+
+export type ContextoLamina = {
   api: MigracaoApi;
   usuarioId: number;
   laboratorioId: string | null;
@@ -120,10 +121,10 @@ async function resolverTipo(contexto: ContextoLamina, fase: FaseProtocoloDTO, no
   return resolvido;
 }
 
-async function enviarCelula(contexto: ContextoLamina, slide: Slide, laminaId: string, entry: Entry): Promise<void> {
+/** Envia uma célula com o id já definido. A repetição idêntica é idempotente; id com outro conteúdo responde 409 (o chamador decide). */
+export async function enviarRegistro(contexto: ContextoLamina, laminaId: string, id: string, entry: Entry): Promise<void> {
   const fase = contexto.versao.fases.find(item => item.nome === entry.phase);
   if (!fase) throw new FalhaDeEnvio(`A fase "${entry.phase}" não existe no protocolo atual.`);
-  const id = await idEstavel(entry.id, `registro|${contexto.usuarioId}|${slide.id}|${entry.id}`);
   const anormal = entry.status === 'anormal';
   const tipoIds = anormal ? [await resolverTipo(contexto, fase, entry.type)] : undefined;
   const data = new Date(entry.createdAt);
@@ -137,6 +138,11 @@ async function enviarCelula(contexto: ContextoLamina, slide: Slide, laminaId: st
     ...(Number.isNaN(data.getTime()) ? {} : { horaAparelho: data.toISOString() }),
   });
   exigirResposta(registro, 'a célula');
+}
+
+async function enviarCelula(contexto: ContextoLamina, slide: Slide, laminaId: string, entry: Entry): Promise<void> {
+  const id = await idEstavel(entry.id, `registro|${contexto.usuarioId}|${slide.id}|${entry.id}`);
+  await enviarRegistro(contexto, laminaId, id, entry);
 }
 
 function protocoloDe(protocolos: ProtocoloDTO[], slide: Slide): ProtocoloDTO {
