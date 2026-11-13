@@ -31,7 +31,7 @@
 .labs-app .notifications-panel :is(button):focus-visible { outline: 3px solid var(--lab-focus); outline-offset: 2px; }
 
 html[data-appearance="dark"] .labs-app .notification-error,
-html[data-appearance="dark"] .labs-app .notification-action-error { color: #efaaa0; }
+html[data-appearance="dark"] .labs-app .notification-action-error { color: var(--lab-bad-ink); }
 
 @media (max-width: 700px) {
   .labs-app .notifications-panel { width: min(440px, calc(100vw - 32px)); max-height: calc(100dvh - 82px); padding: 16px; }

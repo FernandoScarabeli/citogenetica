@@ -6,8 +6,8 @@ button.segmented-option:first-child { border-radius: 4px 0 0 4px; }
 @media (hover: hover) and (pointer: fine) { button.segmented-option:not([aria-pressed="true"]):hover { background: var(--lab-ground, #edf1ed); } }
 
 /* Cópia pintada como selecionada, recortada na opção marcada; o recorte desliza (movimento na tela: ease-in-out forte). */
-.segmented-active { position: absolute; inset: 0; display: flex; border-radius: 4px; background: var(--lab-accent, #263d32); pointer-events: none; }
-.segmented-active .segmented-option { border-right-color: transparent; color: var(--lab-surface, #fff); }
+.segmented-active { position: absolute; inset: 0; display: flex; border-radius: 4px; background: var(--lab-primary, #263d32); pointer-events: none; }
+.segmented-active .segmented-option { border-right-color: transparent; color: #fff; }
 .segmented-active.is-ready { transition: clip-path 220ms cubic-bezier(0.77, 0, 0.175, 1); }
 
 @media (prefers-reduced-motion: reduce) { .segmented-active.is-ready { transition: none; } }

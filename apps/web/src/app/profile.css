@@ -42,9 +42,9 @@
 .profile-panel-hint { margin: 0; color: var(--lab-muted); font-size: var(--fs-caption); line-height: var(--lh-caption); }
 @keyframes profile-panel-in { from { opacity: 0; translate: 0 -6px; } }
 
-html[data-appearance="dark"] .profile-feedback { color: #a4c5b2; }
-html[data-appearance="dark"] :is(.profile-feedback.error, .profile-field-error) { color: #efaaa0; }
-html[data-appearance="dark"] .profile-field input:hover { border-color: #55645a; }
+html[data-appearance="dark"] .profile-feedback { color: var(--lab-good-ink); }
+html[data-appearance="dark"] :is(.profile-feedback.error, .profile-field-error) { color: var(--lab-bad-ink); }
+html[data-appearance="dark"] .profile-field input:hover { border-color: var(--lab-line-strong); }
 
 @media (max-width: 600px) {
   .profile-card { padding: 16px; }

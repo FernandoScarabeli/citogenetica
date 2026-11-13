@@ -46,7 +46,7 @@
 .detail .batch-choice:not(:has(> button[aria-pressed="true"]))::before { opacity: 0; }
 .detail .batch-choice button { font-weight: 550; transition: color 220ms ease; }
 .detail .batch-choice button[aria-pressed="true"] { background: transparent; font-weight: 550; }
-html[data-appearance="dark"] .detail .batch-choice::before { background: #33493b; }
+html[data-appearance="dark"] .detail .batch-choice::before { background: var(--lab-good-bg-strong); }
 html[data-appearance="dark"] .labs-app .detail .batch-choice button[aria-pressed="true"] { background: transparent; }
 
 /* Botão final troca de verde (adicionar) para vermelho (remover) suavemente. */
@@ -83,16 +83,16 @@ html[data-appearance="dark"] .labs-app .detail .batch-choice button[aria-pressed
 @keyframes history-in { from { opacity: 0; translate: 0 -4px; } }
 
 /* Modo escuro: mesmas cores em tons escuros. */
-html[data-appearance="dark"] .phase-count.is-normal { background: #24382c; color: #b7d6c3; }
-html[data-appearance="dark"] .phase-count.is-abnormal { background: #3a2622; color: #efaaa0; }
+html[data-appearance="dark"] .phase-count.is-normal { background: var(--lab-good-bg); color: var(--lab-good-ink); }
+html[data-appearance="dark"] .phase-count.is-abnormal { background: var(--lab-bad-bg); color: var(--lab-bad-ink); }
 html[data-appearance="dark"] .detail .phase-card .count-button { background: var(--lab-surface); }
-html[data-appearance="dark"] .detail .phase-card .count-button.is-normal { border-color: #4f7a60; color: #b7d6c3; }
-html[data-appearance="dark"] .detail .phase-card .count-button.is-abnormal { border-color: #7a4a42; color: #efaaa0; }
-html[data-appearance="dark"] .detail .phase-card .count-button.is-normal:active { background: #2c4033; }
-html[data-appearance="dark"] .detail .phase-card .count-button.is-abnormal:active { background: #47302a; }
+html[data-appearance="dark"] .detail .phase-card .count-button.is-normal { border-color: var(--lab-good-line); color: var(--lab-good-ink); }
+html[data-appearance="dark"] .detail .phase-card .count-button.is-abnormal { border-color: var(--lab-bad-line); color: var(--lab-bad-ink); }
+html[data-appearance="dark"] .detail .phase-card .count-button.is-normal:active { background: var(--lab-good-bg-strong); }
+html[data-appearance="dark"] .detail .phase-card .count-button.is-abnormal:active { background: var(--lab-bad-bg-strong); }
 @media (hover: hover) and (pointer: fine) {
-  html[data-appearance="dark"] .detail .phase-card .count-button.is-normal:hover { background: #25352b; }
-  html[data-appearance="dark"] .detail .phase-card .count-button.is-abnormal:hover { background: #33231f; }
+  html[data-appearance="dark"] .detail .phase-card .count-button.is-normal:hover { background: var(--lab-good-bg); }
+  html[data-appearance="dark"] .detail .phase-card .count-button.is-abnormal:hover { background: var(--lab-bad-bg); }
 }
 
 @media (max-width: 1000px) { .phase-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
