@@ -1,0 +1,85 @@
+package br.ufla.citogenetica.usuario.internal.domain;
+
+import br.ufla.citogenetica.shared.persistence.BaseEntity;
+import br.ufla.citogenetica.usuario.internal.domain.Role;
+import br.ufla.citogenetica.usuario.internal.domain.StatusEnum;
+import jakarta.persistence.*;
+import lombok.*;
+import lombok.experimental.SuperBuilder;
+import org.springframework.security.core.GrantedAuthority;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
+import org.springframework.security.core.userdetails.UserDetails;
+
+import java.util.Collection;
+import java.util.Collections;
+import java.time.Instant;
+
+@Getter
+@Setter
+@SuperBuilder
+@NoArgsConstructor
+@AllArgsConstructor
+@Entity
+@Table(name = "usuario")
+public class Usuario extends BaseEntity<Long> implements UserDetails {
+
+    @Column(name = "nome", nullable = false, length = 100)
+    private String nome;
+
+    @Column(name = "email", nullable = false)
+    private String email;
+
+    @Column(name = "senha", nullable = false)
+    private String senha;
+
+    @Column(name = "email_confirmado_em")
+    private Instant emailConfirmadoEm;
+
+    /** Chave da foto de perfil no armazenamento; nula quando a conta não tem foto. */
+    @Column(name = "foto_chave", length = 80)
+    private String fotoChave;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "status", nullable = false)
+    private StatusEnum status;
+
+    @ManyToOne(fetch = FetchType.EAGER)
+    @JoinColumn(name = "role_id", nullable = false)
+    private Role role;
+
+    @Override
+    public Collection<GrantedAuthority> getAuthorities() {
+        return Collections.singletonList(
+                new SimpleGrantedAuthority("ROLE_" + role.getNome().name()));
+    }
+
+    @Override
+    public String getPassword() {
+        return this.senha;
+    }
+
+    @Override
+    public String getUsername() {
+        return this.email;
+    }
+
+    @Override
+    public boolean isAccountNonExpired() {
+        return true;
+    }
+
+    @Override
+    public boolean isAccountNonLocked() {
+        return true;
+    }
+
+    @Override
+    public boolean isCredentialsNonExpired() {
+        return true;
+    }
+
+    @Override
+    public boolean isEnabled() {
+        return this.status == StatusEnum.ATIVO && this.emailConfirmadoEm != null;
+    }
+}

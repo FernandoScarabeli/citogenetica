@@ -1,0 +1,34 @@
+package br.ufla.citogenetica.usuario.internal.persistence;
+
+import br.ufla.citogenetica.usuario.internal.domain.Usuario;
+import br.ufla.citogenetica.usuario.api.UsuarioRosterInfo;
+import jakarta.persistence.LockModeType;
+import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
+import org.springframework.data.jpa.repository.Lock;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
+import org.springframework.stereotype.Repository;
+
+import java.util.Optional;
+import java.util.Collection;
+import java.util.List;
+
+@Repository
+public interface UsuarioRepository extends JpaRepository<Usuario, Long>, JpaSpecificationExecutor<Usuario> {
+    Optional<Usuario> findByEmail(String email);
+
+    @Query("select new br.ufla.citogenetica.usuario.api.UsuarioRosterInfo(usuario.id, usuario.nome, usuario.email) "
+            + "from Usuario usuario where usuario.id in :ids")
+    List<UsuarioRosterInfo> buscarDadosRoster(@Param("ids") Collection<Long> ids);
+
+    @Query("select count(usuario) > 0 from Usuario usuario "
+            + "where lower(usuario.email) = lower(:email) and usuario.id <> :id")
+    boolean existsByEmailIgnoreCaseAndIdNot(@Param("email") String email, @Param("id") Long id);
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("select usuario from Usuario usuario where usuario.email = :email")
+    Optional<Usuario> findByEmailForUpdate(@Param("email") String email);
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("select usuario from Usuario usuario where usuario.id = :id")
+    Optional<Usuario> findByIdForUpdate(@Param("id") Long id);
+}

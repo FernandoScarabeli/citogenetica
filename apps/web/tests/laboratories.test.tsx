@@ -1,0 +1,547 @@
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
+import { MemoryRouter } from 'react-router';
+import { ApiError } from '../src/api/errors';
+import type { LaboratorioResponseDTO, ParticipacaoResponseDTO } from '../src/api/contracts/laboratorio';
+import type { UsuarioResponseDTO } from '../src/api/contracts/usuario';
+
+const api = vi.hoisted(() => ({
+  listarMeus: vi.fn(),
+  buscar: vi.fn(),
+  criar: vi.fn(),
+  atualizarNome: vi.fn(),
+  listarParticipacoes: vi.fn(),
+  alterarPapeis: vi.fn(),
+  removerParticipacao: vi.fn(),
+  sair: vi.fn(),
+}));
+const invitationsApi = vi.hoisted(() => ({ criar: vi.fn(), listar: vi.fn(), reenviar: vi.fn(), revogar: vi.fn(), aceitar: vi.fn(), recusar: vi.fn() }));
+const orientationApi = vi.hoisted(() => ({
+  listarVinculos: vi.fn(), encerrarVinculo: vi.fn(), criarConvite: vi.fn(), listarConvites: vi.fn(),
+  reenviarConvite: vi.fn(), cancelarConvite: vi.fn(), aceitarConvite: vi.fn(), recusarConvite: vi.fn(),
+}));
+
+vi.mock('../src/api/laboratorio-api', () => ({ laboratorioApi: api }));
+vi.mock('../src/api/convite-api', () => ({ conviteApi: invitationsApi }));
+vi.mock('../src/api/orientacao-api', () => ({ orientacaoApi: orientationApi }));
+
+import { Laboratories } from '../src/Laboratories';
+import { EVENTO_CONVITE_ACEITO } from '../src/NotificationCenter';
+
+const USER: UsuarioResponseDTO = {
+  id: 12,
+  version: 0,
+  createdDate: '2026-11-03T12:00:00',
+  lastModifiedDate: null,
+  nome: 'Ana Pesquisadora',
+  email: 'ana@ufla.br',
+  status: 'ATIVO',
+  role: { id: 1, version: 0, createdDate: '2026-11-03T12:00:00', lastModifiedDate: null, nome: 'USER' },
+};
+
+const ACTIVE_LAB: LaboratorioResponseDTO = {
+  id: '8d8c8657-599d-4d5e-9f27-f4d62d3a043a',
+  nome: 'Laboratório de Citogenética',
+  estado: 'ATIVO',
+  papeis: ['MEMBRO', 'ADMIN'],
+  versao: 2,
+};
+
+const SELF: ParticipacaoResponseDTO = {
+  id: '3ea2e25b-4e57-4275-a3d3-faf6ceec7428',
+  nome: USER.nome,
+  email: USER.email,
+  papeis: ['MEMBRO', 'ADMIN'],
+  versao: 1,
+};
+
+const OTHER: ParticipacaoResponseDTO = {
+  id: '2ea2e25b-4e57-4275-a3d3-faf6ceec7428',
+  nome: 'Bruna Almeida',
+  email: 'bruna@ufla.br',
+  papeis: ['MEMBRO', 'ORIENTADOR'],
+  versao: 4,
+};
+
+function apiError(status: number, message = 'A operação não pode ser concluída.', retryAfterSeconds?: number) {
+  return new ApiError({ status, error: 'Conflict', message, path: '/api/v1/laboratorios' }, retryAfterSeconds);
+}
+
+const PENDING_INVITATION = {
+  id: '8b1acdb2-8608-4b1e-bca7-ea4bb074c1b2',
+  laboratorioId: ACTIVE_LAB.id,
+  emailDestino: 'bruna@ufla.br',
+  papeis: ['MEMBRO', 'ORIENTADOR'] as const,
+  estado: 'PENDENTE' as const,
+  expiraEm: '2026-11-10T18:30:00Z',
+  criadoEm: '2026-11-03T18:30:00Z',
+};
+
+const contagem = vi.hoisted(() => ({ contarLaminasPorLaboratorio: vi.fn() }));
+
+function renderPage(renderSlides = vi.fn(() => <p>Lâminas</p>)) {
+  return render(<MemoryRouter initialEntries={['/laboratorios']}>
+    <Laboratories user={USER} onLogout={vi.fn()} onUserUpdate={vi.fn()} renderSlides={renderSlides} api={contagem as never} />
+  </MemoryRouter>);
+}
+
+async function openLaboratoryManagement(user: ReturnType<typeof userEvent.setup>) {
+  await screen.findByRole('heading', { name: 'Meus laboratórios' });
+  await user.click(screen.getByRole('button', { name: /^Gerenciar/ }));
+  await screen.findByRole('heading', { name: 'Equipe do laboratório' });
+}
+
+async function openInvitations(user: ReturnType<typeof userEvent.setup>) {
+  await openLaboratoryManagement(user);
+  await user.click(screen.getByRole('button', { name: 'Convites' }));
+  await screen.findByRole('heading', { name: 'Convites pendentes' });
+}
+
+function defineDialogSupport() {
+  Object.defineProperty(HTMLDialogElement.prototype, 'showModal', {
+    configurable: true,
+    value(this: HTMLDialogElement) { this.setAttribute('open', ''); },
+  });
+  Object.defineProperty(HTMLDialogElement.prototype, 'close', {
+    configurable: true,
+    value(this: HTMLDialogElement) { this.removeAttribute('open'); },
+  });
+}
+
+beforeEach(() => {
+  vi.resetAllMocks();
+  defineDialogSupport();
+  api.listarMeus.mockResolvedValue([ACTIVE_LAB]);
+  contagem.contarLaminasPorLaboratorio.mockResolvedValue(new Map());
+  api.buscar.mockResolvedValue(ACTIVE_LAB);
+  api.criar.mockResolvedValue(ACTIVE_LAB);
+  api.atualizarNome.mockResolvedValue(ACTIVE_LAB);
+  api.listarParticipacoes.mockResolvedValue([SELF, OTHER]);
+  api.alterarPapeis.mockImplementation(async (_labId, participationId, _version, papeis) => ({
+    ...(participationId === SELF.id ? SELF : OTHER),
+    papeis,
+    versao: (participationId === SELF.id ? SELF : OTHER).versao + 1,
+  }));
+  api.removerParticipacao.mockResolvedValue(undefined);
+  api.sair.mockResolvedValue(undefined);
+  invitationsApi.criar.mockResolvedValue(PENDING_INVITATION);
+  invitationsApi.listar.mockResolvedValue([PENDING_INVITATION]);
+  invitationsApi.reenviar.mockResolvedValue({ ...PENDING_INVITATION, expiraEm: '2026-11-17T18:30:00Z' });
+  invitationsApi.revogar.mockResolvedValue(undefined);
+  orientationApi.listarVinculos.mockResolvedValue([{
+    id: 'vinculo-1', laboratorioId: ACTIVE_LAB.id, orientadorUsuarioId: 44, nomeOrientador: 'Bruna Almeida',
+    pesquisadorUsuarioId: USER.id, nomePesquisador: USER.nome, criadoEm: '2026-10-20T12:00:00Z',
+  }]);
+  orientationApi.listarConvites.mockResolvedValue([]);
+  orientationApi.encerrarVinculo.mockResolvedValue(undefined);
+  orientationApi.criarConvite.mockResolvedValue(undefined);
+  orientationApi.reenviarConvite.mockResolvedValue(undefined);
+  orientationApi.cancelarConvite.mockResolvedValue(undefined);
+  window.history.replaceState(null, '', '/laboratorios');
+});
+
+describe('gestão de laboratórios reais', () => {
+  it('convida por e-mail com Membro sempre incluído e sem papéis adicionais por padrão', async () => {
+    const user = userEvent.setup();
+    renderPage();
+    await openInvitations(user);
+
+    const memberRole = screen.getByRole('checkbox', { name: /Membro/ }) as HTMLInputElement;
+    expect(memberRole.checked).toBe(true);
+    expect(memberRole.disabled).toBe(true);
+    await user.type(screen.getByLabelText('E-mail'), 'nova@ufla.br');
+    await user.click(screen.getByRole('button', { name: 'Convidar' }));
+
+    await waitFor(() => expect(invitationsApi.criar).toHaveBeenCalledWith(ACTIVE_LAB.id, 'nova@ufla.br', ['MEMBRO']));
+    expect((await screen.findByRole('status')).textContent).toContain('Convite enviado para bruna@ufla.br.');
+  });
+
+  it('convida com os dois papéis adicionais opcionais', async () => {
+    const user = userEvent.setup();
+    renderPage();
+    await openInvitations(user);
+    await user.type(screen.getByLabelText('E-mail'), 'docente@ufla.br');
+    await user.click(screen.getByRole('checkbox', { name: /Administrador/ }));
+    await user.click(screen.getByRole('checkbox', { name: /Orientador/ }));
+    await user.click(screen.getByRole('button', { name: 'Convidar' }));
+
+    await waitFor(() => expect(invitationsApi.criar).toHaveBeenCalledWith(ACTIVE_LAB.id, 'docente@ufla.br', ['MEMBRO', 'ADMIN', 'ORIENTADOR']));
+  });
+
+  it.each([
+    'Este endereço já participa ativamente do laboratório.',
+    'Já existe convite pendente para este endereço; use o reenvio.',
+  ])('orienta a conferir a lista e reenviar após conflito 409: %s', async message => {
+    const user = userEvent.setup();
+    invitationsApi.criar.mockRejectedValueOnce(apiError(409, message));
+    renderPage();
+    await openInvitations(user);
+    await user.type(screen.getByLabelText('E-mail'), 'bruna@ufla.br');
+    await user.click(screen.getByRole('button', { name: 'Convidar' }));
+
+    expect((await screen.findByRole('alert')).textContent).toContain('Confira a lista e use Reenviar');
+    expect(await screen.findByRole('button', { name: 'Reenviar' })).toBeTruthy();
+  });
+
+  it('mostra Retry-After e bloqueia o envio enquanto a contagem regressiva corre', async () => {
+    const user = userEvent.setup();
+    invitationsApi.criar.mockRejectedValueOnce(apiError(429, 'Muitas solicitações.', 3));
+    renderPage();
+    await openInvitations(user);
+    await user.type(screen.getByLabelText('E-mail'), 'nova@ufla.br');
+    await user.click(screen.getByRole('button', { name: 'Convidar' }));
+
+    expect((await screen.findByRole('alert')).textContent).toContain('Tente novamente em 3 segundos.');
+    expect((screen.getByRole('button', { name: 'Aguarde 3 s' }) as HTMLButtonElement).disabled).toBe(true);
+    expect(invitationsApi.criar).toHaveBeenCalledTimes(1);
+  });
+
+  it('lista papéis e validade, reenvia e exige confirmação acessível para cancelar', async () => {
+    const user = userEvent.setup();
+    renderPage();
+    await openInvitations(user);
+
+    expect(await screen.findByText('bruna@ufla.br')).toBeTruthy();
+    expect(screen.getByText(/Válido até/).textContent).toContain('10 de nov. de 2026');
+    expect(screen.getAllByText('Orientador').length).toBeGreaterThan(0);
+    await user.click(screen.getByRole('button', { name: 'Reenviar' }));
+    await waitFor(() => expect(invitationsApi.reenviar).toHaveBeenCalledWith(ACTIVE_LAB.id, PENDING_INVITATION.id));
+    expect((await screen.findByRole('status')).textContent).toContain('Convite reenviado para bruna@ufla.br.');
+
+    await user.click(screen.getByRole('button', { name: 'Cancelar convite para bruna@ufla.br' }));
+    const dialog = screen.getByRole('dialog');
+    expect(within(dialog).getByRole('heading', { name: 'Cancelar convite?' })).toBeTruthy();
+    expect(within(dialog).getByText(/deixará de ser válido/)).toBeTruthy();
+    expect(document.activeElement).toBe(within(dialog).getByRole('button', { name: 'Manter convite' }));
+    await user.click(within(dialog).getByRole('button', { name: 'Cancelar convite' }));
+
+    await waitFor(() => expect(invitationsApi.revogar).toHaveBeenCalledWith(ACTIVE_LAB.id, PENDING_INVITATION.id));
+    expect(await screen.findByText('Não há convites pendentes.')).toBeTruthy();
+  });
+
+  it('não oferece convites a quem não é administrador nem em laboratório desativado', async () => {
+    const memberOnlyLab = { ...ACTIVE_LAB, papeis: ['MEMBRO'] as const };
+    api.listarMeus.mockResolvedValue([memberOnlyLab]);
+    api.buscar.mockResolvedValue(memberOnlyLab);
+    const user = userEvent.setup();
+    const firstPage = renderPage();
+    await openLaboratoryManagement(user);
+    expect(screen.queryByRole('button', { name: 'Convites' })).toBeNull();
+    expect(invitationsApi.listar).not.toHaveBeenCalled();
+    firstPage.unmount();
+
+    const disabledLab = { ...ACTIVE_LAB, estado: 'DESATIVADO' as const };
+    api.listarMeus.mockResolvedValue([disabledLab]);
+    api.buscar.mockResolvedValue(disabledLab);
+    const secondUser = userEvent.setup();
+    renderPage();
+    await openLaboratoryManagement(secondUser);
+    expect(screen.queryByRole('button', { name: 'Convites' })).toBeNull();
+    expect(invitationsApi.listar).not.toHaveBeenCalled();
+  });
+
+  it('abre a seção de orientação usando os vínculos visíveis que a API retorna', async () => {
+    const memberOnlyLab = { ...ACTIVE_LAB, papeis: ['MEMBRO'] as const };
+    api.listarMeus.mockResolvedValue([memberOnlyLab]);
+    api.buscar.mockResolvedValue(memberOnlyLab);
+    const user = userEvent.setup();
+    renderPage();
+    await openLaboratoryManagement(user);
+    await user.click(screen.getByRole('button', { name: 'Orientação' }));
+
+    expect(await screen.findByRole('heading', { name: 'Vínculos ativos' })).toBeTruthy();
+    expect(within(screen.getByRole('region', { name: 'Orientação', exact: true })).getByText('Bruna Almeida')).toBeTruthy();
+    expect(orientationApi.listarVinculos).toHaveBeenCalledWith(ACTIVE_LAB.id, expect.any(AbortSignal));
+    expect(orientationApi.listarConvites).not.toHaveBeenCalled();
+  });
+
+  it('trata respostas 403 e 404 ao consultar convites', async () => {
+    const user = userEvent.setup();
+    invitationsApi.listar.mockRejectedValueOnce(apiError(403, 'Acesso negado.'));
+    renderPage();
+    await openInvitations(user);
+    expect((await screen.findByRole('alert')).textContent).toContain('Você não tem permissão para consultar os convites');
+
+    invitationsApi.listar.mockRejectedValueOnce(apiError(404, 'Não encontrado.'));
+    await user.click(screen.getByRole('button', { name: 'Tentar novamente' }));
+    expect((await screen.findByRole('alert')).textContent).toContain('Este laboratório não foi encontrado');
+  });
+
+  it('lista, cria e renomeia laboratório usando somente o campo nome', async () => {
+    const user = userEvent.setup();
+    const created = { ...ACTIVE_LAB, id: 'b61a3d4f-1f26-41dc-b1e7-8e69b8d75d90', nome: 'Citogenética vegetal' };
+    const renamed = { ...created, nome: 'Citogenética de plantas' };
+    api.listarMeus.mockResolvedValueOnce([]);
+    api.criar.mockResolvedValueOnce(created);
+    api.buscar.mockResolvedValue(created);
+    api.atualizarNome.mockResolvedValueOnce(renamed);
+
+    renderPage();
+    await screen.findByRole('heading', { name: 'Nenhum laboratório ainda' });
+    expect(screen.getByText(/Você ainda não participa de nenhum laboratório\. Se alguém vai te convidar, o convite chega por e-mail/)).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Abrir lâminas avulsas' })).toBeTruthy();
+    expect(screen.getByText('Lâminas que não pertencem a nenhum laboratório.')).toBeTruthy();
+    await user.click(screen.getByRole('button', { name: 'Criar laboratório' }));
+    await user.type(screen.getByLabelText('Nome do laboratório'), 'Citogenética vegetal');
+    await user.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Criar laboratório' }));
+    await screen.findByRole('heading', { name: 'Citogenética vegetal' });
+
+    expect(api.criar).toHaveBeenCalledWith('Citogenética vegetal');
+    expect(await screen.findByText(/Membro e Administrador/)).toBeTruthy();
+    await user.click(screen.getByRole('button', { name: 'Configurações' }));
+    const name = screen.getByLabelText('Nome do laboratório');
+    await user.clear(name);
+    await user.type(name, 'Citogenética de plantas');
+    await user.click(screen.getByRole('button', { name: 'Salvar nome' }));
+
+    expect(api.atualizarNome).toHaveBeenCalledWith(created.id, 'Citogenética de plantas');
+    expect(await screen.findByText('Nome do laboratório atualizado.')).toBeTruthy();
+  });
+
+  it('mantém papéis combináveis, MEMBRO obrigatório e envia versaoEsperada', async () => {
+    const user = userEvent.setup();
+    renderPage();
+    await openLaboratoryManagement(user);
+    await user.click(screen.getByRole('button', { name: 'Alterar papéis de Bruna Almeida' }));
+
+    const memberRole = screen.getByRole('checkbox', { name: /Membro/ });
+    expect((memberRole as HTMLInputElement).disabled).toBe(true);
+    expect((memberRole as HTMLInputElement).checked).toBe(true);
+    await user.click(screen.getByRole('checkbox', { name: /Orientador/ }));
+    await user.click(screen.getByRole('checkbox', { name: /Administrador/ }));
+    await user.click(screen.getByRole('button', { name: 'Salvar papéis' }));
+
+    await waitFor(() => expect(api.alterarPapeis).toHaveBeenCalledWith(
+      ACTIVE_LAB.id,
+      OTHER.id,
+      OTHER.versao,
+      ['MEMBRO', 'ADMIN'],
+    ));
+    expect(await screen.findByText('Papéis de Bruna Almeida atualizados.')).toBeTruthy();
+  });
+
+  it('atualiza o contador de membros ao voltar para a aba do navegador e ao abrir Membros', async () => {
+    const user = userEvent.setup();
+    const NOVO = { ...OTHER, id: '1ea2e25b-4e57-4275-a3d3-faf6ceec7428', nome: 'Carla Nova', email: 'carla@ufla.br' };
+    let currentMembers: ParticipacaoResponseDTO[] = [SELF, OTHER];
+    api.listarParticipacoes.mockImplementation(async () => currentMembers);
+    renderPage();
+    await openLaboratoryManagement(user);
+    const abaMembros = () => screen.getByRole('button', { name: /^Membros/ });
+    expect(abaMembros().textContent).toBe('Membros 2');
+
+    currentMembers = [SELF, OTHER, NOVO];
+    fireEvent.focus(window);
+    await waitFor(() => expect(abaMembros().textContent).toBe('Membros 3'));
+    expect(screen.getByText('Carla Nova')).toBeTruthy();
+
+    currentMembers = [SELF, OTHER];
+    await user.click(screen.getByRole('button', { name: 'Configurações' }));
+    await user.click(abaMembros());
+    await waitFor(() => expect(abaMembros().textContent).toBe('Membros 2'));
+  });
+
+  it('recarrega membros e avisa quando a versão da participação ficou obsoleta', async () => {
+    const user = userEvent.setup();
+    const latestOther = { ...OTHER, papeis: ['MEMBRO', 'ADMIN'] as const, versao: 5 };
+    let currentMembers: ParticipacaoResponseDTO[] = [SELF, OTHER];
+    api.listarParticipacoes.mockImplementation(async () => currentMembers);
+    api.alterarPapeis.mockRejectedValueOnce(apiError(409));
+    renderPage();
+    await openLaboratoryManagement(user);
+    currentMembers = [SELF, latestOther as ParticipacaoResponseDTO];
+    await user.click(screen.getByRole('button', { name: 'Alterar papéis de Bruna Almeida' }));
+    await user.click(screen.getByRole('checkbox', { name: /Administrador/ }));
+    await user.click(screen.getByRole('button', { name: 'Salvar papéis' }));
+
+    expect(await screen.findByText(/papéis foram alterados por outra pessoa/)).toBeTruthy();
+    const brunaRow = screen.getByText('Bruna Almeida').closest('tr');
+    expect(brunaRow?.querySelector('.role-chip')?.textContent).toBe('Membro');
+    expect(brunaRow?.querySelectorAll('.role-chip').length).toBe(2);
+    expect(api.listarParticipacoes).toHaveBeenCalledTimes(2);
+  });
+
+  it('explica o conflito da remoção do papel Orientador com vínculo ativo', async () => {
+    const user = userEvent.setup();
+    api.alterarPapeis.mockRejectedValueOnce(apiError(409));
+    renderPage();
+    await openLaboratoryManagement(user);
+    await user.click(screen.getByRole('button', { name: 'Alterar papéis de Bruna Almeida' }));
+    await user.click(screen.getByRole('checkbox', { name: /Orientador/ }));
+    await user.click(screen.getByRole('button', { name: 'Salvar papéis' }));
+
+    expect(await screen.findByText(/Não foi possível remover o papel Orientador. Encerre todos os vínculos ativos dessa pessoa/)).toBeTruthy();
+  });
+
+  it('explica o conflito do último administrador ao alterar papéis e ao sair', async () => {
+    const user = userEvent.setup();
+    api.listarParticipacoes.mockResolvedValue([SELF]);
+    api.alterarPapeis.mockRejectedValueOnce(apiError(409));
+    api.sair.mockRejectedValueOnce(apiError(409));
+    renderPage();
+    await openLaboratoryManagement(user);
+    await user.click(screen.getByRole('button', { name: 'Alterar papéis de Ana Pesquisadora' }));
+    await user.click(screen.getByRole('checkbox', { name: /Administrador/ }));
+    await user.click(screen.getByRole('button', { name: 'Salvar papéis' }));
+    expect(await screen.findByText('É preciso manter pelo menos um administrador. Dê esse papel a outra pessoa antes.')).toBeTruthy();
+
+    await user.click(screen.getByRole('button', { name: 'Cancelar' }));
+    expect(screen.queryByRole('button', { name: 'Sair do laboratório' })).toBeNull();
+    await user.click(screen.getByRole('button', { name: 'Configurações' }));
+    await user.click(screen.getByRole('button', { name: 'Sair do laboratório' }));
+    const dialog = screen.getByRole('dialog');
+    expect(dialog.textContent).toContain('Você perde o acesso a este laboratório. As lâminas que você registrou continuam com o laboratório.');
+    await user.click(within(dialog).getByRole('button', { name: 'Sair do laboratório' }));
+
+    expect(await screen.findByText('Você é o último administrador. Dê esse papel a outra pessoa antes de sair.')).toBeTruthy();
+    expect(api.sair).toHaveBeenCalledWith(ACTIVE_LAB.id);
+  });
+
+  it('remove uma participação ativa depois de confirmar', async () => {
+    const user = userEvent.setup();
+    renderPage();
+    await openLaboratoryManagement(user);
+    await user.click(screen.getByRole('button', { name: 'Remover Bruna Almeida do laboratório' }));
+    const dialog = screen.getByRole('dialog');
+    await user.click(within(dialog).getByRole('button', { name: 'Remover participação' }));
+
+    await waitFor(() => expect(api.removerParticipacao).toHaveBeenCalledWith(ACTIVE_LAB.id, OTHER.id));
+    expect(await screen.findByText('Bruna Almeida foi removido do laboratório.')).toBeTruthy();
+    expect(screen.queryByText('bruna@ufla.br')).toBeNull();
+  });
+
+  it('explica por que não pode remover o último administrador', async () => {
+    const user = userEvent.setup();
+    const memberOnlySelf = { ...SELF, papeis: ['MEMBRO'] as const };
+    const soleAdmin = { ...OTHER, papeis: ['MEMBRO', 'ADMIN'] as const };
+    api.listarParticipacoes.mockResolvedValue([memberOnlySelf as ParticipacaoResponseDTO, soleAdmin as ParticipacaoResponseDTO]);
+    api.removerParticipacao.mockRejectedValueOnce(apiError(409));
+    renderPage();
+    await openLaboratoryManagement(user);
+    await user.click(screen.getByRole('button', { name: 'Remover Bruna Almeida do laboratório' }));
+    const dialog = screen.getByRole('dialog');
+    await user.click(within(dialog).getByRole('button', { name: 'Remover participação' }));
+
+    expect(await screen.findByText('É preciso manter pelo menos um administrador. Dê esse papel a outra pessoa antes.')).toBeTruthy();
+  });
+
+  it('mostra a mensagem de orientandos ativos ao remover e não a repete ao abrir a janela de novo', async () => {
+    const user = userEvent.setup();
+    const mensagem = 'Encerre as orientações de Bruna Almeida antes de removê-lo do laboratório.';
+    api.removerParticipacao.mockRejectedValueOnce(apiError(409, mensagem));
+    renderPage();
+    await openLaboratoryManagement(user);
+    await user.click(screen.getByRole('button', { name: 'Remover Bruna Almeida do laboratório' }));
+    await user.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Remover participação' }));
+    expect(await screen.findByText(mensagem)).toBeTruthy();
+
+    await user.click(screen.getByRole('button', { name: 'Remover Bruna Almeida do laboratório' }));
+    const dialog = screen.getByRole('dialog');
+    expect(within(dialog).queryByText(mensagem)).toBeNull();
+    expect(screen.queryByText(mensagem)).toBeNull();
+  });
+
+  it('mostra o motivo de permissão 403 ao renomear', async () => {
+    const user = userEvent.setup();
+    api.atualizarNome.mockRejectedValueOnce(apiError(403, 'Acesso negado.'));
+    renderPage();
+    await openLaboratoryManagement(user);
+    await user.click(screen.getByRole('button', { name: 'Configurações' }));
+    await user.click(screen.getByRole('button', { name: 'Salvar nome' }));
+
+    expect(await screen.findByText(/Somente administradores podem alterar o nome/)).toBeTruthy();
+    expect(screen.getByText(/Acesso negado/)).toBeTruthy();
+  });
+
+  it('volta à lista com aviso se o laboratório retornar 404', async () => {
+    const user = userEvent.setup();
+    api.buscar.mockRejectedValueOnce(apiError(404, 'Laboratório não encontrado.'));
+    renderPage();
+    await screen.findByRole('button', { name: ACTIVE_LAB.nome });
+    await user.click(screen.getByRole('button', { name: /^Gerenciar/ }));
+
+    expect((await screen.findByRole('status')).textContent).toContain('Este laboratório não está mais disponível');
+    expect(await screen.findByRole('heading', { name: 'Meus laboratórios' })).toBeTruthy();
+  });
+
+  it('mantém o laboratório desativado em consulta e encaminha as lâminas como somente leitura', async () => {
+    const user = userEvent.setup();
+    const disabled = { ...ACTIVE_LAB, estado: 'DESATIVADO' as const };
+    const renderSlides = vi.fn((_lab, _back, readOnly) => <p>{readOnly ? 'Consulta somente leitura' : 'Edição'}</p>);
+    api.listarMeus.mockResolvedValue([disabled]);
+    api.buscar.mockResolvedValue(disabled);
+    api.listarParticipacoes.mockResolvedValue([SELF]);
+    renderPage(renderSlides);
+    await screen.findByRole('heading', { name: 'Meus laboratórios' });
+    await user.click(screen.getByRole('button', { name: /^Gerenciar/ }));
+    await screen.findByRole('button', { name: 'Configurações' });
+    await user.click(screen.getByRole('button', { name: 'Configurações' }));
+
+    expect(screen.queryByLabelText('Nome do laboratório')).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Sair do laboratório' })).toBeNull();
+    await user.click(screen.getByRole('button', { name: 'Meus laboratórios' }));
+    await user.click(screen.getByRole('button', { name: disabled.nome }));
+
+    expect(await screen.findByText('Consulta somente leitura')).toBeTruthy();
+    expect(renderSlides).toHaveBeenCalledWith(disabled, expect.any(Function), true);
+  });
+});
+
+describe('lista de laboratórios em tabela', () => {
+  const LABS: LaboratorioResponseDTO[] = [
+    { id: 'lab-c', nome: 'Laboratório 10', estado: 'ATIVO', papeis: ['MEMBRO'], versao: 1 },
+    { id: 'lab-a', nome: 'genética animal', estado: 'ATIVO', papeis: ['MEMBRO', 'ADMIN', 'ORIENTADOR'], versao: 1 },
+    { id: 'lab-b', nome: 'Laboratório 9', estado: 'DESATIVADO', papeis: ['MEMBRO', 'ORIENTADOR'], versao: 1 },
+  ];
+
+  function rows() {
+    return screen.getAllByRole('row').slice(1).map(row => within(row).getAllByRole('cell').map(cell => cell.textContent)
+      .concat(within(row).getByRole('rowheader').textContent ?? ''));
+  }
+
+  it('recarrega a lista quando um convite é aceito pelo sino', async () => {
+    api.listarMeus.mockResolvedValueOnce([]).mockResolvedValue(LABS);
+    renderPage();
+    await screen.findByRole('heading', { name: 'Meus laboratórios' });
+    expect(screen.queryByRole('table')).toBeNull();
+
+    window.dispatchEvent(new Event(EVENTO_CONVITE_ACEITO));
+
+    expect(await screen.findByRole('table')).toBeTruthy();
+  });
+
+  it('ordena por nome, mostra o papel principal e o número de lâminas', async () => {
+    api.listarMeus.mockResolvedValue(LABS);
+    contagem.contarLaminasPorLaboratorio.mockResolvedValue(new Map([['lab-a', 12], ['lab-b', 1], ['lab-c', 0]]));
+    renderPage();
+    await screen.findByRole('table');
+
+    await waitFor(() => expect(rows()).toEqual([
+      ['Administrador, Orientador·', '12 lâminas', '', 'genética animal'],
+      ['Orientador·', '1 lâmina', '', 'Laboratório 9DesativadoSomente consulta. Para reativar, fale com a administração da plataforma.'],
+      ['Membro·', '0 lâminas', '', 'Laboratório 10'],
+    ]));
+    expect(contagem.contarLaminasPorLaboratorio).toHaveBeenCalledWith(['lab-c', 'lab-a', 'lab-b'], expect.any(AbortSignal));
+    expect(screen.queryByText('Ativo')).toBeNull();
+  });
+
+  it('clicar no nome abre as lâminas e a engrenagem abre Gerenciar', async () => {
+    const user = userEvent.setup();
+    const renderSlides = vi.fn(() => <p>Lâminas do laboratório</p>);
+    api.listarMeus.mockResolvedValue([ACTIVE_LAB]);
+    renderPage(renderSlides);
+
+    await user.click(await screen.findByRole('button', { name: ACTIVE_LAB.nome }));
+    expect(await screen.findByText('Lâminas do laboratório')).toBeTruthy();
+    expect(renderSlides).toHaveBeenCalledWith(ACTIVE_LAB, expect.any(Function), false);
+  });
+
+  it('se o número de lâminas falhar, mostra um traço e o resto segue', async () => {
+    contagem.contarLaminasPorLaboratorio.mockRejectedValue(apiError(500));
+    renderPage();
+    expect(await screen.findByLabelText('Não disponível')).toBeTruthy();
+    expect(screen.getByRole('button', { name: ACTIVE_LAB.nome })).toBeTruthy();
+    expect(screen.getByRole('button', { name: `Gerenciar ${ACTIVE_LAB.nome}` })).toBeTruthy();
+  });
+});

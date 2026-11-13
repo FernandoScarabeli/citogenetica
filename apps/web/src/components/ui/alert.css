@@ -1,0 +1,56 @@
+.feedback-alert {
+  --feedback-bg: #263d32;
+  --feedback-ink: #fff;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 14px;
+  border-radius: 8px;
+  color: var(--feedback-ink);
+  background: var(--feedback-bg);
+  font-family: 'Inter Variable', sans-serif;
+  font-size: 13px;
+  line-height: 20px;
+  box-shadow: 0 4px 16px #00000014;
+}
+.feedback-alert[data-variant="success"] { --feedback-bg: #285c40; }
+.feedback-alert[data-variant="destructive"] { --feedback-bg: #963b38; }
+.feedback-alert[data-variant="warning"] { --feedback-bg: #f2ca68; --feedback-ink: #392a0d; }
+.feedback-alert[data-variant="info"] { --feedback-bg: #355a69; }
+.feedback-alert-icon { display: flex; flex: none; align-items: center; }
+.feedback-alert-title { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+.feedback-alert .feedback-alert-close {
+  display: grid; place-items: center; flex: none; width: 32px; height: 32px;
+  padding: 0; border: 0; border-radius: 4px; background: transparent; color: inherit; cursor: pointer;
+}
+.feedback-alert-close:hover { background: #ffffff20; }
+.feedback-alert-close:focus-visible { outline: 2px solid currentColor; outline-offset: 2px; }
+.floating-notice { position: fixed; z-index: 100; top: 92px; right: max(24px, env(safe-area-inset-right)); width: min(420px, calc(100vw - 32px)); }
+@media (max-width: 700px) {
+  .floating-notice { top: max(80px, env(safe-area-inset-top)); right: 16px; }
+  .feedback-alert .feedback-alert-close { width: 44px; height: 44px; }
+  .feedback-alert { padding: 8px 10px 8px 14px; }
+}
+
+/* A saída preserva o elemento montado; somente opacidade e transformação animam. */
+.floating-notice {
+  --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
+  opacity: 0;
+  transform: translateY(-12px);
+  transition: opacity var(--notice-exit-duration) var(--ease-out), transform var(--notice-exit-duration) var(--ease-out);
+}
+.floating-notice[data-state="open"] {
+  opacity: 1;
+  transform: translateY(0);
+  transition-duration: 220ms;
+}
+@starting-style {
+  .floating-notice[data-state="open"] { opacity: 0; transform: translateY(-12px); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .floating-notice,
+  .floating-notice[data-state="open"] { transform: none; transition-property: opacity; }
+  @starting-style {
+    .floating-notice[data-state="open"] { opacity: 0; transform: none; }
+  }
+}

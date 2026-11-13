@@ -4,10 +4,10 @@ Aplicação de registro de lâminas de meiose e mitose para o Laboratório de Ci
 
 ## Executar
 
-Requisitos: Node.js 22 e npm.
+Requisitos: Node.js 26 LTS e npm. A versão principal do Node está em `.nvmrc`.
 
 ```sh
-npm install
+npm ci
 npm run dev
 ```
 
@@ -18,6 +18,28 @@ npm test
 npm run build
 npm run preview
 ```
+
+### Docker Compose
+
+Na raiz do repositório, gere o `.env` e inicie os serviços, incluindo a API, o frontend servido pelo Nginx e o Mailpit:
+
+```sh
+./scripts/gerar-env.sh
+docker compose up -d --build
+```
+
+Se o `.env` já existe, use `./scripts/gerar-env.sh --add-missing` para acrescentar somente as variáveis que faltam. O comando preserva os valores existentes; atualize `API_FRONTEND_URL`, as variáveis `API_FRONTEND_*_URL` e `API_CORS_ALLOWED_ORIGINS` para acompanhar `WEB_PORT`. O site fica em <http://localhost:3000> por padrão; a porta pode ser alterada com `WEB_PORT`. Os e-mails enviados no ambiente local aparecem no Mailpit em <http://localhost:8025> (porta configurável por `MAILPIT_WEB_PORT`). As URLs de confirmação e convite do template apontam para o site servido pelo Compose.
+
+### Desenvolvimento com a API
+
+O front usa caminhos relativos em `/api` e o Vite os encaminha para `http://localhost:8080`, incluindo conexões SSE sem buffering. Suba a API e seus serviços locais conforme `../api/README.md`; em outro terminal:
+
+```sh
+cd apps/web
+npm run dev
+```
+
+Para apontar o proxy a outro host, defina `API_PROXY_TARGET` no ambiente ao iniciar o Vite (ex.: `API_PROXY_TARGET=http://localhost:9080 npm run dev`). O padrão é `http://localhost:8080`. A variável é lida só pelo servidor de desenvolvimento e não vai para o navegador. Cookies de sessão e CSRF seguem na mesma origem do Vite por meio do proxy.
 
 ## Tipografia
 
@@ -49,19 +71,21 @@ npx shadcn@latest add https://www.fluidfunctionalism.com/r/typography.json --ove
 
 ## Dados e integração
 
-Os registros são armazenados no `localStorage` do navegador, sob uma chave versionada. Use **Backup** para guardar uma cópia e **Importar** para restaurá-la; a aplicação apresenta quantas lâminas serão substituídas antes de confirmar. A importação atual aceita os backups JSON gerados por esta aplicação, não os arquivos das ferramentas anteriores.
+As lâminas e contagens são armazenadas no `localStorage` deste navegador, sob `citogenetica:workspace:v1`. Use **Backup** para guardar uma cópia e **Importar** para restaurá-la; a aplicação apresenta quantas lâminas serão substituídas antes de confirmar. A importação atual aceita os backups JSON gerados por esta aplicação, não os arquivos das ferramentas anteriores.
 
-Não há autenticação, isolamento entre usuários, servidor, sincronização entre dispositivos ou garantia de recuperação dos dados locais. O navegador pode apagar esses dados; mantenha backups. Os protocolos e cálculos estão em `src/domain.ts` e o acesso ao armazenamento em `src/storage.ts`, para facilitar a futura integração com a API.
+O front autentica por sessão da API: verifica `/api/v1/usuarios/me` ao abrir, usa `/api/v1/auth/login` e `/api/v1/auth/logout`, e envia o token CSRF pelas rotas protegidas. `/`, `/entrar` e as rotas de pesquisa usam navegação declarativa; laboratórios, perfil e contagem exigem uma sessão válida.
+
+Essa sessão ainda não isola os registros de pesquisa. Lâminas e contagens continuam armazenadas localmente no navegador e não são sincronizadas nem associadas à conta autenticada. O navegador pode apagar esses dados; mantenha backups. Os protocolos e cálculos estão em `src/domain.ts` e o acesso a lâminas em `src/storage.ts`.
 
 O relatório usa a impressão do navegador: na aba **Resumo**, escolha **Imprimir / PDF** e, na janela de impressão, selecione salvar em PDF.
 
-## Fluxo de laboratórios do protótipo
+## Laboratórios e participações
 
-O acesso local em `/` abre `/laboratorios` (também disponível em `/app`). A conta demonstrativa `pesquisador@exemplo.com` permite explorar criação e alternância de laboratórios, aceite/recusa de convite recebido, membros, atribuição de papéis hierárquicos, criação/revogação de convites, edição do laboratório e saída. A hierarquia local é Administrador → Orientador → Pesquisador: cada nível inclui as capacidades disponíveis dos níveis abaixo. O último administrador não pode sair nem perder seu papel sem outro administrador ativo. Registros antigos com múltiplos papéis são preservados e interpretados pelo nível mais alto. A orientação e o acesso coletivo ainda não estão implementados; as permissões precisam ser garantidas também no backend.
+Após entrar, `/laboratorios` consulta os laboratórios da conta em `/api/v1/laboratorios`. A criação envia somente o nome; a API atribui Membro e Administrador a quem cria. O nome pode ser alterado por Administradores. Participantes ativos veem nome, e-mail e papéis. Os papéis Membro, Administrador e Orientador são combináveis; Membro é obrigatório. A API é a fonte de autorização e de conflitos, incluindo a proteção do último Administrador. Um laboratório desativado fica disponível apenas para consulta, inclusive nas lâminas locais.
 
-Os grupos Citogenética e Genética Vegetal, os membros Marina Alves, Rafael Lima e Clara Costa e seus e-mails são exemplos. Os convites são simulações locais: não enviam e-mail, não autenticam contas e não têm expiração real. Autorização, validade de convites e regras de concessão de administração precisam ser implementadas no backend. Vínculos de orientação continuam pendentes de validação, conforme a documentação.
+A configuração local antiga `citogenetica:laboratories:v1` é removida silenciosamente na inicialização. A limpeza afeta somente essa chave; `citogenetica:workspace:v1` e `citogenetica:preferences:v1` permanecem intactas. Convites e orientação são geridos pela API e o cabeçalho autenticado mostra as notificações da conta.
 
-As lâminas novas recebem `labId`; os registros antigos sem esse campo continuam em **Lâminas avulsas**. Alternar grupos não transfere lâminas. O backup de pesquisa contém somente as lâminas do espaço aberto; a importação pede confirmação e vincula os registros ao espaço escolhido, bloqueando colisões de IDs com outro espaço. A chave `citogenetica:laboratories:v1` mantém laboratórios, participações e convites separadamente dos dados de pesquisa. O backup de lâminas não inclui essa configuração demonstrativa. Sair ou remover um membro preserva os dados locais de pesquisa.
+As lâminas novas em um laboratório real recebem o UUID dele e aparecem somente naquele espaço. Lâminas sem `labId` e lâminas com identificadores locais antigos que não são UUID continuam acessíveis em **Lâminas avulsas**. As lâminas e contagens continuam locais e não são transferidas nem apagadas ao criar ou sair de um laboratório. O backup aberto em um laboratório contém somente as lâminas daquele UUID; em **Lâminas avulsas**, inclui os registros sem vínculo real.
 
 ### Metas e ajustes de contagem
 
@@ -69,6 +93,12 @@ A meta é opcional e pode ser definida ao criar ou editar a lâmina. Lâminas de
 
 A ação de quantidade adiciona ou remove células por fase e classificação; para anormais, o tipo é obrigatório. A remoção seleciona os registros mais recentes da classificação e não permite remover mais do que existe. Desfazer restaura a última alteração de contagem feita na sessão, inclusive um lote; após recarregar, o desfazer volta a remover apenas o último registro. A confirmação de regras científicas e do uso de contagem em lote com o laboratório continua necessária.
 
-O nome de exibição, a foto de perfil e a aparência são preferências salvas apenas neste navegador; não alteram os dados de membros dos laboratórios nem constituem uma conta autenticada.
+O nome e o e-mail exibidos no perfil vêm da conta autenticada. O nome é atualizado em /api/v1/usuarios/me; a senha é atualizada em /api/v1/usuarios/me/senha, mantendo a sessão atual e encerrando as demais. Foto e aparência continuam salvas apenas neste navegador. O campo name de versões antigas das preferências é ignorado, sem impedir a leitura da foto e do tema.
 
-A gestão de dispositivos conectados e a alteração de senha dependem de autenticação e de uma API de sessões, ainda não implementadas.
+A troca de e-mail no front segue o contrato registrado em docs/handoff-coordenacao.md (POST /api/v1/usuarios/me/email e POST /api/v1/auth/confirmar-troca-email). Os controllers presentes neste checkout ainda não expõem essas rotas; até a implementação correspondente na API, as duas chamadas retornarão erro. A API também não oferece gerenciamento de dispositivos, por isso o perfil não mostra essa aba.
+
+## Notificações
+
+O sino consulta a contagem de não lidas e a lista paginada na API. Enquanto a sessão estiver ativa, cada aba mantém uma única conexão SSE autenticada pelo cookie; os eventos invalidam os dados locais e, ao abrir o painel ou retornar à aba, a contagem também é consultada novamente. Convites de laboratório e de orientação não incluem token na notificação; a pessoa deve usar o link recebido por e-mail.
+
+O `EventSource` nativo não permite ler o status HTTP nem o cabeçalho `Retry-After` em uma falha. Quando o servidor encerra a conexão, o cliente verifica a sessão pela API antes de agendar nova tentativa. A falha por limite de conexões usa a espera de 30 segundos definida pela API; as falhas recuperáveis usam espera exponencial com teto de 30 segundos.

@@ -1,9 +1,31 @@
 server:
   port: ${SERVER_PORT:8080}
+  forward-headers-strategy: none
+  servlet:
+    session:
+      timeout: ${API_SECURITY_SESSION_TIMEOUT:30m}
+      cookie:
+        name: CITOGENETICA_SESSION
+        http-only: true
+        secure: true
+        same-site: lax
+        path: /
 
 spring:
   application:
     name: citogenetica-api
+
+  # Maior arquivo aceito hoje: a foto de lâmina (10 MB; a de perfil é conferida em 2 MB no serviço).
+  # A folga no pedido cobre os cabeçalhos e a legenda do formulário.
+  servlet:
+    multipart:
+      max-file-size: 10MB
+      max-request-size: 11MB
+
+  session:
+    timeout: ${API_SECURITY_SESSION_TIMEOUT:30m}
+    jdbc:
+      initialize-schema: never
 
   datasource:
     url: jdbc:postgresql://${SPRING_DATASOURCE_HOST}:${SPRING_DATASOURCE_PORT}/${SPRING_DATASOURCE_DATABASE}
@@ -12,10 +34,11 @@ spring:
     driver-class-name: org.postgresql.Driver
 
   jpa:
-    show-sql: true
+    # Sem Open Session In View: a conexão JDBC volta ao pool ao fim da transação, e não ao fim
+    # da requisição. Com ele ligado, cada stream SSE aberto prendia uma conexão até fechar.
+    open-in-view: false
     properties:
       hibernate:
-        format_sql: true
         dialect: org.hibernate.dialect.PostgreSQLDialect
     hibernate:
       ddl-auto: validate
@@ -32,11 +55,73 @@ springdoc:
     path: /swagger-ui.html
 
 api:
+  cors:
+    allowed-origins: ${API_CORS_ALLOWED_ORIGINS}
   security:
-    jwt:
-      secret: ${API_SECURITY_JWT_SECRET}
+    trusted-proxy:
+      internal-proxies: ${API_SECURITY_TRUSTED_PROXY_REGEX:}
     token:
       recovery-expiration-minutes: ${API_SECURITY_TOKEN_RECOVERY_EXPIRATION_MINUTES:15}
+    recovery:
+      hmac-secret: ${API_SECURITY_RECOVERY_HMAC_SECRET}
+      max-attempts: ${API_SECURITY_RECOVERY_MAX_ATTEMPTS:5}
+      email-executor-core-size: ${API_SECURITY_RECOVERY_EMAIL_EXECUTOR_CORE_SIZE:1}
+      email-executor-max-size: ${API_SECURITY_RECOVERY_EMAIL_EXECUTOR_MAX_SIZE:2}
+      email-executor-queue-capacity: ${API_SECURITY_RECOVERY_EMAIL_EXECUTOR_QUEUE_CAPACITY:50}
+    email-confirmation:
+      expiration-hours: ${API_SECURITY_EMAIL_CONFIRMATION_EXPIRATION_HOURS:24}
+      pending-retention-days: ${API_SECURITY_EMAIL_CONFIRMATION_PENDING_RETENTION_DAYS:30}
+      cleanup-interval-ms: ${API_SECURITY_EMAIL_CONFIRMATION_CLEANUP_INTERVAL_MS:3600000}
+      cleanup-batch-size: ${API_SECURITY_EMAIL_CONFIRMATION_CLEANUP_BATCH_SIZE:100}
+      frontend-url: ${API_FRONTEND_EMAIL_CONFIRMATION_URL}
+    email-change-confirmation:
+      expiration-hours: ${API_SECURITY_EMAIL_CHANGE_CONFIRMATION_EXPIRATION_HOURS:24}
+      frontend-url: ${API_FRONTEND_EMAIL_CHANGE_CONFIRMATION_URL}
+    laboratory-invitations:
+      expiration-days: ${API_SECURITY_LABORATORY_INVITATIONS_EXPIRATION_DAYS:7}
+      cleanup-interval-ms: ${API_SECURITY_LABORATORY_INVITATIONS_CLEANUP_INTERVAL_MS:3600000}
+      cleanup-batch-size: ${API_SECURITY_LABORATORY_INVITATIONS_CLEANUP_BATCH_SIZE:100}
+      frontend-url: ${API_FRONTEND_LABORATORY_INVITATION_URL}
+      rate-limit:
+        window-minutes: ${API_SECURITY_LABORATORY_INVITATIONS_RATE_LIMIT_WINDOW_MINUTES:15}
+        send-per-laboratory-author: ${API_SECURITY_LABORATORY_INVITATIONS_RATE_LIMIT_SEND_PER_LABORATORY_AUTHOR:10}
+        accept-per-ip: ${API_SECURITY_LABORATORY_INVITATIONS_RATE_LIMIT_ACCEPT_IP:30}
+        accept-per-user: ${API_SECURITY_LABORATORY_INVITATIONS_RATE_LIMIT_ACCEPT_USER:20}
+    orientation-invitations:
+      frontend-url: ${API_FRONTEND_LABORATORY_ORIENTATION_INVITATION_URL}
+    rate-limit:
+      window-minutes: ${API_SECURITY_RATE_LIMIT_WINDOW_MINUTES:15}
+      cleanup-interval-ms: ${API_SECURITY_RATE_LIMIT_CLEANUP_INTERVAL_MS:3600000}
+      login:
+        ip: ${API_SECURITY_RATE_LIMIT_LOGIN_IP:60}
+        email: ${API_SECURITY_RATE_LIMIT_LOGIN_EMAIL:10}
+      recovery-request:
+        ip: ${API_SECURITY_RATE_LIMIT_RECOVERY_REQUEST_IP:30}
+        email: ${API_SECURITY_RATE_LIMIT_RECOVERY_REQUEST_EMAIL:3}
+      validate:
+        ip: ${API_SECURITY_RATE_LIMIT_VALIDATE_IP:30}
+        email: ${API_SECURITY_RATE_LIMIT_VALIDATE_EMAIL:10}
+      reset:
+        ip: ${API_SECURITY_RATE_LIMIT_RESET_IP:30}
+        email: ${API_SECURITY_RATE_LIMIT_RESET_EMAIL:10}
+      register:
+        ip: ${API_SECURITY_RATE_LIMIT_REGISTER_IP:10}
+        email: ${API_SECURITY_RATE_LIMIT_REGISTER_EMAIL:5}
+      resend-confirmation:
+        ip: ${API_SECURITY_RATE_LIMIT_RESEND_CONFIRMATION_IP:10}
+        email: ${API_SECURITY_RATE_LIMIT_RESEND_CONFIRMATION_EMAIL:3}
+      email-confirmation:
+        ip: ${API_SECURITY_RATE_LIMIT_EMAIL_CONFIRMATION_IP:30}
+        email: ${API_SECURITY_RATE_LIMIT_EMAIL_CONFIRMATION_EMAIL:10}
+      change-email:
+        ip: ${API_SECURITY_RATE_LIMIT_CHANGE_EMAIL_IP:10}
+        user: ${API_SECURITY_RATE_LIMIT_CHANGE_EMAIL_USER:5}
+      confirm-email-change:
+        ip: ${API_SECURITY_RATE_LIMIT_CONFIRM_EMAIL_CHANGE_IP:30}
+        user: ${API_SECURITY_RATE_LIMIT_CONFIRM_EMAIL_CHANGE_USER:10}
+  sse:
+    max-connections-per-user: ${API_SSE_MAX_CONNECTIONS_PER_USER:5}
+    timeout: ${API_SSE_TIMEOUT:30m}
   frontend:
     url: ${API_FRONTEND_URL}
   email:
@@ -63,11 +148,13 @@ storage:
   secret-key: ${STORAGE_SECRET_KEY}
   presigned-url-validity-seconds: ${STORAGE_PRESIGNED_URL_VALIDITY_SECONDS:900}
 
+# Fora do perfil dev, o health público responde só o status (padrão do Spring: never),
+# sem versão do banco, caminhos ou espaço em disco. Nenhum outro endpoint é exposto.
 management:
   endpoint:
     health:
-      show-details: always
+      show-details: never
   endpoints:
     web:
       exposure:
-        include: health,info
+        include: health

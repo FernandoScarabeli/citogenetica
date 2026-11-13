@@ -1,0 +1,248 @@
+@layer components {
+  .login-notice,
+  .login-error {
+    margin: 0 0 20px;
+    padding: 12px 14px;
+    border: 1px solid var(--access-line);
+    border-radius: 4px;
+    font-size: var(--fs-body);
+    line-height: var(--lh-body);
+  }
+
+  .login-notice {
+    background: var(--access-surface);
+    color: var(--access-ink);
+  }
+
+  .login-error {
+    border-color: #a7433d;
+    background: #fbefed;
+    color: #762b27;
+  }
+
+  .login-error:focus {
+    outline: 3px solid var(--access-focus);
+    outline-offset: 3px;
+  }
+
+  .auth-page .access-form .access-field input {
+    background: var(--access-white);
+    color: var(--access-ink);
+  }
+
+  .auth-page .access-form .access-field input[aria-invalid="true"] {
+    border-color: #a7433d;
+  }
+
+  .auth-page .access-signin:not(:disabled) {
+    background: var(--access-green);
+    color: var(--access-white);
+    cursor: pointer;
+    transition: background-color 160ms ease-out;
+  }
+
+  .auth-page .access-signin:not(:disabled):hover {
+    background: var(--access-hover);
+  }
+
+  .auth-page .access-signin:disabled {
+    background: var(--access-disabled);
+    color: var(--access-muted);
+    opacity: 1;
+  }
+
+  .auth-page .invitation-actions {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
+    margin-top: 20px;
+  }
+
+  .auth-page .invitation-actions > * { width: 100%; margin: 0; }
+
+  .auth-page .invitation-secondary-action {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 48px;
+    padding: 12px 16px;
+    border: 1px solid var(--access-line);
+    border-radius: 4px;
+    background: var(--access-white);
+    color: var(--access-ink);
+    font: inherit;
+    font-size: var(--fs-body);
+    font-weight: 550;
+    text-decoration: none;
+  }
+
+  .auth-page .invitation-secondary-action:hover:not(:disabled) { background: var(--access-surface); }
+  .auth-page .invitation-secondary-action:disabled { cursor: not-allowed; opacity: .6; }
+
+  .auth-page .invitation-session-error { display: grid; gap: 12px; }
+  .auth-page .invitation-session-error p { margin: 0; }
+  .auth-page .invitation-actions:has(> :only-child) { grid-template-columns: 1fr; }
+  .auth-page .invitation-details { margin: 0 0 14px; color: var(--access-muted); font-size: var(--fs-body); }
+  .auth-page .invitation-details p { margin: 0 0 6px; }
+  .auth-page .invitation-details strong { color: var(--access-ink); font-weight: 550; }
+  .auth-page .invitation-account { margin: 0 0 14px; color: var(--access-muted); font-size: var(--fs-body); }
+  .auth-page .invitation-account strong { color: var(--access-ink); font-weight: 550; }
+
+  @media (max-width: 480px) {
+    .auth-page .invitation-actions { grid-template-columns: 1fr; }
+  }
+
+  .auth-page .access-intro h1:focus {
+    outline: 3px solid var(--access-focus);
+    outline-offset: 4px;
+  }
+
+  .auth-page .access-password-toggle {
+    position: absolute;
+    top: 2px;
+    right: 2px;
+    min-width: 68px;
+    min-height: 44px;
+    padding: 0 8px;
+    border: 0;
+    background: transparent;
+    color: var(--access-green);
+    font-size: var(--fs-caption);
+    font-weight: 600;
+    cursor: pointer;
+  }
+
+  .auth-page .access-password-toggle:focus-visible {
+    outline: 3px solid var(--access-focus);
+    outline-offset: 0;
+    border-radius: 3px;
+  }
+
+  .password-input-wrap { position: relative; }
+  .auth-page .password-input-wrap input { padding-right: 82px; }
+
+  .access-field-help,
+  .access-field-error {
+    margin: -2px 0 0;
+    font-size: var(--fs-caption);
+    line-height: var(--lh-caption);
+  }
+
+  .access-field-help { color: var(--access-muted); }
+  .access-field-error { color: #762b27; }
+
+  .auth-switch {
+    margin: 20px 0 0;
+    color: var(--access-muted);
+    font-size: var(--fs-body);
+    line-height: var(--lh-body);
+  }
+
+  .auth-switch a,
+  .auth-secondary-link {
+    color: var(--access-green);
+    font-weight: 600;
+    text-decoration: underline;
+    text-underline-offset: 3px;
+  }
+
+  .auth-secondary-button {
+    display: inline-flex;
+    align-items: center;
+    min-height: 44px;
+    width: fit-content;
+    padding: 0;
+    border: 0;
+    background: transparent;
+    color: var(--access-green);
+    font: inherit;
+    font-size: var(--fs-body);
+    font-weight: 600;
+    text-decoration: underline;
+    text-underline-offset: 3px;
+    cursor: pointer;
+  }
+
+  .auth-secondary-button:disabled { cursor: wait; opacity: .7; }
+
+  .recovery-code-input {
+    text-align: center;
+    font-size: 24px !important;
+    font-variant-numeric: tabular-nums;
+    letter-spacing: .32em;
+  }
+
+  .recovery-actions {
+    display: grid;
+    justify-items: start;
+    gap: 4px;
+    margin-top: 12px;
+  }
+
+  .recovery-step {
+    margin: 0 0 16px;
+    color: var(--access-muted);
+    font-size: var(--fs-caption);
+    line-height: var(--lh-caption);
+  }
+
+  .auth-secondary-link {
+    display: inline-flex;
+    align-items: center;
+    min-height: 44px;
+    width: fit-content;
+    font-size: var(--fs-body);
+  }
+
+  .landing-create-account { justify-content: center; }
+
+  .session-state,
+  .not-found {
+    min-height: 100svh;
+    display: grid;
+    align-content: center;
+    justify-items: start;
+    gap: 12px;
+    width: min(100% - 48px, 640px);
+    margin-inline: auto;
+    color: #212924;
+  }
+
+  .session-state h1,
+  .not-found h1 {
+    margin: 0;
+    font-size: var(--fs-display);
+    line-height: var(--lh-display);
+    font-weight: 550;
+  }
+
+  .session-state p,
+  .not-found p {
+    margin: 0 0 8px;
+    color: #59675e;
+    font-size: var(--fs-body);
+    line-height: var(--lh-body);
+  }
+
+  .not-found-code {
+    color: #486452 !important;
+    font-size: var(--fs-title) !important;
+    font-weight: 600;
+    letter-spacing: .06em;
+  }
+
+  .not-found a {
+    text-decoration: none;
+  }
+
+  .session-state button {
+    min-height: 44px;
+  }
+
+  @media (max-width: 480px) {
+    .session-state,
+    .not-found {
+      width: min(100% - 32px, 640px);
+    }
+  }
+}

@@ -12,7 +12,7 @@ Legenda: `[ ]` a fazer · `[~]` em andamento · `[x]` feito · ⚠️ depende de
 Nada é commitado até o fim da sequência.
 - [x] **T01 · Segurança + .gitignore**: remover `backend/local.yaml`; `.gitignore` com `node_modules/`, `dist/`, `.impeccable/`, `.taste-skill/` e os PDFs de `docs/` (ficam só locais)
 - [x] **T02 · Monorepo**: `backend/` → `apps/api/`, `frontend/` → `apps/web/`; `docker-compose.yml` e `.env.example` na **raiz** (fluxo: clonar → `cp .env.example .env` → `docker compose up -d --build`); restaurar o Maven Wrapper (`.mvn/`) e conferir se o Dockerfile builda. `infra/` só quando houver deploy real.
-- [ ] **T02b · Front no compose**: serviço `web` no `docker-compose.yml`, pra um único `up` subir tudo; healthcheck também no serviço `api`
+- [x] **T02b · Front no compose**: serviço `web` no `docker-compose.yml`, pra um único `up` subir tudo; healthcheck também no serviço `api`
 - [x] **T02c · Trocar o MinIO por RustFS**: `rustfs/rustfs:1.0.3` (só dev por enquanto; reavaliar versão e backup antes de produção); SDK `io.minio` → AWS SDK v2; bucket **privado** com URLs temporárias assinadas (endpoint público para assinar). O fluxo de domínio das fotos (entidade, status, checksum, permissões) fica para a etapa 6
 - [x] **T02d · Dockerfile padrão de mercado**: compilar com a imagem oficial `maven` (tag fixa, Java 17) e rodar com JRE 17; `mvnw` fica intocado para uso local/IDE
 - [x] **T03 · Renomear para citogenetica**: pacote `br.ufla.citogenetica`, Maven `citogenetica-api`, `CitogeneticaApplication`, banco/bucket/projeto compose `citogenetica`, containers sem nome fixo, OpenAPI e e-mails sem textos do template, contato removido até haver um oficial, comentário da migration V1 limpo (antes do primeiro commit)
@@ -30,10 +30,10 @@ Nada é commitado até o fim da sequência.
 ### Docs
 - [ ] Converter o PDF da proposta em Markdown versionado em `docs/`:
   - [ ] `docs/requisitos.md`
-  - [ ] `docs/arquitetura.md` (monólito modular, módulos, dependências)
+  - [x] `docs/arquitetura.md` (monólito modular, módulos, dependências) + ADR 0001
   - [ ] `docs/modelagem.md` + `docs/modelagem/entidades.mmd` (Mermaid citado no doc)
   - [ ] `docs/glossario.md` (termos da citogenética ↔ entidades)
-  - [ ] `docs/questoes-validacao.md` (com status de cada questão)
+  - [x] `docs/questoes-validacao.md` (com status de cada questão)
 - [ ] Mover os protótipos e manuais para `docs/referencias/legado/`
 - [ ] Registrar as decisões técnicas já tomadas (ADRs curtas): Java 17, Maven, React, e-mail+senha, UUID
 
@@ -42,40 +42,42 @@ Nada é commitado até o fim da sequência.
 ## 1. Backend (API, banco e tal)
 
 ### 1.1 Correções na base existente
-- [ ] Recuperação de senha: código com `SecureRandom`, limite de tentativas, invalidar após N erros, rate limit nos endpoints públicos
-- [ ] Respostas iguais para e-mail existente e inexistente (evitar enumeração)
-- [ ] Usar `recovery-expiration-minutes` em vez dos 15 minutos fixos
-- [ ] `atualizarSenha`: só o próprio usuário pode trocar a senha
-- [ ] `SecurityFilter`: rejeitar usuário inativo ou removido com 401, não 500
-- [ ] `JWTConfig`: expiração com `Instant.now()`
-- [ ] Regras de rota: permitir que o usuário edite o próprio perfil
-- [ ] Decidir entre JWT em header e sessão com cookie HttpOnly + CSRF (sugerido no planejamento)
-- [ ] CORS único, com as origens vindas do `.env`
-- [ ] `CriteriaCreator`: campo inválido → 400; criar a extensão `unaccent` na migration
-- [ ] `show-sql` só em dev; actuator sem `show-details: always` em produção
-- [ ] Ajustar `GlobalExceptionHandler` para os casos novos
+- [x] Recuperação de senha: código com `SecureRandom`, limite de tentativas, invalidar após N erros, rate limit nos endpoints públicos
+- [x] Respostas iguais para e-mail existente e inexistente (evitar enumeração)
+- [x] Usar `recovery-expiration-minutes` em vez dos 15 minutos fixos
+- [x] `atualizarSenha`: só o próprio usuário pode trocar a senha
+- [x] `SecurityFilter`: rejeitar usuário inativo ou removido com 401, não 500
+- [x] `JWTConfig`: expiração com `Instant.now()` (não se aplica: JWT substituído por sessão)
+- [x] Regras de rota: permitir que o usuário edite o próprio perfil
+- [x] Decidir entre JWT em header e sessão com cookie HttpOnly + CSRF (sugerido no planejamento)
+- [x] CORS único, com as origens vindas do `.env`
+- [x] `CriteriaCreator`: campo inválido → 400; criar a extensão `unaccent` na migration
+- [x] `show-sql` só em dev; actuator sem `show-details: always` em produção
+- [x] Ajustar `GlobalExceptionHandler` para os casos novos
 
 ### 1.2 Notificações e SSE (arrumar, não remover)
-- [ ] `notificacao.usuario_id` + filtrar todas as consultas pelo usuário logado
-- [ ] `marcarComoLida`: conferir o dono
-- [ ] Emitters por usuário (`Map<usuarioId, List<SseEmitter>>`), com publish só para o destinatário
-- [ ] Publicar depois do commit (`@TransactionalEventListener(AFTER_COMMIT)`)
-- [ ] Autenticar o SSE sem token na URL (cookie ou ticket curto de uso único)
-- [ ] `/subscribers/count` só para admin, ou remover
-- [ ] ⚠️ Definir quais eventos geram notificação (convite, comentário, conflito...)
+- [x] `notificacao.usuario_id` + filtrar todas as consultas pelo usuário logado
+- [x] `marcarComoLida`: conferir o dono
+- [x] Emitters por usuário (`Map<usuarioId, List<SseEmitter>>`), com publish só para o destinatário
+- [x] Publicar depois do commit (`@TransactionalEventListener(AFTER_COMMIT)`)
+- [x] Autenticar o SSE sem token na URL (cookie ou ticket curto de uso único)
+- [x] `/subscribers/count` só para admin, ou remover
+- [~] ⚠️ Definir quais eventos geram notificação (comentário, conflito...) — convites de laboratório e de orientação já notificam
 
 ### 1.3 Base do domínio
-- [ ] **Primeira tarefa depois do primeiro commit: auto-cadastro com confirmação de e-mail** (sem isso ninguém cria conta, porque o admin padrão foi removido na T04)
-- [ ] `./mvnw test` precisa passar num clone limpo, sem `.env` nem banco rodando: perfil de teste + Postgres via Testcontainers no teste de contexto (hoje ele exige variáveis de e-mail e banco no ar)
-- [ ] IDs UUID nas entidades novas (gerados no cliente quando vierem offline)
-- [ ] Papel por laboratório (Participação), não global no usuário
-- [ ] Auto-cadastro + verificação de e-mail
-- [ ] Testes de integração com Testcontainers + OpenAPI atualizado a cada etapa
+- [x] Monólito modular: pacotes por módulo (`usuario`, `notificacao`, `exemplo`) + `shared`, `config`, `infra`, com regras verificadas por ArchUnit
+- [x] **Primeira tarefa depois do primeiro commit: auto-cadastro com confirmação de e-mail** (sem isso ninguém cria conta, porque o admin padrão foi removido na T04)
+- [x] `./mvnw test` precisa passar num clone limpo, sem `.env` nem banco rodando: perfil de teste + Postgres via Testcontainers no teste de contexto (hoje ele exige variáveis de e-mail e banco no ar)
+- [x] IDs UUID nas entidades novas (gerados no cliente quando vierem offline) — ADR 0003
+- [x] Papel por laboratório (Participação), não global no usuário
+- [~] Admin global da plataforma (acima dos laboratórios): primeiro admin por comando de uso único (ADR 0002) e desativar/reativar laboratório feitos; listagem global de laboratórios e painel feitos; faltam parâmetros do sistema
+- [x] Auto-cadastro + verificação de e-mail (e troca de e-mail com confirmação no endereço novo)
+- [x] Testes de integração com Testcontainers + OpenAPI atualizado a cada etapa
 
 ### 1.4 Etapas da API (seguindo o planejamento)
-- [ ] **Etapa 1 · Base**: Laboratório, Participação (ATIVA/SAIU/REMOVIDA), Convite (hash do token, expiração, aceite atômico), Vínculo de orientação, regra do último administrador
-- [ ] **Etapa 2 · Contagem**: Protocolo, Versão (imutável quando publicada), Fase (`conta_como_divisao`), Tipo de anormalidade (fixo e personalizado, normalização), Lâmina, Registro (`quantidade`, `registrado_em`, `fuso_registro`, exclusão lógica, versão), cálculos oficiais (totais, %, IM), desfazer, edição, histórico; seed de meiose e mitose
-- [ ] **Etapa 3 · Dados**: exportação JSON versionada, importador dos backups legados (sem duplicar), CSV (resumo e uma linha por registro), PDF
+- [x] **Etapa 1 · Base**: Laboratório, Participação (ATIVA/SAIU/REMOVIDA), Convite (hash do token, expiração, aceite atômico), Vínculo de orientação, regra do último administrador; `LaboratorioAccessQuery` pronta para as lâminas da Etapa 2
+- [x] **Etapa 2 · Contagem**: Protocolo, Versão (imutável quando publicada), Fase (`conta_como_divisao`), Tipo de anormalidade (fixo e personalizado, normalização), Lâmina, Registro (`quantidade`, `registrado_em`, `fuso_registro`, exclusão lógica, versão), cálculos oficiais (totais, %, IM), desfazer, edição, histórico; seed de meiose e mitose
+- [x] **Etapa 3 · Dados**: exportação JSON versionada (uma ou várias lâminas), CSV no padrão do Excel (resumo e uma linha por registro, uma ou várias lâminas), relatório PDF (OpenPDF 2.0.5, última para Java 17) e importador dos backups dos HTMLs antigos no site, sem duplicar
 - [ ] **Etapa 4 · Offline/sync**: operações idempotentes (`operacao_id` + hash do payload), revisões, conflitos, consulta incremental com cursor
 - [ ] **Etapa 5 · Pesquisa**: Projeto, Experimento, editor de protocolos configuráveis
 - [ ] **Etapa 6 · Colaboração**: Fotos (MinIO privado, upload em duas fases, checksum), Comentários
@@ -86,34 +88,47 @@ Nada é commitado até o fim da sequência.
 ## 2. Frontend
 
 ### 2.1 Correções no que já existe
-- [ ] Papéis sem hierarquia: admin não herda permissão de editar contagens (o planejamento é explícito)
-- [ ] Histórico por dia + edição de registro (o modal existe, mas nada abre ele)
-- [ ] "Desfazer" sem apagar registros em sequência depois de recarregar (limite e/ou confirmação)
-- [ ] Lote como **1 registro com `quantidade`**, e não N registros
-- [ ] Importação mesclando por id de registro (não substituir a lâmina inteira) + prévia de conflitos
-- [ ] Escopo das anormalidades personalizadas: usuário + laboratório + fase
-- [ ] Excluir lâmina: tratar falha do `commit`
-- [ ] CSV: escapar células que começam com `=`, `+`, `-` ou `@`
-- [ ] "Criada por" com dado real
+- [x] Papéis sem hierarquia: admin não herda permissão de editar contagens (o planejamento é explícito) — papéis de laboratório já vêm da API e são combináveis; aplicado às contagens na API (Etapa 2)
+- [x] Histórico por dia + edição de registro
+- [x] "Desfazer" sem apagar registros em sequência depois de recarregar (limite e/ou confirmação)
+- [x] Lote como **1 registro com `quantidade`**, e não N registros
+- [x] ~~Importação mesclando por id de registro~~: a importação de backup saiu (2026-11-12); as lâminas antigas do navegador vão sozinhas para o sistema. O importador dos HTMLs antigos fica na Etapa 3
+- [x] Escopo das anormalidades personalizadas: usuário + laboratório + fase
+- [x] Excluir lâmina: falha tratada (exclusão agora pela API, com aviso de erro e conflito)
+- [x] CSV: escapar células que começam com `=`, `+`, `-` ou `@`
+- [x] "Criada por" com dado real
 
 ### 2.2 Integração com a API
-- [ ] Camada `api/` substituindo `storage.ts`, `laboratories.ts` e `demoUser`
-- [ ] Telas de cadastro, login, recuperação de senha e verificação de e-mail
-- [ ] Laboratórios, convites e membros reais
-- [ ] Contagem, lâminas, resumo e IM vindos da API
-- [ ] Notificações via SSE no sino
-- [ ] Importador dos backups dos HTMLs antigos (meiose e mitose)
+- [x] Camada `api/` substituindo `storage.ts`, `laboratories.ts` e `demoUser` — `storage.ts` fica só para ler as lâminas antigas do navegador (migração automática) e para o download do CSV
+- [x] Telas de cadastro, login, recuperação de senha e verificação de e-mail (e Minha conta: nome, senha, troca de e-mail)
+- [x] Laboratórios, convites e membros reais (e orientação)
+- [x] Contagem, lâminas, resumo e IM vindos da API
+- [x] Lâminas antigas do navegador enviadas sozinhas ao abrir "Meus laboratórios", com a data original (sem tela; a lâmina só sai do navegador depois de todas as células confirmadas)
+- [x] Notificações via SSE no sino
+- [x] Painel do admin da plataforma: lista, busca, filtro, desativar e reativar laboratório
+- [x] Importador dos backups dos HTMLs antigos (meiose e mitose), com backups de teste em `apps/web/tests/fixtures/legado/`
+- [x] Botões de exportação na lâmina (CSV, PDF, JSON) e "Exportar todas" nas listas
 
 ### 2.3 PWA e offline (Etapa 4)
 - [ ] Manifest, service worker, IndexedDB
-- [ ] Fila persistente de operações + indicador de estado ("Salvo neste aparelho: N pendentes")
+- [~] Fila persistente de operações + indicador de estado: feita só para os cliques de contagem (aviso fixo "N células guardadas neste aparelho", reenvio sozinho); faltam lote, edição, desfazer e o resto do sistema
 - [ ] Tela de resolução de conflitos
-- [ ] Sair da conta com pendências (continuar, exportar ou sair mantendo os dados)
+- [~] Sair da conta com pendências: confirmação e fila mantida para os cliques de contagem; falta a opção de exportar
 
 ### 2.4 Etapas 5–7 no front
 - [ ] Projetos e experimentos, editor de protocolos
 - [ ] Fotos e comentários
-- [ ] Comparações, gráficos, atalhos de teclado
+- [ ] Comparações, gráficos, atalhos de teclado na contagem (se o laboratório pedir)
+
+### 2.5 Revisão dos fluxos (2026-11-08 a 2026-11-12)
+- [x] Diagnóstico de todos os fluxos e os 10 itens aprovados pelo dono, mesclados em `dev` (ver `docs/revisao-fluxos.md`)
+- [x] Aceitar convite direto pelo sino de notificações (fluxo 16) — laboratório e orientação (#101)
+- [x] Hora do clique nas células reenviadas sem internet: o histórico mostra a hora do clique e "enviada às" (#102)
+- [x] Nota explicando que os percentuais de anormalidades podem somar mais de 100% (célula com mais de um tipo) (#99)
+- [x] Textos menores (#98): confirmação de cadastro (fluxo 2), botão que sobra na recuperação de senha (4), erro que fica na tela em Minha conta (5), confirmação de sair do laboratório (12), frase no cartão de laboratório desativado (15)
+- [x] Painel do admin geral com o mesmo cabeçalho do resto (sino, modo escuro, menu) (#91)
+- [x] Contador da aba "Membros" não atualiza quando alguém aceita um convite — relê ao voltar à aba e ao abrir "Membros" (#100)
+- [ ] ⚠️ Avisar o admin quando alguém aceita um convite (notificação nova; decisão do dono)
 
 ---
 
@@ -122,7 +137,7 @@ Nada é commitado até o fim da sequência.
 - [ ] `CONTRIBUTING.md`: setup, padrão de branch e commit, como rodar os testes, fluxo de PR
 - [ ] `CODE_OF_CONDUCT.md`, `SECURITY.md` (como reportar vulnerabilidades)
 - [ ] Templates de issue e PR (`.github/`)
-- [ ] CI (GitHub Actions): build + testes da API e do web, lint
+- [~] CI (GitHub Actions): build + testes da API e do web feitos (`API CI` e `Web CI`) e Dependabot ativo; falta lint
 - [ ] Seção de autoria e mantenedores no README
 - [ ] `CHANGELOG.md` e versionamento (SemVer)
 - [ ] Guia de deploy (⚠️ hospedagem UFLA/DGTI ou serviço externo) + política de backup do banco
@@ -132,11 +147,11 @@ Nada é commitado até o fim da sequência.
 
 ## ⚠️ Pendências com o laboratório (bloqueiam partes acima)
 Ver `docs/questoes-validacao.md`. As principais:
-- [ ] Visibilidade das lâminas entre pesquisadores
-- [ ] Quem cria o vínculo orientador ↔ pesquisador; se pode haver mais de um orientador
-- [ ] Uma célula pode ter mais de uma anormalidade?
-- [ ] Limites do lote, meta configurável, casas decimais
-- [ ] Alcance do "desfazer" entre aparelhos
-- [ ] Backups reais (ou fictícios) dos HTMLs antigos para testar a migração
-- [ ] Formato de CSV e PDF esperado (Excel, R, SISVAR)
+- [x] Visibilidade das lâminas: o próprio pesquisador, seus orientadores e os administradores do laboratório (decidido em 2026-11-03)
+- [x] Vínculo de orientação: o orientador convida e o pesquisador aceita; pode haver mais de um orientador (decidido em 2026-11-03)
+- [x] Uma célula pode ter mais de uma anormalidade: sim (decidido em 2026-11-03)
+- [x] Limites do lote, meta configurável, casas decimais: decididos em 2026-11-08 (ver `docs/questoes-validacao.md`)
+- [x] Alcance do "desfazer" entre aparelhos: vale em qualquer aparelho (decidido em 2026-11-08)
+- [x] Backups dos HTMLs antigos: gerados usando os próprios HTMLs (decidido em 2026-11-12)
+- [x] Formato de CSV e PDF: CSV no padrão do Excel em português, PDF gerado pela API (decidido em 2026-11-12)
 - [ ] Hospedagem e responsável pela manutenção

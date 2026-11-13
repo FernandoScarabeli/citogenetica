@@ -1,6 +1,6 @@
 ---
 name: Citogenética — Laboratórios
-description: Identidade herdada do protótipo local; extensão Operate.
+description: Identidade do sistema de Citogenética; extensão Operate.
 colors:
   lab-accent: "#263d32"
   lab-ink: "#212924"
@@ -78,13 +78,73 @@ Cantos discretos nos controles e painéis, conforme os raios extraídos. Iniciai
 
 Ações primárias verdes; secundárias brancas com borda. Papéis e estados aparecem em etiquetas textuais; abas têm sublinhado na seleção. Em Laboratórios, foco visível usa contorno de 3px, afastado 3px. Botões têm altura mínima de 40px, passando a 44px até 700px. Transições de cor de 160ms e deslocamento de 1px ao pressionar respeitam movimento reduzido.
 
-Autenticação e convites são simulações locais: sem autenticação/autorização reais, envio de e-mail ou expiração real. Conta, dados demonstrativos e armazenamento local são identificados na interface. Orientação e visibilidade coletiva seguem pendentes de validação.
+Conta, laboratórios, membros, papéis, convites e orientação usam a API real. Os registros de pesquisa (lâminas e contagens) ainda ficam no navegador e não são isolados por conta, até a etapa de contagem da API.
 
 ## Do's and Don'ts
 
 - Preservar Inter, verde/sálvia, margens e cabeçalho herdados ao estender telas.
-- Preservar foco visível, indicação de demonstração e ordem linear no celular.
-- Não apresentar acesso e convites locais como serviços reais.
+- Preservar foco visível, linguagem clara sobre estados locais e ordem linear no celular.
+- Não apresentar lâminas e contagens locais como sincronizadas com o servidor.
 - Não converter pendências de validação em decisões de produto confirmadas.
 
 Fontes: `apps/web/src/laboratories.css`, `apps/web/src/styles.css`, `apps/web/src/theme.css`, `apps/web/src/typography.css`, `apps/web/src/Laboratories.tsx`, `apps/web/README.md`, `.impeccable/laboratorios.md` e `.impeccable/review/critique.md`.
+
+## Gestão compacta do laboratório
+
+A gestão usa uma coluna de até 1100px e uma superfície única para as quatro abas,
+com borda discreta e sem sombra. Nome e estado ficam juntos no cabeçalho. Na lista
+de membros, o e-mail acompanha o nome; os papéis e ações mantêm colunas próprias.
+Formulários de nome e convite têm largura máxima de 600px, com ações próximas aos
+campos. A saída do laboratório aparece somente em Configurações.
+
+Os ajustes ficam em `apps/web/src/laboratory-management.css`, limitados à gestão,
+e usam os tokens existentes, inclusive no modo escuro. No celular, as abas rolam
+horizontalmente e membros e formulários passam a uma coluna.
+
+## Avisos de sucesso
+
+Confirmações de criação e alteração de laboratório, papéis, convites e orientação
+usam um aviso flutuante no canto superior direito, sem alterar o fluxo da página.
+O aviso fecha em cinco segundos, oferece fechamento manual e pausa enquanto há
+mouse ou foco sobre ele ou enquanto a página está oculta. Usa Inter, verde escuro
+e ícones Lucide. Erros que exigem correção continuam junto do respectivo fluxo.
+
+Componentes reutilizáveis em `apps/web/src/components/ui/alert-1.tsx` e
+`floating-notice.tsx`, adaptados à estrutura React/TypeScript e ao tema existente,
+sem novas dependências.
+
+O aviso entra em 220ms e sai em 180ms, com opacidade e deslocamento vertical de
+12px, usando transições que podem ser interrompidas por uma nova mensagem.
+O conteúdo permanece montado durante a saída. Com movimento reduzido, somente
+a opacidade muda.
+
+## Movimento entre abas
+
+As abas de gestão usam só CSS (`src/components/ui/tab-transition.css`), sem
+biblioteca de animação. A linha da aba ativa desliza até a aba escolhida em
+220ms (`cubic-bezier(0.77, 0, 0.175, 1)`), com `translateX` + `scaleX`. O
+conteúdo antigo sai na hora, sem sobrepor; o novo entra em 200ms
+(`cubic-bezier(0.23, 1, 0.32, 1)`) com opacidade e 8px vindo do lado da aba
+escolhida. Com movimento reduzido, a linha pula direto e o conteúdo só esmaece.
+
+## Modo escuro
+
+Fundos e linhas em cinza neutro (grafite); o verde aparece só nos detalhes:
+ações principais, abas, links, foco e a contagem normal. As cores ficam em
+tokens no começo de `src/laboratories.css` (`.labs-app` para o claro e
+`html[data-appearance="dark"] .labs-app` para o escuro); as telas usam só os
+tokens, nunca cores escritas direto.
+
+| Token | Escuro | Uso |
+|---|---|---|
+| `--lab-background` | `#141517` | fundo da página |
+| `--lab-surface` | `#1c1d20` | cartões, tabelas, janelas |
+| `--lab-ground` | `#26282c` | preenchimentos e passar o mouse |
+| `--lab-line` / `--lab-line-strong` | `#34363b` / `#4a4d53` | divisórias / bordas de campos e botões |
+| `--lab-ink` / `--lab-muted` | `#ececee` / `#a3a6ad` | texto / texto secundário |
+| `--lab-accent` | `#6dbf8f` | detalhes em verde (links, abas, foco) |
+| `--lab-primary` | `#2f7a52` | fundo dos botões principais (texto branco) |
+| `--lab-good-*` / `--lab-bad-*` / `--lab-tint*` | verdes e vermelhos escuros | contagem normal/anormal, erros, etiquetas |
+
+Contraste conferido: texto 14:1, texto secundário 6,9:1, verde 7,6:1 sobre as
+superfícies, texto branco 5,2:1 sobre o botão principal.

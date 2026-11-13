@@ -2,6 +2,13 @@ export type Protocol = 'meiose' | 'mitose';
 export type Entry = { id: string; phase: string; status: 'normal' | 'anormal'; type: string; createdAt: string; editedAt?: string };
 export type Slide = { labId?: string; id: string; name: string; protocol: Protocol; species: string; treatment: string; notes: string; goal?: number | null; createdAt: string; entries: Entry[] };
 export type State = { version: 1; slides: Slide[]; customTypes: Record<string, string[]> };
+const UUID_PATTERN = /^[\da-f]{8}-[\da-f]{4}-[\da-f]{4}-[\da-f]{4}-[\da-f]{12}$/i;
+
+export function slidesForLaboratory(slides: Slide[], laboratoryId: string | null): Slide[] {
+  if (laboratoryId) return slides.filter(slide => slide.labId === laboratoryId);
+  return slides.filter(slide => !slide.labId || !UUID_PATTERN.test(slide.labId));
+}
+
 export const protocols: Record<Protocol, { name: string; phases: { name: string; types: string[] }[] }> = {
   meiose: { name: 'Meiose', phases: [
     {name:'Leptóteno/Zigóteno', types:[]}, {name:'Paquíteno',types:[]}, {name:'Diplóteno/Diacinese',types:['Univalente','Trivalente','Tetravalente']},
@@ -27,7 +34,7 @@ export function summary(slide: Slide) {
   const dividing = phases.filter(p => p.name !== 'Interfase').reduce((sum,p) => sum + p.total, 0);
   return {phases, total, abnormal: phases.reduce((sum,p)=>sum+p.abnormal,0), im: total ? dividing / total * 100 : 0};
 }
-export const pct = (num: number, den: number) => `${(den ? num / den * 100 : 0).toFixed(1).replace('.', ',')}%`;
+export const pct = (num: number, den: number) => `${(den ? num / den * 100 : 0).toFixed(2).replace('.', ',')}%`;
 export function isState(value: unknown): value is State {
   if (!value || typeof value !== 'object') return false;
   const v = value as State;
@@ -42,10 +49,4 @@ export function removeMatching(entries: Entry[], phase: string, status: Entry['s
  if (quantity > candidates.length) throw new Error('Quantidade maior que os registros disponíveis');
  const ids = new Set(candidates.slice(-quantity).map(e => e.id));
  return entries.filter(e => !ids.has(e.id));
-}
-
-export function slideCsv(slide: Slide): string {
- const stats = summary(slide);
- const rows: (string | number)[][] = [['Fase','Normais','Anormais','Total','% anormais','Tipos de anormalidade'], ...stats.phases.map(p => [p.name,p.normal,p.abnormal,p.total,pct(p.abnormal,p.total),Object.entries(p.types).map(([t,n]) => `${t}: ${n} (${pct(n,p.total)})`).join('; ')]), [], ['Observações',slide.notes]];
- return '\ufeff'+rows.map(row=>row.map(value=>`"${String(value).replace(/"/g,'""')}"`).join(';')).join('\n');
 }
