@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react';
-import { ChevronLeft, ChevronRight, LogOut, Microscope, Search, ShieldAlert, X } from 'lucide-react';
-import { Link } from 'react-router';
+import { ChevronLeft, ChevronRight, Microscope, Search, ShieldAlert, X } from 'lucide-react';
+import { Link, useNavigate } from 'react-router';
 import { adminApi } from '../api/admin-api';
 import type { AdminLaboratorioPageDTO, AdminLaboratorioResponseDTO } from '../api/contracts/admin';
 import type { EstadoLaboratorio } from '../api/contracts/laboratorio';
@@ -9,7 +9,9 @@ import { isConflict, isForbidden, isNotFound } from '../api/errors';
 import { FloatingNotice } from '../components/ui/floating-notice';
 import { SegmentedControl } from '../components/ui/segmented-control';
 import { typeClass } from '../lib/type-scale';
-import { loadPreferences } from '../preferences';
+import { loadPreferences, savePreferences } from '../preferences';
+import { NotificationCenter } from '../NotificationCenter';
+import { AccountMenu } from './AccountMenu';
 import { useSession } from './SessionProvider';
 import '../laboratories.css';
 import './admin-laboratories.css';
@@ -75,21 +77,24 @@ function AdminActionDialog({ action, busy, error, onClose, onConfirm }: {
   </dialog>;
 }
 
+/** Mesmo cabeçalho das outras telas: sino de notificações e o menu do perfil (perfil, admin, modo escuro, sair). */
 function AdminTopbar({ user, onLogout }: { user: UsuarioResponseDTO; onLogout: () => void }) {
+  const navigate = useNavigate();
+  const [preferences, setPreferences] = useState(() => loadPreferences().value);
+  useEffect(() => {
+    document.documentElement.dataset.appearance = preferences.dark ? 'dark' : 'light';
+    return () => { delete document.documentElement.dataset.appearance; };
+  }, [preferences.dark]);
+  function toggleAppearance() {
+    const next = { ...preferences, dark: !preferences.dark };
+    try { savePreferences(next); } catch { /* sem armazenamento: vale só nesta visita */ }
+    setPreferences(next);
+  }
   return <header className="topbar"><div className="topbar-inner">
     <Link className="brand" to="/laboratorios"><span className="brand-mark"><Microscope size={21} aria-hidden="true" /></span><span>citogenética<small>Laboratório de Citogenética · UFLA</small></span></Link>
-    <div className="lab-account admin-account">
-      <span className="admin-identity"><strong>{user.nome}</strong><small>{user.email}</small></span>
-      <button className="button secondary" type="button" onClick={onLogout}><LogOut size={16} aria-hidden="true" />Sair</button>
-    </div>
+    <div className="lab-account"><NotificationCenter/><AccountMenu name={user.nome} email={user.email} photo={preferences.photo} dark={preferences.dark}
+      platformAdmin={user.role.nome === 'ADMIN'} onProfile={() => navigate('/perfil')} onAppearance={toggleAppearance} onLogout={onLogout} /></div>
   </div></header>;
-}
-
-function useAppearance() {
-  useEffect(() => {
-    document.documentElement.dataset.appearance = loadPreferences().value.dark ? 'dark' : 'light';
-    return () => { delete document.documentElement.dataset.appearance; };
-  }, []);
 }
 
 export function AdminLaboratories({ user, onLogout, api = adminApi }: {
@@ -97,7 +102,6 @@ export function AdminLaboratories({ user, onLogout, api = adminApi }: {
   onLogout: () => void;
   api?: AdminApi;
 }) {
-  useAppearance();
   const isAdmin = user.role.nome === 'ADMIN';
   return <div className="labs-app">
     <AdminTopbar user={user} onLogout={onLogout} />

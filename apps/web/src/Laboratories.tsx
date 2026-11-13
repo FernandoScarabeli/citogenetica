@@ -1,5 +1,5 @@
 import { Fragment, useCallback, useEffect, useRef, useState, type FormEvent, type ReactNode } from 'react';
-import { ArrowRight, ChevronDown, ChevronRight, LogOut, Moon, Microscope, Plus, Search, Settings, ShieldCheck, UserRound, X } from 'lucide-react';
+import { ArrowRight, ChevronRight, LogOut, Microscope, Plus, Search, Settings, X } from 'lucide-react';
 import { Link, useLocation, useNavigate } from 'react-router';
 import { isConflict, isForbidden, isNotFound, isUnauthorized } from './api/errors';
 import type { LaboratorioResponseDTO, PapelLaboratorio, ParticipacaoResponseDTO } from './api/contracts/laboratorio';
@@ -20,6 +20,7 @@ import { loadPreferences, savePreferences } from './preferences';
 import type { UsuarioResponseDTO } from './api/contracts/usuario';
 import { ProfileSettings } from './app/ProfileSettings';
 import { NotificationCenter } from './NotificationCenter';
+import { AccountMenu } from './app/AccountMenu';
 
 const initialPreferences = loadPreferences();
 type Confirmation = { kind: 'leave' } | { kind: 'remove'; participation: ParticipacaoResponseDTO };
@@ -54,58 +55,6 @@ function SlideCount({ total }: { total: number | null | undefined }) {
 
 function isCurrentUser(participation: ParticipacaoResponseDTO, email: string): boolean {
   return !!participation.email && participation.email.trim().toLocaleLowerCase('pt-BR') === email.trim().toLocaleLowerCase('pt-BR');
-}
-
-function AccountMenu({ name, email, photo, dark, platformAdmin, onProfile, onAppearance, onLogout }: {
-  name: string;
-  email: string;
-  photo?: string;
-  dark: boolean;
-  platformAdmin: boolean;
-  onProfile: () => void;
-  onAppearance: () => void;
-  onLogout: () => void;
-}) {
-  const [open, setOpen] = useState(false);
-  const root = useRef<HTMLDivElement>(null);
-  const trigger = useRef<HTMLButtonElement>(null);
-
-  useEffect(() => {
-    if (!open) return;
-    function outside(event: PointerEvent) {
-      if (!root.current?.contains(event.target as Node)) setOpen(false);
-    }
-    function key(event: KeyboardEvent) {
-      if (event.key === 'Escape') {
-        setOpen(false);
-        trigger.current?.focus();
-      }
-    }
-    document.addEventListener('pointerdown', outside);
-    document.addEventListener('keydown', key);
-    return () => {
-      document.removeEventListener('pointerdown', outside);
-      document.removeEventListener('keydown', key);
-    };
-  }, [open]);
-
-  const initial = name.charAt(0).toLocaleUpperCase('pt-BR');
-  return <div className="account-menu" ref={root}>
-    <button ref={trigger} type="button" className="account-trigger" aria-label="Menu do perfil" aria-expanded={open} aria-controls={open ? 'account-panel' : undefined} onClick={() => setOpen(value => !value)}>
-      <span className="account-initial" aria-hidden="true">{photo ? <img src={photo} alt="" /> : initial}</span>
-      <span className="account-trigger-identity"><span className="account-trigger-name">{name}</span><span className="account-trigger-email">{email}</span></span>
-      <ChevronDown size={16} aria-hidden="true" />
-    </button>
-    {open && <div className="account-panel" id="account-panel" role="group" aria-label="Menu do perfil">
-      <div className="account-panel-identity"><span className="account-initial" aria-hidden="true">{photo ? <img src={photo} alt="" /> : initial}</span><div><strong>{name}</strong><small>{email}</small></div></div>
-      <div className="account-panel-actions">
-        <button type="button" onClick={() => { setOpen(false); onProfile(); }}><UserRound size={18} aria-hidden="true" />Configurações do perfil</button>
-        {platformAdmin && <Link to="/admin/laboratorios" onClick={() => setOpen(false)}><ShieldCheck size={18} aria-hidden="true" />Administração da plataforma</Link>}
-        <button type="button" aria-pressed={dark} onClick={onAppearance}><Moon size={18} aria-hidden="true" /><span>Modo escuro</span><span className="account-switch" aria-hidden="true"><span /></span></button>
-      </div>
-      <div className="account-panel-footer"><button type="button" onClick={() => { setOpen(false); onLogout(); }}><LogOut size={18} aria-hidden="true" />Sair</button></div>
-    </div>}
-  </div>;
 }
 
 function CreateLaboratoryDialog({ name, error, busy, onName, onClose, onSubmit }: {
