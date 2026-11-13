@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { agruparPorDia, instanteExibido, mensagemDeErro, normalizarNomeTipo } from '../src/contagem-utils';
+import { agruparPorDia, enviadaDepois, instanteExibido, mensagemDeErro, normalizarNomeTipo, textoEnvio } from '../src/contagem-utils';
 import { ApiError, NetworkError } from '../src/api/errors';
 import { pct } from '../src/domain';
 
@@ -11,9 +11,27 @@ describe('data exibida no histórico', () => {
     expect(instanteExibido({ registradoEm: oficial, horaAparelho: aparelho, fusoAparelho: null })).toBe(aparelho);
   });
 
-  it('usa a hora do servidor quando há fuso ou não há hora do aparelho', () => {
-    expect(instanteExibido({ registradoEm: oficial, horaAparelho: aparelho, fusoAparelho: 'America/Sao_Paulo' })).toBe(oficial);
+  it('usa a hora do servidor quando a célula chegou na hora ou não há hora do aparelho', () => {
+    const naHora = { registradoEm: '2026-11-08T15:00:03Z', horaAparelho: '2026-11-08T15:00:00Z', fusoAparelho: 'America/Sao_Paulo' };
+    expect(enviadaDepois(naHora)).toBe(false);
+    expect(instanteExibido(naHora)).toBe(naHora.registradoEm);
     expect(instanteExibido({ registradoEm: oficial, horaAparelho: null, fusoAparelho: null })).toBe(oficial);
+  });
+
+  it('célula guardada sem internet mostra a hora do clique e diz quando foi enviada', () => {
+    const reenviada = { registradoEm: '2026-11-08T17:30:00Z', horaAparelho: '2026-11-08T13:05:00Z', fusoAparelho: 'America/Sao_Paulo' };
+    expect(enviadaDepois(reenviada)).toBe(true);
+    expect(instanteExibido(reenviada)).toBe(reenviada.horaAparelho);
+    expect(textoEnvio(reenviada)).toMatch(/^enviada às \d{2}:\d{2}$/);
+
+    const outroDia = { ...reenviada, registradoEm: '2026-11-10T17:30:00Z' };
+    expect(textoEnvio(outroDia)).toMatch(/^enviada em 10 de nov de 2026 às \d{2}:\d{2}$/);
+  });
+
+  it('relógio do aparelho adiantado não troca a hora mostrada', () => {
+    const adiantado = { registradoEm: '2026-11-08T15:00:00Z', horaAparelho: '2026-11-08T15:30:00Z', fusoAparelho: 'America/Sao_Paulo' };
+    expect(enviadaDepois(adiantado)).toBe(false);
+    expect(instanteExibido(adiantado)).toBe(adiantado.registradoEm);
   });
 
   it('agrupa por dia mantendo a ordem', () => {

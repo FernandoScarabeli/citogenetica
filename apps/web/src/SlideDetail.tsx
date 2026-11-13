@@ -10,7 +10,7 @@ import { NetworkError, isConflict, isNotFound } from './api/errors';
 import { mensagemFilaEnviando, mensagemFilaGuardada } from './contagem/fila-registros';
 import { useFilaRegistros } from './contagem/useFilaRegistros';
 import {
-  agruparPorDia, descricaoDesfazer, formatarData, formatarHora, fusoDoAparelho, instanteExibido, mensagemDeErro, normalizarNomeTipo, rotuloDesfazer,
+  agruparPorDia, descricaoDesfazer, enviadaDepois, formatarData, formatarHora, fusoDoAparelho, instanteExibido, textoEnvio, mensagemDeErro, normalizarNomeTipo, rotuloDesfazer,
 } from './contagem-utils';
 import { pct } from './domain';
 import { ActionMenu } from './components/ui/action-menu';
@@ -672,7 +672,7 @@ export function SlideDetail({ api, laminaId, usuarioId, readOnly, protocolos, on
       {history.items.length === 0 ? <div className="empty-state small-empty"><p>Nenhuma célula registrada nesta lâmina.</p></div> : <div className="history-list">
         {agruparPorDia(history.items).map(group => <div key={group.dia}><h3 className="history-date">{group.dia}</h3>{group.registros.map(record => <div className="history-row" key={record.id}>
           <div><strong>{phaseName(record.faseId)} · {record.status === 'NORMAL' ? 'Normal' : 'Anormal'}</strong><p>{num(record.quantidade)} {celulas(record.quantidade)}{record.tipos.length > 0 && <> · {record.tipos.map(tipo => tipo.nome).join(', ')}</>}</p></div>
-          <time dateTime={instanteExibido(record)}>{formatarHora(instanteExibido(record))}</time>
+          <span className="history-time"><time dateTime={instanteExibido(record)}>{formatarHora(instanteExibido(record))}</time>{enviadaDepois(record) && <small title="Contada sem internet e enviada depois">{textoEnvio(record)}</small>}</span>
           {canEdit && <button className="text-button history-edit" type="button" disabled={guardadas > 0} title={guardadas > 0 ? DICA_FILA : undefined} onClick={() => openEditRecord(record)}><Pencil size={14} aria-hidden="true" /> Editar<span className="sr-only"> registro de {phaseName(record.faseId)} às {formatarHora(instanteExibido(record))}</span></button>}
         </div>)}</div>)}
       </div>}
