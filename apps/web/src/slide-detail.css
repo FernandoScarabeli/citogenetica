@@ -117,3 +117,26 @@ html[data-appearance="dark"] .detail .phase-card .count-button.is-abnormal:activ
   .history-section[open] .history-content { animation: history-fade 200ms ease; }
   @keyframes history-fade { from { opacity: 0; } }
 }
+
+/* Janela de célula anormal: abre a cada célula anormal (dezenas de vezes por dia), então não anima ao abrir.
+   Todas as opções aparecem de uma vez, sem rolagem interna; a fase vai no título. */
+dialog.abnormal-dialog { width: min(560px, calc(100% - 32px)); }
+.abnormal-dialog .type-checklist { margin-top: 4px; }
+.abnormal-dialog .type-checklist legend { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; }
+.abnormal-dialog .modal-description { margin-bottom: 14px; }
+.abnormal-dialog .type-buttons,.abnormal-dialog .type-options { max-height: none; overflow: visible; }
+.abnormal-dialog .type-buttons { grid-template-columns: repeat(2, minmax(0, 1fr)); padding: 0; }
+.abnormal-dialog .type-button { touch-action: manipulation; }
+.abnormal-dialog .type-button-other { display: inline-flex; align-items: center; gap: 6px; border-style: dashed; border-color: var(--lab-accent, #263d32); background: var(--lab-surface, #fff); color: var(--lab-accent, #263d32); font-weight: 550; }
+.abnormal-dialog .type-button-other[aria-expanded="true"] { border-style: solid; background: var(--lab-ground, #edf1ed); }
+.abnormal-dialog .multi-hint { margin: 14px 0 0; color: var(--lab-muted, #59675e); font-size: var(--fs-caption); line-height: var(--lh-caption); }
+.abnormal-dialog .multi-hint .multi-toggle { margin: 0; padding: 0; font-size: inherit; }
+html[data-appearance="dark"] .abnormal-dialog .type-button-other { border-color: var(--lab-accent); color: var(--lab-accent); }
+
+/* No celular vira uma folha presa embaixo da tela, na altura do polegar, com as opções em 2 colunas. */
+@media (max-width: 600px) {
+  dialog.abnormal-dialog { width: 100%; max-width: 100%; max-height: 92dvh; margin: auto 0 0; padding: 20px 16px calc(16px + env(safe-area-inset-bottom)); border-width: 1px 0 0; border-radius: 12px 12px 0 0; overflow-y: auto; }
+  .abnormal-dialog .type-button { min-height: 52px; padding: 8px 10px; font-size: 14px; line-height: 18px; }
+  .abnormal-dialog .modal-actions { margin-top: 18px; }
+  .abnormal-dialog .modal-actions .button { flex: 1; height: 44px; }
+}

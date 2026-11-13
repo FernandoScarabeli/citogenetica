@@ -339,6 +339,7 @@ describe('anormalidades', () => {
     renderSlides();
     await openSlide(user);
     await user.click(abnormalButton());
+    expect(screen.getByRole('heading', { name: 'Célula anormal · Prófase' })).toBeTruthy();
     await user.click(screen.getByRole('button', { name: 'Stickiness' }));
 
     await waitFor(() => expect(api.criarRegistro).toHaveBeenCalledTimes(1));
@@ -353,7 +354,7 @@ describe('anormalidades', () => {
     renderSlides();
     await openSlide(user);
     await user.click(abnormalButton());
-    await user.click(screen.getByRole('button', { name: 'Outro (especificar)' }));
+    await user.click(screen.getByRole('button', { name: 'Outro…' }));
     await user.type(screen.getByLabelText('Descreva a anormalidade'), 'Fragmento');
     await user.click(screen.getByRole('button', { name: /Registrar célula/ }));
 

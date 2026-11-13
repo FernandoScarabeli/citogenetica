@@ -682,7 +682,7 @@ export function SlideDetail({ api, laminaId, usuarioId, readOnly, protocolos, on
 
     {guardadas > 0 && <div className="fila-aviso" role="status"><span aria-hidden="true" className="fila-aviso-ponto" />{fila.enviando ? mensagemFilaEnviando(guardadas) : mensagemFilaGuardada(guardadas)}</div>}
 
-    {modal === 'abnormal' && <Modal title="Registrar célula anormal" onClose={() => setModal(null)}>{multi
+    {modal === 'abnormal' && <Modal title={`Célula anormal · ${phaseName(phaseId)}`} className="abnormal-dialog" onClose={() => setModal(null)}>{multi
       ? <form className="entry-form" onSubmit={event => void submitAbnormal(event)}>
         <p className="modal-description">Marque todas as anormalidades observadas na célula.</p>
         <TypeChecklist legend={`Anormalidades em ${phaseName(phaseId)}`} options={optionsFor(phaseId)} selected={selectedTypes} onToggle={toggleType} other={otherChecked} onOther={value => { setTypeError(''); setOtherChecked(value); }} otherText={otherText} onOtherText={value => { setTypeError(''); setOtherText(value); }} error={typeError} firstRef={typeRef} />
@@ -690,9 +690,9 @@ export function SlideDetail({ api, laminaId, usuarioId, readOnly, protocolos, on
         <div className="modal-actions"><button type="button" className="button secondary" onClick={() => setModal(null)}>Cancelar</button><button className="button primary" disabled={busy}><Check size={16} /> Registrar célula</button></div>
       </form>
       : <form className="entry-form" onSubmit={event => void submitAbnormal(event)}>
-        <p className="modal-description">Toque na anormalidade observada para registrar a célula.</p>
+        <p className="modal-description">Toque na anormalidade observada.</p>
         <TypeButtons legend={`Anormalidades em ${phaseName(phaseId)}`} options={optionsFor(phaseId)} onPick={pickAbnormal} other={otherChecked} onOther={value => { setTypeError(''); setOtherChecked(value); }} otherText={otherText} onOtherText={value => { setTypeError(''); setOtherText(value); }} error={typeError} />
-        <button type="button" className="text-button multi-toggle" onClick={() => { resetTypes(); setMulti(true); }}>Marcar várias</button>
+        <p className="multi-hint">Mais de uma na mesma célula? <button type="button" className="text-button multi-toggle" onClick={() => { resetTypes(); setMulti(true); }}>Marcar várias</button></p>
         <div className="modal-actions"><button type="button" className="button secondary" onClick={() => setModal(null)}>Cancelar</button>{otherChecked && <button className="button primary" disabled={busy}><Check size={16} /> Registrar célula</button>}</div>
       </form>}</Modal>}
 
