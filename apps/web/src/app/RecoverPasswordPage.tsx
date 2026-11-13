@@ -302,7 +302,6 @@ export function RecoverPasswordPage() {
       </form>
       <div className="recovery-actions">
         <Link className="auth-secondary-link" to="/entrar">Voltar para entrar</Link>
-        <button className="auth-secondary-button" type="button" onClick={restartFlow} disabled={busy}>Limpar e começar de novo</button>
       </div>
     </>}
 
@@ -339,7 +338,7 @@ export function RecoverPasswordPage() {
       <div className="recovery-actions">
         <button className="auth-secondary-button" type="button" onClick={() => void requestCode('resend')} disabled={busy || (countdown.isWaiting && rateLimitedAction === 'resend')}>Reenviar código</button>
         <button className="auth-secondary-button" type="button" onClick={goBack} disabled={busy}>Voltar para o e-mail</button>
-        <button className="auth-secondary-button" type="button" onClick={restartFlow} disabled={busy}>Recomeçar</button>
+        <button className="auth-secondary-button" type="button" onClick={restartFlow} disabled={busy}>Usar outro e-mail</button>
       </div>
     </>}
 
@@ -384,7 +383,7 @@ export function RecoverPasswordPage() {
       </form>
       <div className="recovery-actions">
         <button className="auth-secondary-button" type="button" onClick={goBack} disabled={busy}>Voltar para o código</button>
-        <button className="auth-secondary-button" type="button" onClick={restartFlow} disabled={busy}>Recomeçar</button>
+        <button className="auth-secondary-button" type="button" onClick={restartFlow} disabled={busy}>Usar outro e-mail</button>
       </div>
     </>}
   </AuthLayout>;

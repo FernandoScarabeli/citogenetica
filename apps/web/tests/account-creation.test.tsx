@@ -182,7 +182,7 @@ describe('cadastro e confirmação de e-mail', () => {
     await user.click(screen.getByRole('button', { name: 'Criar conta' }));
 
     expect(await screen.findByRole('heading', { name: 'Confira seu e-mail' })).toBeTruthy();
-    expect(screen.getByText(/Se houver uma confirmação de cadastro pendente/)).toBeTruthy();
+    expect(screen.getByText(/Enviamos um link de confirmação para o seu e-mail/)).toBeTruthy();
     expect(screen.getByRole('button', { name: 'Reenviar e-mail' })).toBeTruthy();
     expect(screen.getByRole('link', { name: 'Ir para entrar' })).toBeTruthy();
     expect(document.activeElement).toBe(screen.getByRole('heading', { name: 'Confira seu e-mail' }));

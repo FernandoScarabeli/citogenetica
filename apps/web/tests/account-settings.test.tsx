@@ -207,6 +207,23 @@ describe('Minha conta', () => {
     expect(senhaAtual('Senha').getAttribute('aria-invalid')).toBe('true');
   });
 
+  it('fechar o bloco de senha leva o erro junto', async () => {
+    const { user } = await openSecurity({
+      updatePassword: () => apiError(409, 'A senha atual está incorreta.'),
+    });
+    await user.type(senhaAtual('Senha'), 'incorreta');
+    await user.type(screen.getByLabelText('Nova senha'), 'NovaSegura-489!');
+    await user.type(screen.getByLabelText('Confirme sua nova senha'), 'NovaSegura-489!');
+    await user.click(screen.getByRole('button', { name: 'Salvar nova senha' }));
+    await screen.findByText('A senha atual está incorreta.');
+
+    await user.click(within(screen.getByRole('region', { name: 'Senha' })).getByRole('button', { name: 'Cancelar' }));
+    await user.click(screen.getByRole('button', { name: 'Alterar senha' }));
+
+    expect(screen.queryByText('A senha atual está incorreta.')).toBeNull();
+    expect(senhaAtual('Senha').getAttribute('aria-invalid')).toBeNull();
+  });
+
   it('reaproveita a política de senha e valida a confirmação antes da chamada', async () => {
     const { calls, user } = await openSecurity();
     await user.type(senhaAtual('Senha'), 'SenhaAtual123!');

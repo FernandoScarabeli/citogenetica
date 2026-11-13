@@ -161,7 +161,7 @@ export function Slides({ laboratory, onBack, readOnly, usuarioId, api = contagem
         {slide ? <><button className="text-button" type="button" onClick={() => { setNotice(''); navigate(caminhoLaminas(laboratoryId)); }}>{scopeName}</button><ChevronRight size={14} aria-hidden="true" /><strong aria-current="page">{slide.nome}</strong></> : <strong aria-current="page">{scopeName}</strong>}
       </nav>
     </div>
-    {readOnly && <p className="page-container lab-muted">Este laboratório está desativado. Os registros estão disponíveis somente para leitura.</p>}
+    {readOnly && <p className="page-container lab-muted">Somente consulta. Para reativar, fale com a administração da plataforma.</p>}
     {notice && <p className="page-container slide-notice" role="status">{notice}</p>}
     {error && <div className="error-banner" role="alert">{error}<button type="button" onClick={() => setError('')} aria-label="Dispensar"><X size={16} /></button></div>}
     {status === 'loading' ? <main className="page-container home slide-state" aria-live="polite"><p>Carregando as lâminas…</p></main>

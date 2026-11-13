@@ -26,6 +26,9 @@ import { AccountMenu } from './app/AccountMenu';
 const initialPreferences = loadPreferences();
 type Confirmation = { kind: 'leave' } | { kind: 'remove'; participation: ParticipacaoResponseDTO };
 
+/** Laboratório desativado: o que pode fazer e a quem recorrer. */
+const AVISO_DESATIVADO = 'Somente consulta. Para reativar, fale com a administração da plataforma.';
+
 function errorMessage(error: unknown, fallback: string): string {
   return error instanceof Error && error.message ? error.message : fallback;
 }
@@ -112,7 +115,7 @@ function ConfirmationDialog({ confirmation, busy, error, onClose, onConfirm }: {
   const heading = removing ? `Remover ${confirmation.participation.nome}?` : 'Sair do laboratório?';
   const description = removing
     ? `A participação de ${confirmation.participation.nome} será encerrada.`
-    : 'Sua participação será encerrada e este laboratório deixará de aparecer na sua lista.';
+    : 'Você perde o acesso a este laboratório. As lâminas que você registrou continuam com o laboratório.';
 
   return <dialog ref={dialog} className="laboratory-dialog" aria-labelledby="confirm-lab-title" aria-describedby="confirm-lab-description" onCancel={event => { event.preventDefault(); onClose(); }}>
     <div className="dialog-heading"><h2 id="confirm-lab-title">{heading}</h2><button className="icon-button" type="button" aria-label="Fechar" onClick={onClose}><X size={19} aria-hidden="true" /></button></div>
@@ -399,7 +402,7 @@ export function Laboratories({ user, onLogout, onUserUpdate, renderSlides, api =
       }
       if (hasRole(participation.papeis, 'ADMIN') && !hasRole(selectedRoles, 'ADMIN')
         && latest.filter(item => hasRole(item.papeis, 'ADMIN')).length <= 1) {
-        setPageError(`${errorMessage(conflict, 'A operação não pode ser concluída.')} É necessário manter ao menos um Administrador ativo.`);
+        setPageError('É preciso manter pelo menos um administrador. Dê esse papel a outra pessoa antes.');
         return;
       }
       if (hasRole(participation.papeis, 'ORIENTADOR') && !hasRole(selectedRoles, 'ORIENTADOR')) {
@@ -473,14 +476,14 @@ export function Laboratories({ user, onLogout, onUserUpdate, renderSlides, api =
           setMembers(latest);
           const self = latest.find(item => isCurrentUser(item, user.email));
           if (self && hasRole(self.papeis, 'ADMIN') && latest.filter(item => hasRole(item.papeis, 'ADMIN')).length <= 1) {
-            setPageError(`${errorMessage(error, 'A operação não pode ser concluída.')} Você é o último Administrador ativo. Atribua esse papel a outra pessoa antes de sair.`);
+            setPageError('Você é o último administrador. Dê esse papel a outra pessoa antes de sair.');
           } else setPageError(errorMessage(error, 'A operação não pode ser concluída.'));
         } else {
           const latest = await laboratorioApi.listarParticipacoes(currentLab.id).catch(() => members);
           setMembers(latest);
           const removed = latest.find(item => item.id === target.participation.id);
           if (removed && hasRole(removed.papeis, 'ADMIN') && latest.filter(item => hasRole(item.papeis, 'ADMIN')).length <= 1) {
-            setPageError(`${errorMessage(error, 'A operação não pode ser concluída.')} É necessário manter ao menos um Administrador ativo.`);
+            setPageError('É preciso manter pelo menos um administrador. Dê esse papel a outra pessoa antes.');
           } else setPageError(errorMessage(error, 'A operação não pode ser concluída.'));
         }
       } else if (!isUnauthorized(error)) {
@@ -528,7 +531,7 @@ export function Laboratories({ user, onLogout, onUserUpdate, renderSlides, api =
                 : visibleLabs.length ? <table className="laboratory-table">
                   <thead><tr><th scope="col" aria-sort="ascending">Laboratório</th><th scope="col">Seu papel</th><th scope="col" className="is-number">Lâminas</th><th scope="col" colSpan={2}><span className="sr-only">Ações</span></th></tr></thead>
                   <tbody>{visibleLabs.map(lab => <tr key={lab.id} className={lab.estado === 'DESATIVADO' ? 'is-disabled' : undefined}>
-                    <th scope="row"><button className="laboratory-row-open" type="button" onClick={() => openSlides(lab)}>{lab.nome}</button>{lab.estado === 'DESATIVADO' && <span className="laboratory-state is-disabled">Desativado</span>}</th>
+                    <th scope="row"><button className="laboratory-row-open" type="button" onClick={() => openSlides(lab)}>{lab.nome}</button>{lab.estado === 'DESATIVADO' && <><span className="laboratory-state is-disabled">Desativado</span><small className="laboratory-disabled-note">{AVISO_DESATIVADO}</small></>}</th>
                     <td className="laboratory-row-role">{papeisPrincipais(lab.papeis)}<span className="laboratory-row-separator" aria-hidden="true">·</span></td>
                     <td className="is-number laboratory-row-count"><SlideCount total={slideTotals === null ? undefined : slideTotals.get(lab.id) ?? null} /></td>
                     <td className="laboratory-row-actions"><button className="icon-button laboratory-row-manage" type="button" aria-label={`Gerenciar ${lab.nome}`} title="Gerenciar" onClick={() => openManage(lab)}><Settings size={17} aria-hidden="true" /></button></td>
@@ -543,7 +546,7 @@ export function Laboratories({ user, onLogout, onUserUpdate, renderSlides, api =
           {detailStatus === 'error' ? <div className="laboratory-empty"><p>{pageError || 'Não foi possível carregar os dados do laboratório.'}</p><button className="button secondary" type="button" onClick={() => setDetailRetry(value => value + 1)}>Tentar novamente</button></div>
               : detailStatus === 'loading' || currentLab?.id !== selectedId ? <div className="laboratory-loading" aria-live="polite"><p>Carregando laboratório e membros…</p><span /><span /></div>
               : currentLab && <>
-                <div className="page-heading laboratory-detail-heading"><div><h1>{currentLab.nome}</h1><div className="laboratory-detail-meta"><span className={`laboratory-state ${currentLab.estado === 'ATIVO' ? 'is-active' : 'is-disabled'}`}>{currentLab.estado === 'ATIVO' ? 'Ativo' : 'Desativado'}</span>{currentLab.estado === 'DESATIVADO' && <span>Somente leitura</span>}</div></div><button className="button primary" type="button" onClick={() => openSlides(currentLab)}>Acessar lâminas <ArrowRight size={16} aria-hidden="true" /></button></div>
+                <div className="page-heading laboratory-detail-heading"><div><h1>{currentLab.nome}</h1><div className="laboratory-detail-meta"><span className={`laboratory-state ${currentLab.estado === 'ATIVO' ? 'is-active' : 'is-disabled'}`}>{currentLab.estado === 'ATIVO' ? 'Ativo' : 'Desativado'}</span>{currentLab.estado === 'DESATIVADO' && <span>{AVISO_DESATIVADO}</span>}</div></div><button className="button primary" type="button" onClick={() => openSlides(currentLab)}>Acessar lâminas <ArrowRight size={16} aria-hidden="true" /></button></div>
                 <div className="laboratory-management-panel"><nav className="tabs laboratory-tabs" aria-label="Gestão do laboratório"><button type="button" className={section === 'membros' ? 'selected' : ''} aria-current={section === 'membros' ? 'page' : undefined} onClick={() => openSection('membros')}>Membros <span>{members.length}</span></button><button type="button" className={section === 'orientacao' ? 'selected' : ''} aria-current={section === 'orientacao' ? 'page' : undefined} onClick={() => openSection('orientacao')}>Orientação</button>{admin && <button type="button" className={section === 'convites' ? 'selected' : ''} aria-current={section === 'convites' ? 'page' : undefined} onClick={() => openSection('convites')}>Convites</button>}<button type="button" className={section === 'configuracoes' ? 'selected' : ''} aria-current={section === 'configuracoes' ? 'page' : undefined} onClick={() => openSection('configuracoes')}>Configurações</button><TabIndicator active={section} /></nav>
                 <TabTransition tab={section} index={ORDEM_ABAS.indexOf(section)}>
                 {section === 'membros' ? <section className="members-section" aria-labelledby="members-title">
@@ -556,7 +559,7 @@ export function Laboratories({ user, onLogout, onUserUpdate, renderSlides, api =
                 </section> : section === 'orientacao' ? <LaboratoryOrientations onNotice={setNotice} laboratorioId={currentLab.id} userId={user.id} isOrientador={hasRole(currentLab.papeis, 'ORIENTADOR')} isAdmin={!!admin} laboratorioAtivo={currentLab.estado === 'ATIVO'} /> : section === 'convites' && admin ? <LaboratoryInvitations laboratorioId={currentLab.id} onNotice={setNotice} /> : <section className="laboratory-settings" aria-labelledby="laboratory-settings-title">
                   <div><h2 id="laboratory-settings-title">Dados do laboratório</h2><p>O laboratório faz parte da UFLA.</p></div>
                   {admin ? <form className="laboratory-name-form" onSubmit={event => void saveLaboratoryName(event)}><label htmlFor="laboratory-name">Nome do laboratório</label><input id="laboratory-name" required maxLength={120} value={nameDraft} onChange={event => setNameDraft(event.target.value)} /><button className="button primary" type="submit" disabled={!nameDraft.trim() || savingName}>{savingName ? 'Salvando…' : 'Salvar nome'}</button></form>
-                    : <div className="laboratory-read-only-name"><span>Nome do laboratório</span><strong>{currentLab.nome}</strong>{currentLab.estado === 'DESATIVADO' && <p>Este laboratório está desativado e disponível somente para consulta.</p>}</div>}
+                    : <div className="laboratory-read-only-name"><span>Nome do laboratório</span><strong>{currentLab.nome}</strong>{currentLab.estado === 'DESATIVADO' && <p>{AVISO_DESATIVADO}</p>}</div>}
                 </section>}
                 {section === 'configuracoes' && currentLab.estado === 'ATIVO' && <section className="leave-laboratory" aria-labelledby="leave-title"><div><h2 id="leave-title">Sair do laboratório</h2><p>Você perderá o acesso a este laboratório.</p></div><button className="button secondary" type="button" onClick={() => openConfirmation({ kind: 'leave' })}><LogOut size={16} aria-hidden="true" />Sair do laboratório</button></section>}
                 </TabTransition>
