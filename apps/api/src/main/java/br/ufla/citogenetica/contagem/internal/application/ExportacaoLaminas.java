@@ -1,6 +1,7 @@
 package br.ufla.citogenetica.contagem.internal.application;
 
 import java.time.Instant;
+import java.time.ZoneId;
 import java.util.List;
 import java.util.UUID;
 
@@ -17,6 +18,12 @@ public record ExportacaoLaminas(Instant exportadoEm, List<LaminaExportada> lamin
 
     /** Versão do formato do arquivo. */
     public static final int VERSAO = 1;
+
+    /**
+     * Fuso de Brasília: datas e horas de dentro dos CSVs e a data no nome de todos os arquivos exportados (JSON e
+     * CSV), para que nunca discordem. O campo {@code exportadoEm} do JSON continua em UTC.
+     */
+    public static final ZoneId FUSO_ARQUIVOS = ZoneId.of("America/Sao_Paulo");
 
     public record LaminaExportada(UUID id, String nome, String especie, String tratamento, String observacoes,
                                   Integer meta, Instant criadaEm, Instant atualizadaEm, long versao,

@@ -46,6 +46,7 @@ public class ExportacaoLaminaService {
     private final VersaoProtocoloRepository versaoRepository;
     private final ProtocoloRepository protocoloRepository;
     private final UsuarioRosterQuery usuarioRosterQuery;
+    private final ResumoLaminaService resumoService;
     private final Clock clock;
 
     @Transactional(readOnly = true, isolation = Isolation.REPEATABLE_READ)
@@ -58,7 +59,30 @@ public class ExportacaoLaminaService {
         return montar(laminaService.listarTodasVisiveis(laboratorioId, donoFiltro, usuarioId));
     }
 
+    /** Lâmina com os cálculos oficiais de {@link ResumoLaminaService}, para o CSV de resumo. */
+    @Transactional(readOnly = true, isolation = Isolation.REPEATABLE_READ)
+    public ExportacaoResumos resumir(UUID laminaId, Long usuarioId) {
+        return montarResumos(List.of(acesso.carregarParaLeitura(laminaId, usuarioId)));
+    }
+
+    @Transactional(readOnly = true, isolation = Isolation.REPEATABLE_READ)
+    public ExportacaoResumos resumirVarias(UUID laboratorioId, Long donoFiltro, Long usuarioId) {
+        return montarResumos(laminaService.listarTodasVisiveis(laboratorioId, donoFiltro, usuarioId));
+    }
+
+    private ExportacaoResumos montarResumos(List<Lamina> laminas) {
+        // Sem registros: o resumo vem da agregação oficial, não da lista de registros.
+        ExportacaoLaminas base = montar(laminas, false);
+        Map<UUID, ResumoLamina> resumos = resumoService.resumirEmLote(laminas.stream().map(Lamina::getId).toList());
+        return new ExportacaoResumos(base.exportadoEm(), base.laminas().stream()
+                .map(lamina -> new ExportacaoResumos.LaminaResumida(lamina, resumos.get(lamina.id()))).toList());
+    }
+
     private ExportacaoLaminas montar(List<Lamina> laminas) {
+        return montar(laminas, true);
+    }
+
+    private ExportacaoLaminas montar(List<Lamina> laminas, boolean comRegistros) {
         if (laminas.isEmpty()) {
             return new ExportacaoLaminas(clock.instant(), List.of());
         }
@@ -70,7 +94,7 @@ public class ExportacaoLaminaService {
         List<UUID> laminaIds = laminas.stream().map(Lamina::getId).toList();
         Map<UUID, List<RegistroContagemRepository.RegistroExportado>> registrosPorLamina = new HashMap<>();
         Map<UUID, List<String>> tiposPorRegistro = new HashMap<>();
-        for (int inicio = 0; inicio < laminaIds.size(); inicio += TAMANHO_BLOCO) {
+        for (int inicio = 0; comRegistros && inicio < laminaIds.size(); inicio += TAMANHO_BLOCO) {
             List<UUID> bloco = laminaIds.subList(inicio, Math.min(inicio + TAMANHO_BLOCO, laminaIds.size()));
             for (var registro : registroRepository.findAtivosParaExportacao(bloco)) {
                 registrosPorLamina.computeIfAbsent(registro.getLaminaId(), id -> new ArrayList<>()).add(registro);

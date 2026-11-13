@@ -24,6 +24,9 @@ import org.springframework.transaction.annotation.Transactional;
 @RequiredArgsConstructor
 public class ResumoLaminaService {
 
+    /** Lâminas por consulta em lote; folgado em relação ao limite de parâmetros do driver. */
+    private static final int TAMANHO_BLOCO = 500;
+
     private final AcessoLamina acesso;
     private final RegistroContagemRepository registroRepository;
 
@@ -31,9 +34,40 @@ public class ResumoLaminaService {
     @Transactional(readOnly = true, isolation = Isolation.REPEATABLE_READ)
     public ResumoLamina resumir(UUID laminaId, Long usuarioId) {
         Lamina lamina = acesso.carregarParaLeitura(laminaId, usuarioId);
+        return calcular(lamina.getId(),
+                registroRepository.totaisPorFase(lamina.getId(), lamina.getProtocoloVersaoId()),
+                registroRepository.totaisPorTipo(lamina.getId()));
+    }
 
+    /**
+     * Mesmos cálculos de {@link #resumir} para várias lâminas já autorizadas, com a agregação em lote (duas consultas
+     * por bloco, sem N+1). Deve rodar dentro de uma transação do chamador, para enxergar o mesmo instante dos demais
+     * dados.
+     */
+    public Map<UUID, ResumoLamina> resumirEmLote(List<UUID> laminaIds) {
+        Map<UUID, ResumoLamina> resultado = new HashMap<>();
+        for (int inicio = 0; inicio < laminaIds.size(); inicio += TAMANHO_BLOCO) {
+            List<UUID> bloco = laminaIds.subList(inicio, Math.min(inicio + TAMANHO_BLOCO, laminaIds.size()));
+            Map<UUID, List<TotalFase>> fases = new HashMap<>();
+            for (var linha : registroRepository.totaisPorFaseDasLaminas(bloco)) {
+                fases.computeIfAbsent(linha.getLaminaId(), id -> new ArrayList<>()).add(linha);
+            }
+            Map<UUID, List<TotalTipo>> tipos = new HashMap<>();
+            for (var linha : registroRepository.totaisPorTipoDasLaminas(bloco)) {
+                tipos.computeIfAbsent(linha.getLaminaId(), id -> new ArrayList<>()).add(linha);
+            }
+            for (UUID id : bloco) {
+                resultado.put(id, calcular(id, fases.getOrDefault(id, List.of()), tipos.getOrDefault(id, List.of())));
+            }
+        }
+        return resultado;
+    }
+
+    /** Conta oficial a partir das linhas agregadas (fases na ordem do protocolo; tipos já ordenados por fase). */
+    private static ResumoLamina calcular(UUID laminaId, List<? extends TotalFase> linhasFase,
+                                         List<? extends TotalTipo> linhasTipo) {
         Map<UUID, List<TotalTipo>> tiposPorFase = new HashMap<>();
-        for (TotalTipo tipo : registroRepository.totaisPorTipo(lamina.getId())) {
+        for (TotalTipo tipo : linhasTipo) {
             tiposPorFase.computeIfAbsent(tipo.getFaseId(), fase -> new ArrayList<>()).add(tipo);
         }
 
@@ -41,7 +75,7 @@ public class ResumoLaminaService {
         long total = 0;
         long anormais = 0;
         long divisao = 0;
-        for (TotalFase linha : registroRepository.totaisPorFase(lamina.getId(), lamina.getProtocoloVersaoId())) {
+        for (TotalFase linha : linhasFase) {
             long totalFase = linha.getNormais() + linha.getAnormais();
             List<ResumoLamina.Tipo> tipos = tiposPorFase.getOrDefault(linha.getFaseId(), List.of()).stream()
                     .map(tipo -> new ResumoLamina.Tipo(tipo.getTipoId(), tipo.getNome(), tipo.getContagem(),
@@ -55,7 +89,7 @@ public class ResumoLaminaService {
                 divisao += totalFase;
             }
         }
-        return new ResumoLamina(lamina.getId(), total, anormais, percentual(divisao, total), List.copyOf(fases));
+        return new ResumoLamina(laminaId, total, anormais, percentual(divisao, total), List.copyOf(fases));
     }
 
     /** Parte ÷ total × 100, na mesma ordem de operações do front; total zero dá 0. */

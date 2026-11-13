@@ -160,6 +160,52 @@ public interface RegistroContagemRepository extends JpaRepository<RegistroContag
             """, nativeQuery = true)
     List<TotalTipo> totaisPorTipo(@Param("laminaId") UUID laminaId);
 
+    /** {@link TotalFase} de uma lâmina dentro de uma consulta em lote. */
+    interface TotalFaseDaLamina extends TotalFase {
+        UUID getLaminaId();
+    }
+
+    /** {@link TotalTipo} de uma lâmina dentro de uma consulta em lote. */
+    interface TotalTipoDaLamina extends TotalTipo {
+        UUID getLaminaId();
+    }
+
+    /**
+     * Mesma conta de {@link #totaisPorFase}, de várias lâminas numa só consulta: uma linha por (lâmina, fase da
+     * versão do protocolo da lâmina), fases em ordem do protocolo, mesmo zeradas. Quem chama limita o tamanho da
+     * lista (e não passa coleção vazia).
+     */
+    @Query(value = """
+            SELECT l.id AS "laminaId", f.id AS "faseId", f.nome AS "nome", f.ordem AS "ordem",
+                   f.conta_como_divisao AS "contaComoDivisao",
+                   COALESCE(SUM(r.quantidade) FILTER (WHERE r.status = 'NORMAL'), 0) AS "normais",
+                   COALESCE(SUM(r.quantidade) FILTER (WHERE r.status = 'ANORMAL'), 0) AS "anormais"
+              FROM lamina l
+              JOIN protocolo_fase f ON f.versao_id = l.protocolo_versao_id
+              LEFT JOIN registro_contagem r
+                     ON r.fase_id = f.id AND r.lamina_id = l.id AND r.excluido_em IS NULL
+             WHERE l.id IN (:laminaIds)
+             GROUP BY l.id, f.id, f.nome, f.ordem, f.conta_como_divisao
+             ORDER BY l.id, f.ordem
+            """, nativeQuery = true)
+    List<TotalFaseDaLamina> totaisPorFaseDasLaminas(@Param("laminaIds") Collection<UUID> laminaIds);
+
+    /**
+     * Mesma conta de {@link #totaisPorTipo}, de várias lâminas numa só consulta, com a mesma ordem dentro de cada
+     * fase. Quem chama limita o tamanho da lista (e não passa coleção vazia).
+     */
+    @Query(value = """
+            SELECT r.lamina_id AS "laminaId", r.fase_id AS "faseId", t.id AS "tipoId", t.nome AS "nome",
+                   SUM(r.quantidade) AS "contagem"
+              FROM registro_contagem r
+              JOIN registro_contagem_tipo rt ON rt.registro_id = r.id
+              JOIN tipo_anormalidade t ON t.id = rt.tipo_id
+             WHERE r.lamina_id IN (:laminaIds) AND r.excluido_em IS NULL
+             GROUP BY r.lamina_id, r.fase_id, t.id, t.nome, t.usuario_id, t.ordem, t.nome_normalizado
+             ORDER BY r.lamina_id, r.fase_id, (t.usuario_id IS NOT NULL), t.ordem, t.nome_normalizado, t.id
+            """, nativeQuery = true)
+    List<TotalTipoDaLamina> totaisPorTipoDasLaminas(@Param("laminaIds") Collection<UUID> laminaIds);
+
     /**
      * Total de células (soma de {@code quantidade} dos registros não excluídos) de várias lâminas numa só consulta.
      * Lâminas sem registro ativo ficam de fora; quem chama assume 0. Não chamar com coleção vazia.

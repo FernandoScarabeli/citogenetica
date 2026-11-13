@@ -12,9 +12,9 @@ final class NomeArquivo {
     private NomeArquivo() {
     }
 
-    /** Remove caracteres inválidos em arquivo e controles, junta espaços e tira pontos e espaços das pontas. */
+    /** Troca caracteres inválidos em arquivo e controles por espaço (não gruda palavras), junta espaços e tira pontos e espaços das pontas. */
     static String limpar(String nome) {
-        String limpo = ESPACOS.matcher(INVALIDOS.matcher(nome).replaceAll("")).replaceAll(" ")
+        String limpo = ESPACOS.matcher(INVALIDOS.matcher(nome).replaceAll(" ")).replaceAll(" ")
                 .replaceAll("^[ .]+|[ .]+$", "");
         return limpo.isEmpty() ? PADRAO : limpo;
     }

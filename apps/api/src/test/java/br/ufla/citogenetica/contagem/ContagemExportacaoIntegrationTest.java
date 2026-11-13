@@ -391,14 +391,15 @@ class ContagemExportacaoIntegrationTest extends AbstractContagemIntegrationTest 
                 .andExpect(status().isOk()).andReturn();
         ContentDisposition disposicao = ContentDisposition.parse(uma.getResponse().getHeader(HttpHeaders.CONTENT_DISPOSITION));
         assertThat(disposicao.getType()).isEqualTo("attachment");
-        assertThat(disposicao.getFilename()).isEqualTo("lamina-Lâmina Ação12.json");
+        assertThat(disposicao.getFilename()).isEqualTo("lamina-Lâmina Ação 1 2.json");
         assertThat(uma.getResponse().getHeader(HttpHeaders.CONTENT_DISPOSITION)).contains("filename*=UTF-8''");
 
         MvcResult varias = requisicaoAutenticada(sessao(dono), get(EXPORTACAO)).andExpect(status().isOk()).andReturn();
         String arquivo = ContentDisposition.parse(varias.getResponse().getHeader(HttpHeaders.CONTENT_DISPOSITION))
                 .getFilename();
         assertThat(arquivo).matches("laminas-\\d{4}-\\d{2}-\\d{2}\\.json");
-        assertThat(arquivo).isEqualTo("laminas-" + json(varias).path("exportadoEm").asText().substring(0, 10) + ".json");
+        assertThat(arquivo).isEqualTo("laminas-" + java.time.Instant.parse(json(varias).path("exportadoEm").asText())
+                .atZone(java.time.ZoneId.of("America/Sao_Paulo")).toLocalDate() + ".json");
     }
 
     // ---------------------------------------------------------------- utilidades
