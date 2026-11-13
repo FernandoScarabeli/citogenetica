@@ -93,22 +93,28 @@ html[data-appearance="dark"] .labs-app .error-banner { background: #33231f; }
 .laboratory-search:focus-within,.members-search:focus-within { outline: 3px solid var(--lab-focus); outline-offset: 3px; }
 .laboratory-search input,.members-search input { width: 100%; min-width: 0; height: 36px; margin: 0; padding: 0; border: 0; outline: 0; background: transparent; color: var(--lab-ink); font-size: 13px; }
 .laboratory-search input::placeholder,.members-search input::placeholder { color: #59675e; opacity: 1; }
-.laboratory-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); align-items: start; gap: 16px; }
-.laboratory-card { position: relative; display: flex; flex-direction: column; min-width: 0; min-height: 190px; padding: 20px; border: 1px solid var(--lab-line); border-radius: 6px; background: var(--lab-surface); }
-.laboratory-card-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; }
-.laboratory-card-heading h3 { min-width: 0; margin: 0; overflow-wrap: anywhere; font-size: 17px; line-height: 23px; font-weight: 550; }
+/* Lista de laboratórios: a linha inteira abre as lâminas; a engrenagem leva a "Gerenciar". */
+.laboratory-table { width: 100%; border-collapse: separate; border-spacing: 0; overflow: hidden; border: 1px solid var(--lab-line); border-radius: 6px; background: var(--lab-surface); font-size: 14px; }
+.laboratory-table th,.laboratory-table td { padding: 0 16px; height: 52px; border-top: 1px solid var(--lab-line); text-align: left; vertical-align: middle; }
+.laboratory-table thead th { height: 40px; border-top: 0; color: var(--lab-muted); font-size: 12px; font-weight: 550; }
+.laboratory-table .is-number { text-align: right; font-variant-numeric: tabular-nums; }
+.laboratory-table tbody tr { position: relative; }
+.laboratory-table tbody tr:hover { background: var(--lab-ground); }
+.laboratory-table tbody th { font-weight: 550; }
+.laboratory-table tbody th .laboratory-state { margin-left: 10px; }
+.labs-app .laboratory-row-open { min-height: 0; padding: 0; border: 0; background: none; color: var(--lab-ink); font: inherit; font-size: 15px; font-weight: 550; line-height: 22px; text-align: left; overflow-wrap: anywhere; cursor: pointer; }
+.laboratory-row-open::after { content: ""; position: absolute; inset: 0; }
+.laboratory-row-open:focus-visible { outline: none; }
+.laboratory-table tbody tr:has(.laboratory-row-open:focus-visible) { outline: 3px solid var(--lab-focus); outline-offset: -3px; }
+.laboratory-row-role,.laboratory-row-count { color: var(--lab-muted); }
+.laboratory-row-actions { width: 56px; text-align: right; }
+.laboratory-count-unit { display: none; }
+.labs-app .laboratory-row-manage { position: relative; z-index: 1; display: inline-flex; align-items: center; justify-content: center; vertical-align: middle; }
 .laboratory-state { display: inline-flex; flex: none; align-items: center; min-height: 24px; padding: 2px 8px; border: 1px solid transparent; border-radius: 4px; font-size: 12px; line-height: 18px; font-weight: 550; white-space: nowrap; }
 .laboratory-state.is-active { border-color: #c3d6c7; background: #e9f2eb; color: #274d35; }
 .laboratory-state.is-disabled { border-color: #d4d9d5; background: #eef0ee; color: #39453d; }
-.laboratory-card-meta { display: grid; gap: 8px; margin: 18px 0 20px; color: var(--lab-muted); font-size: 12px; }
 .role-chips { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
 .role-chip { display: inline-flex; align-items: center; min-height: 24px; padding: 2px 8px; border: 1px solid #d4e0d7; border-radius: 4px; background: #eff5f0; color: #2e4e39; font-size: 12px; line-height: 18px; white-space: nowrap; }
-.laboratory-card-actions { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: auto; }
-.laboratory-card-actions .text-button { white-space: nowrap; }
-/* O cartão inteiro abre as lâminas; "Gerenciar" fica acima, como ação secundária menor. */
-.laboratory-card-open::after { content: ""; position: absolute; inset: 0; border-radius: 6px; }
-.laboratory-card:hover { border-color: var(--lab-accent); }
-.labs-app .laboratory-card-manage { position: relative; z-index: 1; color: var(--lab-muted); font-size: 12px; }
 .laboratory-empty,.laboratory-loading { padding: 28px 20px; border: 1px solid var(--lab-line); border-radius: 6px; background: var(--lab-surface); }
 .laboratory-empty { text-align: center; }
 .laboratory-empty h3 { margin: 0; font-size: 16px; font-weight: 550; }
@@ -264,7 +270,6 @@ html[data-appearance="dark"] .orientation-error,html[data-appearance="dark"] .or
 html[data-appearance="dark"] .orientation-notice { color: #a4c5b2; }
 
 @media (max-width: 1000px) {
-  .laboratory-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .labs-app .members-table th:first-child { width: 26%; }
   .labs-app .members-table th:nth-child(2) { width: 28%; }
   .labs-app .members-table th:nth-child(3) { width: 24%; }
@@ -285,6 +290,17 @@ html[data-appearance="dark"] .orientation-notice { color: #a4c5b2; }
 }
 
 @media (max-width: 700px) {
+  /* No celular cada laboratório vira um bloco: nome em cima, papel e lâminas embaixo, engrenagem à direita. */
+  .laboratory-table thead { display: none; }
+  .laboratory-table,.laboratory-table tbody { display: block; }
+  .laboratory-table tbody tr { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; grid-template-areas: "nome nome manage" "papel lam manage"; align-items: center; column-gap: 12px; padding: 12px 8px 12px 16px; border-top: 1px solid var(--lab-line); }
+  .laboratory-table tbody tr:first-child { border-top: 0; }
+  .laboratory-table tbody :is(th, td) { display: block; height: auto; padding: 0; border: 0; }
+  .laboratory-table tbody th { grid-area: nome; }
+  .laboratory-row-role { grid-area: papel; font-size: 13px; }
+  .laboratory-row-count { grid-area: lam; font-size: 13px; }
+  .laboratory-count-unit { display: inline; }
+  .laboratory-row-actions { grid-area: manage; width: auto; }
   .labs-app .topbar { height: 65px; }
   .labs-app .account-trigger-identity,.labs-app .account-trigger > svg { display: none; }
   .labs-app .labs-main { width: calc(100% - 32px); min-height: calc(100dvh - 65px); padding-top: 22px; }
@@ -304,9 +320,6 @@ html[data-appearance="dark"] .orientation-notice { color: #a4c5b2; }
   .orientation-row-actions .text-button,.orientation-row > .text-button { min-height: 44px; }
   .laboratory-search { width: 100%; min-height: 44px; }
   .laboratory-search input,.members-search input { height: 40px; }
-  .laboratory-grid { grid-template-columns: 1fr; gap: 12px; }
-  .laboratory-card { min-height: 0; padding: 18px; }
-  .laboratory-card-actions { flex-wrap: wrap; }
   .loose-slides { align-items: flex-start; flex-direction: column; gap: 8px; }
   .labs-app .labs-footer { margin-top: 28px; }
   .labs-app .laboratory-detail-heading { align-items: flex-start; }

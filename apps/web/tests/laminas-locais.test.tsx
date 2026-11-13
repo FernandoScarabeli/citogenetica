@@ -33,7 +33,7 @@ const slide = (id: string, name: string, cells: number, extra: Partial<Slide> = 
 
 const api = {
   listarProtocolos: vi.fn(), buscarVersaoProtocolo: vi.fn(), listarTiposPersonalizados: vi.fn(), criarTipoPersonalizado: vi.fn(),
-  listarLaminas: vi.fn(), buscarLamina: vi.fn(), criarLamina: vi.fn(), atualizarLamina: vi.fn(), excluirLamina: vi.fn(),
+  listarLaminas: vi.fn(), contarLaminasPorLaboratorio: vi.fn(), buscarLamina: vi.fn(), criarLamina: vi.fn(), atualizarLamina: vi.fn(), excluirLamina: vi.fn(),
   criarRegistro: vi.fn(), listarRegistros: vi.fn(), atualizarRegistro: vi.fn(), desfazerRegistros: vi.fn(), buscarResumo: vi.fn(),
 };
 const seed = (slides: Slide[]) => save({ version: 1, slides, customTypes: {} });
@@ -49,6 +49,7 @@ beforeEach(() => {
   vi.resetAllMocks();
   labApi.listarMeus.mockResolvedValue([lab(LAB_ATIVO, 'Citogenética UFLA'), lab(LAB_DESATIVADO, 'Lab parado', 'DESATIVADO')]);
   api.listarProtocolos.mockResolvedValue(PROTOCOLOS);
+  api.contarLaminasPorLaboratorio.mockResolvedValue(new Map());
   api.criarLamina.mockImplementation(async (r: unknown) => r);
   api.criarRegistro.mockImplementation(async (_l: string, r: unknown) => r);
   api.buscarResumo.mockImplementation(async (id: string) => ({ total: api.criarRegistro.mock.calls.filter(call => call[0] === id).length }));

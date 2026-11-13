@@ -47,6 +47,11 @@ export interface CriarTipoPersonalizadoRequestDTO {
   nome: string;
 }
 
+export interface TotalLaminasLaboratorioDTO {
+  laboratorioId: string;
+  total: number;
+}
+
 export interface LaminaDTO {
   id: string;
   versao: number;

@@ -15,12 +15,15 @@ import type {
   RegistroHistoricoDTO,
   ResumoLaminaDTO,
   TipoPersonalizadoDTO,
+  TotalLaminasLaboratorioDTO,
   VersaoProtocoloDTO,
 } from './contracts/contagem';
 
 const LAMINAS = '/api/v1/laminas';
 const PROTOCOLOS = '/api/v1/protocolos';
 const TIPOS = '/api/v1/tipos-anormalidade/personalizados';
+/** Limite da API por pedido de totais. */
+const TOTAIS_POR_PEDIDO = 100;
 
 export interface ListarLaminasOptions {
   laboratorioId?: string | null;
@@ -80,6 +83,18 @@ export function createContagemApi(client: Pick<HttpClient, 'request' | 'download
       });
       if (options.laboratorioId) query.set('laboratorioId', options.laboratorioId);
       return client.request<PageDTO<LaminaDTO>>(`${LAMINAS}?${query.toString()}`, withSignal(options.signal));
+    },
+
+    /** Quantas lâminas o usuário vê em cada laboratório; os que ele não enxerga ficam de fora do mapa. */
+    async contarLaminasPorLaboratorio(laboratorioIds: string[], signal?: AbortSignal): Promise<Map<string, number>> {
+      const totais = new Map<string, number>();
+      for (let inicio = 0; inicio < laboratorioIds.length; inicio += TOTAIS_POR_PEDIDO) {
+        const query = new URLSearchParams();
+        for (const id of laboratorioIds.slice(inicio, inicio + TOTAIS_POR_PEDIDO)) query.append('laboratorioId', id);
+        const parte = await client.request<TotalLaminasLaboratorioDTO[]>(`${LAMINAS}/totais?${query.toString()}`, withSignal(signal));
+        for (const item of parte) totais.set(item.laboratorioId, item.total);
+      }
+      return totais;
     },
 
     buscarLamina(laminaId: string, signal?: AbortSignal): Promise<LaminaDTO> {

@@ -1,6 +1,8 @@
 package br.ufla.citogenetica.contagem.internal.application;
 
 import java.util.Collection;
+import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -144,6 +146,30 @@ public class LaminaService {
     @Transactional(readOnly = true)
     public List<Lamina> listarTodasVisiveis(UUID laboratorioId, Long donoFiltro, Long usuarioId) {
         return selecionarVisiveis(laboratorioId, donoFiltro, usuarioId, Pageable.unpaged()).getContent();
+    }
+
+    /**
+     * Total de lâminas que o leitor pode ver em cada laboratório pedido, com a mesma regra de {@link #listar}.
+     * Laboratórios que ele não enxerga ficam de fora, sem revelar se existem; os que ele enxerga sem lâmina vêm com 0.
+     */
+    @Transactional(readOnly = true)
+    public Map<UUID, Long> totaisPorLaboratorio(Collection<UUID> laboratorioIds, Long usuarioId) {
+        Map<UUID, Long> totais = new LinkedHashMap<>();
+        for (UUID laboratorioId : new LinkedHashSet<>(laboratorioIds)) {
+            if (laboratorioAccessQuery.podeVerDadosDoPesquisador(laboratorioId, usuarioId, usuarioId)) {
+                totais.put(laboratorioId, 0L);
+            }
+        }
+        if (totais.isEmpty()) {
+            return totais;
+        }
+        for (LaminaRepository.TotalPorDono linha : laminaRepository.contarAtivasPorDono(totais.keySet())) {
+            if (laboratorioAccessQuery.podeVerDadosDoPesquisador(
+                    linha.getLaboratorioId(), linha.getDonoUsuarioId(), usuarioId)) {
+                totais.merge(linha.getLaboratorioId(), linha.getTotal(), Long::sum);
+            }
+        }
+        return totais;
     }
 
     private Page<Lamina> selecionarVisiveis(UUID laboratorioId, Long donoFiltro, Long usuarioId, Pageable pageable) {

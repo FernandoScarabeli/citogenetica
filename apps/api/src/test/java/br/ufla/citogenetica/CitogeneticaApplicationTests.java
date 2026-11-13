@@ -101,6 +101,7 @@ class CitogeneticaApplicationTests extends AbstractIntegrationTest {
                 "/api/v1/tipos-anormalidade/personalizados",
                 "/api/v1/laminas",
                 "/api/v1/laminas/{id}",
+                "/api/v1/laminas/totais",
                 "/api/v1/laminas/{id}/exportacao.json",
                 "/api/v1/laminas/exportacao.json",
                 "/api/v1/laminas/{id}/resumo.csv",
