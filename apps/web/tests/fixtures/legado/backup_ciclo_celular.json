@@ -1,0 +1,347 @@
+{
+  "exportadoEm": "2026-11-13T00:27:04.476Z",
+  "laminas": {
+    "Controle-L1": {
+      "phases": {
+        "Interfase": {
+          "normal": 20,
+          "abnormalTypes": {
+            "Núcleos apoptóticos (condensados)": 1
+          }
+        },
+        "Prófase": {
+          "normal": 3,
+          "abnormalTypes": {
+            "Stickness": 1
+          }
+        },
+        "Metáfase": {
+          "normal": 2,
+          "abnormalTypes": {}
+        },
+        "Anáfase": {
+          "normal": 0,
+          "abnormalTypes": {
+            "Pontes com fragmento": 1
+          }
+        },
+        "Telófase": {
+          "normal": 0,
+          "abnormalTypes": {
+            "Micronúcleo: +de 3": 1,
+            "Célula binucleada": 1
+          }
+        }
+      },
+      "history": [
+        {
+          "id": "hm830fuqgkyo55",
+          "phase": "Interfase",
+          "status": "Normal",
+          "type": null,
+          "t": 1741608014000
+        },
+        {
+          "id": "hm830g5jciponq",
+          "phase": "Interfase",
+          "status": "Normal",
+          "type": null,
+          "t": 1741608028000
+        },
+        {
+          "id": "hm830ggc8wxrfg",
+          "phase": "Interfase",
+          "status": "Normal",
+          "type": null,
+          "t": 1741608042000
+        },
+        {
+          "id": "hm830gr54p5j9u",
+          "phase": "Interfase",
+          "status": "Normal",
+          "type": null,
+          "t": 1741608056000
+        },
+        {
+          "id": "hm830h1y0r3zr8",
+          "phase": "Interfase",
+          "status": "Normal",
+          "type": null,
+          "t": 1741608070000
+        },
+        {
+          "id": "hm830hcqwoti7g",
+          "phase": "Interfase",
+          "status": "Normal",
+          "type": null,
+          "t": 1741608084000
+        },
+        {
+          "id": "hm830hnjsird70",
+          "phase": "Interfase",
+          "status": "Normal",
+          "type": null,
+          "t": 1741608098000
+        },
+        {
+          "id": "hm830hyco5grh0",
+          "phase": "Interfase",
+          "status": "Normal",
+          "type": null,
+          "t": 1741608112000
+        },
+        {
+          "id": "hm830i95k1rl0s",
+          "phase": "Interfase",
+          "status": "Normal",
+          "type": null,
+          "t": 1741608126000
+        },
+        {
+          "id": "hm830ijyg85ayt",
+          "phase": "Interfase",
+          "status": "Normal",
+          "type": null,
+          "t": 1741608140000
+        },
+        {
+          "id": "hm830iurcacf8j",
+          "phase": "Interfase",
+          "status": "Normal",
+          "type": null,
+          "t": 1741608154000
+        },
+        {
+          "id": "hm830j5k8zw5kd",
+          "phase": "Interfase",
+          "status": "Normal",
+          "type": null,
+          "t": 1741608168000
+        },
+        {
+          "id": "hm830jgd4pkokl",
+          "phase": "Interfase",
+          "status": "Normal",
+          "type": null,
+          "t": 1741608182000
+        },
+        {
+          "id": "hm830jr60o63zg",
+          "phase": "Interfase",
+          "status": "Normal",
+          "type": null,
+          "t": 1741608196000
+        },
+        {
+          "id": "hm830k1ywd106r",
+          "phase": "Interfase",
+          "status": "Normal",
+          "type": null,
+          "t": 1741608210000
+        },
+        {
+          "id": "hm830kcrs987as",
+          "phase": "Interfase",
+          "status": "Normal",
+          "type": null,
+          "t": 1741608224000
+        },
+        {
+          "id": "hm830knko3riww",
+          "phase": "Interfase",
+          "status": "Normal",
+          "type": null,
+          "t": 1741608238000
+        },
+        {
+          "id": "hm830kydkwdp56",
+          "phase": "Interfase",
+          "status": "Normal",
+          "type": null,
+          "t": 1741608252000
+        },
+        {
+          "id": "hm830l96gulde3",
+          "phase": "Interfase",
+          "status": "Normal",
+          "type": null,
+          "t": 1741608266000
+        },
+        {
+          "id": "hm830ljzcu8bi8",
+          "phase": "Interfase",
+          "status": "Normal",
+          "type": null,
+          "t": 1741608280000
+        },
+        {
+          "id": "hm830lus8g8rqz",
+          "phase": "Interfase",
+          "status": "Anormal",
+          "type": "Núcleos apoptóticos (condensados)",
+          "t": 1741608294000
+        },
+        {
+          "id": "hm830m5l4a4eov",
+          "phase": "Prófase",
+          "status": "Normal",
+          "type": null,
+          "t": 1741608308000
+        },
+        {
+          "id": "hm830mge0uaoov",
+          "phase": "Prófase",
+          "status": "Normal",
+          "type": null,
+          "t": 1741608322000
+        },
+        {
+          "id": "hm830mr6w1mybz",
+          "phase": "Prófase",
+          "status": "Normal",
+          "type": null,
+          "t": 1741608336000
+        },
+        {
+          "id": "hm830n1zsrkv95",
+          "phase": "Prófase",
+          "status": "Anormal",
+          "type": "Stickness",
+          "t": 1741608350000
+        },
+        {
+          "id": "hm85vj24oyo9xf",
+          "phase": "Metáfase",
+          "status": "Normal",
+          "type": null,
+          "t": 1741781164000
+        },
+        {
+          "id": "hm85vjcxkszao7",
+          "phase": "Metáfase",
+          "status": "Normal",
+          "type": null,
+          "t": 1741781178000
+        },
+        {
+          "id": "hm85vjnqg453fj",
+          "phase": "Anáfase",
+          "status": "Anormal",
+          "type": "Pontes com fragmento",
+          "t": 1741781192000
+        },
+        {
+          "id": "hm85vjyjcc4s3a",
+          "phase": "Telófase",
+          "status": "Anormal",
+          "type": "Micronúcleo: +de 3",
+          "t": 1741781206000
+        },
+        {
+          "id": "hm85vk9c8ndtr4",
+          "phase": "Telófase",
+          "status": "Anormal",
+          "type": "Célula binucleada",
+          "t": 1741781220000
+        }
+      ],
+      "obs": "Controle negativo.",
+      "especie": "Allium cepa",
+      "tratamento": "Água"
+    },
+    "Tratado-L2": {
+      "phases": {
+        "Interfase": {
+          "normal": 8,
+          "abnormalTypes": {}
+        },
+        "Prófase": {
+          "normal": 0,
+          "abnormalTypes": {}
+        },
+        "Metáfase": {
+          "normal": 0,
+          "abnormalTypes": {
+            "Metáfase colchicínica": 1
+          }
+        },
+        "Anáfase": {
+          "normal": 0,
+          "abnormalTypes": {}
+        },
+        "Telófase": {
+          "normal": 0,
+          "abnormalTypes": {}
+        }
+      },
+      "history": [
+        {
+          "id": "hm85vkk5420jvg",
+          "phase": "Interfase",
+          "status": "Normal",
+          "type": null,
+          "t": 1741781234000
+        },
+        {
+          "id": "hm85vkuy09ooj4",
+          "phase": "Interfase",
+          "status": "Normal",
+          "type": null,
+          "t": 1741781248000
+        },
+        {
+          "id": "hm85vl5qwi6fc6",
+          "phase": "Interfase",
+          "status": "Normal",
+          "type": null,
+          "t": 1741781262000
+        },
+        {
+          "id": "hm85vlgjsrntc0",
+          "phase": "Interfase",
+          "status": "Normal",
+          "type": null,
+          "t": 1741781276000
+        },
+        {
+          "id": "hm85vlrco9rpmi",
+          "phase": "Interfase",
+          "status": "Normal",
+          "type": null,
+          "t": 1741781290000
+        },
+        {
+          "id": "hm85vm25kiljdh",
+          "phase": "Interfase",
+          "status": "Normal",
+          "type": null,
+          "t": 1741781304000
+        },
+        {
+          "id": "hm85vmcyg03kn8",
+          "phase": "Interfase",
+          "status": "Normal",
+          "type": null,
+          "t": 1741781318000
+        },
+        {
+          "id": "hm85vmnrcks5uu",
+          "phase": "Interfase",
+          "status": "Normal",
+          "type": null,
+          "t": 1741781332000
+        },
+        {
+          "id": "hm85vmyk8jzguv",
+          "phase": "Metáfase",
+          "status": "Anormal",
+          "type": "Metáfase colchicínica",
+          "t": 1741781346000
+        }
+      ],
+      "obs": "",
+      "especie": "Allium cepa",
+      "tratamento": "Glifosato 1%"
+    }
+  }
+}

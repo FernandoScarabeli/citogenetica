@@ -1,0 +1,289 @@
+{
+  "exportadoEm": "2026-11-13T00:27:03.523Z",
+  "laminas": {
+    "L1-planta A": {
+      "phases": {
+        "Leptóteno/Zigóteno": {
+          "normal": 5,
+          "abnormalTypes": {}
+        },
+        "Paquíteno": {
+          "normal": 5,
+          "abnormalTypes": {}
+        },
+        "Diplóteno/Diacinese": {
+          "normal": 0,
+          "abnormalTypes": {
+            "Univalente": 2
+          }
+        },
+        "Metáfase I": {
+          "normal": 5,
+          "abnormalTypes": {}
+        },
+        "Anáfase I": {
+          "normal": 0,
+          "abnormalTypes": {
+            "Ponte dupla": 1,
+            "ponte  DUPLA": 1
+          }
+        },
+        "Telófase I": {
+          "normal": 0,
+          "abnormalTypes": {}
+        },
+        "Prófase II": {
+          "normal": 0,
+          "abnormalTypes": {}
+        },
+        "Metáfase II": {
+          "normal": 0,
+          "abnormalTypes": {}
+        },
+        "Anáfase II": {
+          "normal": 0,
+          "abnormalTypes": {}
+        },
+        "Telófase II": {
+          "normal": 0,
+          "abnormalTypes": {}
+        },
+        "Tétrade": {
+          "normal": 3,
+          "abnormalTypes": {}
+        }
+      },
+      "history": [
+        {
+          "id": "hm830fuqgkyo55",
+          "phase": "Paquíteno",
+          "status": "Normal",
+          "type": null,
+          "t": 1741608014000
+        },
+        {
+          "id": "hm830g5jciponq",
+          "phase": "Leptóteno/Zigóteno",
+          "status": "Normal",
+          "type": null,
+          "t": 1741608028000
+        },
+        {
+          "id": "hm830ggc8wxrfg",
+          "phase": "Leptóteno/Zigóteno",
+          "status": "Normal",
+          "type": null,
+          "t": 1741608042000
+        },
+        {
+          "id": "hm830gr54p5j9u",
+          "phase": "Leptóteno/Zigóteno",
+          "status": "Normal",
+          "type": null,
+          "t": 1741608056000
+        },
+        {
+          "id": "hm830h1y0r3zr8",
+          "phase": "Leptóteno/Zigóteno",
+          "status": "Normal",
+          "type": null,
+          "t": 1741608070000
+        },
+        {
+          "id": "hm830hcqwoti7g",
+          "phase": "Leptóteno/Zigóteno",
+          "status": "Normal",
+          "type": null,
+          "t": 1741608084000
+        },
+        {
+          "id": "hm830hnjsird70",
+          "phase": "Paquíteno",
+          "status": "Normal",
+          "type": null,
+          "t": 1741608098000
+        },
+        {
+          "id": "hm830hyco5grh0",
+          "phase": "Paquíteno",
+          "status": "Normal",
+          "type": null,
+          "t": 1741608112000
+        },
+        {
+          "id": "hm830i95k1rl0s",
+          "phase": "Paquíteno",
+          "status": "Normal",
+          "type": null,
+          "t": 1741608126000
+        },
+        {
+          "id": "hm830ijyg85ayt",
+          "phase": "Paquíteno",
+          "status": "Normal",
+          "type": null,
+          "t": 1741608140000
+        },
+        {
+          "id": "hm830iurcacf8j",
+          "phase": "Diplóteno/Diacinese",
+          "status": "Anormal",
+          "type": "Univalente",
+          "t": 1741608154000
+        },
+        {
+          "id": "hm830j5k8zw5kd",
+          "phase": "Diplóteno/Diacinese",
+          "status": "Anormal",
+          "type": "Univalente",
+          "t": 1741608168000
+        },
+        {
+          "id": "hm84fzb14pkokl",
+          "phase": "Metáfase I",
+          "status": "Normal",
+          "type": null,
+          "t": 1741694582000
+        },
+        {
+          "id": "hm84fzlu0o63zg",
+          "phase": "Metáfase I",
+          "status": "Normal",
+          "type": null,
+          "t": 1741694596000
+        },
+        {
+          "id": "hm84fzwmwd106r",
+          "phase": "Metáfase I",
+          "status": "Normal",
+          "type": null,
+          "t": 1741694610000
+        },
+        {
+          "id": "hm84g07fs987as",
+          "phase": "Metáfase I",
+          "status": "Normal",
+          "type": null,
+          "t": 1741694624000
+        },
+        {
+          "id": "hm84g0i8o3riww",
+          "phase": "Metáfase I",
+          "status": "Normal",
+          "type": null,
+          "t": 1741694638000
+        },
+        {
+          "id": "hm84g0t1kwdp56",
+          "phase": "Anáfase I",
+          "status": "Anormal",
+          "type": "Ponte dupla",
+          "t": 1741694652000
+        },
+        {
+          "id": "hm84g13ugulde3",
+          "phase": "Anáfase I",
+          "status": "Anormal",
+          "type": "ponte  DUPLA",
+          "t": 1741694666000
+        },
+        {
+          "id": "hm84g1encu8bi8",
+          "phase": "Tétrade",
+          "status": "Normal",
+          "type": null,
+          "t": 1741694680000
+        },
+        {
+          "id": "hm84g1pg8g8rqz",
+          "phase": "Tétrade",
+          "status": "Normal",
+          "type": null,
+          "t": 1741694694000
+        },
+        {
+          "id": "hm84g2094a4eov",
+          "phase": "Tétrade",
+          "status": "Normal",
+          "type": null,
+          "t": 1741694708000
+        }
+      ],
+      "obs": "Lâmina boa.\nAlgumas células sobrepostas."
+    },
+    "L2 ação; \"aspas\"": {
+      "phases": {
+        "Leptóteno/Zigóteno": {
+          "normal": 0,
+          "abnormalTypes": {}
+        },
+        "Paquíteno": {
+          "normal": 0,
+          "abnormalTypes": {}
+        },
+        "Diplóteno/Diacinese": {
+          "normal": 0,
+          "abnormalTypes": {}
+        },
+        "Metáfase I": {
+          "normal": 0,
+          "abnormalTypes": {}
+        },
+        "Anáfase I": {
+          "normal": 0,
+          "abnormalTypes": {}
+        },
+        "Telófase I": {
+          "normal": 0,
+          "abnormalTypes": {}
+        },
+        "Prófase II": {
+          "normal": 0,
+          "abnormalTypes": {}
+        },
+        "Metáfase II": {
+          "normal": 0,
+          "abnormalTypes": {}
+        },
+        "Anáfase II": {
+          "normal": 0,
+          "abnormalTypes": {}
+        },
+        "Telófase II": {
+          "normal": 2,
+          "abnormalTypes": {
+            "Ponte": 1
+          }
+        },
+        "Tétrade": {
+          "normal": 0,
+          "abnormalTypes": {}
+        }
+      },
+      "history": [
+        {
+          "id": "hm84g2luw1mybz",
+          "phase": "Telófase II",
+          "status": "Normal",
+          "type": null,
+          "t": 1741694736000
+        },
+        {
+          "id": "hm84g2wnsrkv95",
+          "phase": "Telófase II",
+          "status": "Normal",
+          "type": null,
+          "t": 1741694750000
+        },
+        {
+          "id": "hm84g37goyo9xf",
+          "phase": "Telófase II",
+          "status": "Anormal",
+          "type": "Ponte",
+          "t": 1741694764000
+        }
+      ],
+      "obs": ""
+    }
+  }
+}
