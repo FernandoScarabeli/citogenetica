@@ -15,6 +15,8 @@ import {
 import { pct } from './domain';
 import { ActionMenu } from './components/ui/action-menu';
 import { EntrySelect, Modal, TypeButtons, TypeChecklist, type TypeChoice } from './SlideWidgets';
+import { SlideComments, SlidePhotos } from './SlideCollaboration';
+import { colaboracaoApi, type ColaboracaoApi } from './api/colaboracao-api';
 import { salvarArquivo } from './salvar-arquivo';
 import './slide-detail.css';
 import { useNotesAutosave } from './useNotesAutosave';
@@ -70,8 +72,10 @@ function withPending(resumo: ResumoLaminaDTO, pending: Pending[]): ResumoLaminaD
   return { ...resumo, fases, total: resumo.total + pending.length, anormais: resumo.anormais + pending.filter(item => item.status === 'ANORMAL').length };
 }
 
-export function SlideDetail({ api, laminaId, usuarioId, readOnly, protocolos, onError, onGone, onLaminaChanged, onDeleted }: {
+export function SlideDetail({ api, colaboracao = colaboracaoApi, laminaId, usuarioId, readOnly, protocolos, onError, onGone, onLaminaChanged, onDeleted }: {
   api: ContagemApi;
+  /** Fotos e comentários; trocável nos testes. */
+  colaboracao?: ColaboracaoApi;
   laminaId: string;
   usuarioId: number;
   readOnly: boolean;
@@ -666,6 +670,9 @@ export function SlideDetail({ api, laminaId, usuarioId, readOnly, protocolos, on
       <textarea id="notes" readOnly={!canEdit} placeholder={canEdit ? 'Anotações gerais sobre esta lâmina…' : ''} value={notes.text} maxLength={5000} onChange={event => notes.setText(event.target.value)} onBlur={() => void notes.flush()} />
       {canEdit && <p className="notes-status" role="status">{notes.state === 'saving' ? 'Salvando…' : notes.state === 'saved' ? 'Salvo' : notes.state === 'error' ? <>Não foi possível salvar. <button className="text-button" type="button" onClick={() => void notes.flush()}>Tentar de novo</button></> : ''}</p>}
     </section>
+
+    <SlidePhotos laminaId={laminaId} canEdit={canEdit} api={colaboracao} />
+    <SlideComments laminaId={laminaId} usuarioId={usuarioId} canComment={!readOnly} api={colaboracao} />
 
     <details className="history-section" aria-label="Histórico de registros">
       <summary><span className={typeClass('title')}>Histórico de registros</span><ChevronDown size={18} aria-hidden="true" /></summary>

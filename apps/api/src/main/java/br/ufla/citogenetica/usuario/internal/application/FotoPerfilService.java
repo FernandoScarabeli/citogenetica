@@ -1,5 +1,6 @@
 package br.ufla.citogenetica.usuario.internal.application;
 
+import br.ufla.citogenetica.shared.storage.FormatoImagem;
 import br.ufla.citogenetica.shared.storage.FotoPerfilStorage;
 import br.ufla.citogenetica.shared.web.error.BusinessException;
 import br.ufla.citogenetica.shared.web.error.NotFoundException;
@@ -16,11 +17,10 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
 
-import java.util.Arrays;
 
 /**
  * Foto de perfil de cada conta, guardada no armazenamento de arquivos.
- * O formato é conferido pelos primeiros bytes do arquivo, e não pelo nome ou pelo tipo informado pelo navegador.
+ * O formato é conferido pelos primeiros bytes do arquivo ({@link FormatoImagem}).
  */
 @Slf4j
 @Service
@@ -35,34 +35,12 @@ public class FotoPerfilService {
 
     public record Foto(byte[] conteudo, String contentType) {}
 
-    private enum Formato {
-        JPEG("jpg", "image/jpeg"),
-        PNG("png", "image/png"),
-        WEBP("webp", "image/webp");
-
-        final String extensao;
-        final String contentType;
-
-        Formato(String extensao, String contentType) {
-            this.extensao = extensao;
-            this.contentType = contentType;
-        }
-
-        static Formato daExtensao(String chave) {
-            String extensao = chave.substring(chave.lastIndexOf('.') + 1);
-            return Arrays.stream(values())
-                    .filter(formato -> formato.extensao.equals(extensao))
-                    .findFirst()
-                    .orElseThrow(() -> new IllegalStateException("Extensão de foto desconhecida: " + extensao));
-        }
-    }
-
     @Transactional
     public Usuario trocarMinhaFoto(byte[] conteudo) {
-        Formato formato = detectarFormato(conteudo);
+        FormatoImagem formato = FormatoImagem.detectar(conteudo, TAMANHO_MAXIMO_BYTES, MENSAGEM_FORMATO);
         Usuario usuario = usuarioAutenticado();
         String chaveAnterior = usuario.getFotoChave();
-        String chaveNova = storage.salvarFotoPerfil(conteudo, formato.extensao, formato.contentType);
+        String chaveNova = storage.salvarFotoPerfil(conteudo, formato.extensao(), formato.contentType());
 
         // A foto antiga só sai depois que o banco aponta para a nova; se o banco falhar, quem sai é a nova.
         TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
@@ -82,35 +60,7 @@ public class FotoPerfilService {
         if (chave == null) {
             throw new NotFoundException("Esta conta não tem foto de perfil.");
         }
-        return new Foto(storage.lerFotoPerfil(chave), Formato.daExtensao(chave).contentType);
-    }
-
-    static Formato detectarFormato(byte[] conteudo) {
-        if (conteudo == null || conteudo.length == 0 || conteudo.length > TAMANHO_MAXIMO_BYTES) {
-            throw new BusinessException(MENSAGEM_FORMATO);
-        }
-        if (comecaCom(conteudo, 0, 0xFF, 0xD8, 0xFF)) {
-            return Formato.JPEG;
-        }
-        if (comecaCom(conteudo, 0, 0x89, 'P', 'N', 'G', 0x0D, 0x0A, 0x1A, 0x0A)) {
-            return Formato.PNG;
-        }
-        if (comecaCom(conteudo, 0, 'R', 'I', 'F', 'F') && comecaCom(conteudo, 8, 'W', 'E', 'B', 'P')) {
-            return Formato.WEBP;
-        }
-        throw new BusinessException(MENSAGEM_FORMATO);
-    }
-
-    private static boolean comecaCom(byte[] conteudo, int inicio, int... esperado) {
-        if (conteudo.length < inicio + esperado.length) {
-            return false;
-        }
-        for (int indice = 0; indice < esperado.length; indice++) {
-            if ((conteudo[inicio + indice] & 0xFF) != esperado[indice]) {
-                return false;
-            }
-        }
-        return true;
+        return new Foto(storage.lerFotoPerfil(chave), FormatoImagem.daChave(chave).contentType());
     }
 
     private void apagarSemFalhar(String chave) {

@@ -1,5 +1,7 @@
 package br.ufla.citogenetica.infra.storage;
 
+import br.ufla.citogenetica.shared.storage.FormatoImagem;
+import br.ufla.citogenetica.shared.storage.FotoLaminaStorage;
 import br.ufla.citogenetica.shared.storage.FotoPerfilStorage;
 import br.ufla.citogenetica.shared.web.error.BusinessException;
 import jakarta.annotation.PostConstruct;
@@ -26,11 +28,13 @@ import java.util.UUID;
 import java.util.regex.Pattern;
 
 @Service
-public class StorageService implements FotoPerfilStorage {
+public class StorageService implements FotoPerfilStorage, FotoLaminaStorage {
 
     private static final Pattern EXTENSION_PATTERN = Pattern.compile("[a-z0-9]{1,10}");
     private static final Pattern PROFILE_PHOTO_KEY_PATTERN = Pattern.compile(
             "perfis/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\\.(jpg|png|webp)");
+    private static final Pattern SLIDE_PHOTO_KEY_PATTERN = Pattern.compile(
+            "laminas/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\\.(jpg|png|webp)");
     private static final Pattern MANAGED_OBJECT_KEY_PATTERN = Pattern.compile(
             "fotos/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\\.[a-z0-9]{1,10}");
 
@@ -107,8 +111,37 @@ public class StorageService implements FotoPerfilStorage {
 
     @Override
     public String salvarFotoPerfil(byte[] content, String extension, String contentType) {
-        String objectKey = "perfis/" + UUID.randomUUID() + "." + extension;
-        validateProfilePhotoKey(objectKey);
+        return putImage("perfis/" + UUID.randomUUID() + "." + extension, PROFILE_PHOTO_KEY_PATTERN, content, contentType);
+    }
+
+    @Override
+    public byte[] lerFotoPerfil(String objectKey) {
+        return getImage(objectKey, PROFILE_PHOTO_KEY_PATTERN);
+    }
+
+    @Override
+    public void apagarFotoPerfil(String objectKey) {
+        deleteImage(objectKey, PROFILE_PHOTO_KEY_PATTERN);
+    }
+
+    @Override
+    public String salvarFotoLamina(byte[] content, FormatoImagem formato) {
+        return putImage("laminas/" + UUID.randomUUID() + "." + formato.extensao(), SLIDE_PHOTO_KEY_PATTERN,
+                content, formato.contentType());
+    }
+
+    @Override
+    public byte[] lerFotoLamina(String objectKey) {
+        return getImage(objectKey, SLIDE_PHOTO_KEY_PATTERN);
+    }
+
+    @Override
+    public void apagarFotoLamina(String objectKey) {
+        deleteImage(objectKey, SLIDE_PHOTO_KEY_PATTERN);
+    }
+
+    private String putImage(String objectKey, Pattern allowedKeys, byte[] content, String contentType) {
+        validateImageKey(objectKey, allowedKeys);
         try {
             s3Client.putObject(PutObjectRequest.builder()
                             .bucket(properties.bucket())
@@ -122,9 +155,8 @@ public class StorageService implements FotoPerfilStorage {
         return objectKey;
     }
 
-    @Override
-    public byte[] lerFotoPerfil(String objectKey) {
-        validateProfilePhotoKey(objectKey);
+    private byte[] getImage(String objectKey, Pattern allowedKeys) {
+        validateImageKey(objectKey, allowedKeys);
         try {
             return s3Client.getObjectAsBytes(GetObjectRequest.builder()
                     .bucket(properties.bucket())
@@ -135,9 +167,8 @@ public class StorageService implements FotoPerfilStorage {
         }
     }
 
-    @Override
-    public void apagarFotoPerfil(String objectKey) {
-        validateProfilePhotoKey(objectKey);
+    private void deleteImage(String objectKey, Pattern allowedKeys) {
+        validateImageKey(objectKey, allowedKeys);
         try {
             s3Client.deleteObject(DeleteObjectRequest.builder()
                     .bucket(properties.bucket())
@@ -148,9 +179,9 @@ public class StorageService implements FotoPerfilStorage {
         }
     }
 
-    private void validateProfilePhotoKey(String objectKey) {
-        if (objectKey == null || !PROFILE_PHOTO_KEY_PATTERN.matcher(objectKey).matches()) {
-            throw new BusinessException("A chave da foto de perfil é inválida.");
+    private void validateImageKey(String objectKey, Pattern allowedKeys) {
+        if (objectKey == null || !allowedKeys.matcher(objectKey).matches()) {
+            throw new BusinessException("A chave da imagem é inválida.");
         }
     }
 
