@@ -113,6 +113,17 @@ describe('recuperação de senha', () => {
     expect(window.location.pathname).toBe('/recuperar-senha');
   });
 
+  it('primeiro passo só tem Voltar; nos outros, "Usar outro e-mail" volta ao começo', async () => {
+    const { user } = await openRecovery();
+    expect(screen.queryByRole('button', { name: 'Limpar e começar de novo' })).toBeNull();
+
+    await sendCode(user);
+    await user.click(screen.getByRole('button', { name: 'Usar outro e-mail' }));
+
+    expect(await screen.findByRole('heading', { name: 'Recuperar senha' })).toBeTruthy();
+    expect((screen.getByRole('textbox', { name: 'E-mail' }) as HTMLInputElement).value).toBe('');
+  });
+
   it('dá sempre uma resposta neutra depois de solicitar o código', async () => {
     const { calls, user } = await openRecovery();
     await sendCode(user, 'nao-cadastrado@ufla.br');

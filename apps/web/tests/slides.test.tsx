@@ -189,7 +189,7 @@ describe('lista de lâminas', () => {
     const { container } = renderSlides({ laboratory: { ...ACTIVE_LAB, estado: 'DESATIVADO' }, readOnly: true });
     await screen.findByRole('button', { name: /L1 planta A/ });
     expect(screen.queryByRole('button', { name: 'Nova lâmina' })).toBeNull();
-    expect(screen.getByText(/laboratório está desativado/)).toBeTruthy();
+    expect(screen.getByText('Somente consulta. Para reativar, fale com a administração da plataforma.')).toBeTruthy();
 
     await openSlide(user);
     expect(screen.queryByRole('button', { name: /Registrar Prófase/ })).toBeNull();

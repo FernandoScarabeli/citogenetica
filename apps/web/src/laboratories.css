@@ -141,6 +141,7 @@ html[data-appearance="dark"] .labs-app .error-banner { background: var(--lab-bad
 .laboratory-row-open:focus-visible { outline: none; }
 .laboratory-table tbody tr:has(.laboratory-row-open:focus-visible) { outline: 3px solid var(--lab-focus); outline-offset: -3px; }
 .laboratory-table tbody tr.is-disabled .laboratory-row-open { color: var(--lab-muted); }
+.laboratory-disabled-note { display: block; margin-top: 4px; color: var(--lab-muted); font-size: 13px; line-height: 18px; }
 .laboratory-table .is-number { width: 110px; }
 .laboratory-row-separator,.laboratory-count-unit { display: none; }
 .laboratory-row-actions { width: 52px; text-align: right; }

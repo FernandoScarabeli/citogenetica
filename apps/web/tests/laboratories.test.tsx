@@ -362,16 +362,17 @@ describe('gestão de laboratórios reais', () => {
     await user.click(screen.getByRole('button', { name: 'Alterar papéis de Ana Pesquisadora' }));
     await user.click(screen.getByRole('checkbox', { name: /Administrador/ }));
     await user.click(screen.getByRole('button', { name: 'Salvar papéis' }));
-    expect(await screen.findByText(/É necessário manter ao menos um Administrador ativo/)).toBeTruthy();
+    expect(await screen.findByText('É preciso manter pelo menos um administrador. Dê esse papel a outra pessoa antes.')).toBeTruthy();
 
     await user.click(screen.getByRole('button', { name: 'Cancelar' }));
     expect(screen.queryByRole('button', { name: 'Sair do laboratório' })).toBeNull();
     await user.click(screen.getByRole('button', { name: 'Configurações' }));
     await user.click(screen.getByRole('button', { name: 'Sair do laboratório' }));
     const dialog = screen.getByRole('dialog');
+    expect(dialog.textContent).toContain('Você perde o acesso a este laboratório. As lâminas que você registrou continuam com o laboratório.');
     await user.click(within(dialog).getByRole('button', { name: 'Sair do laboratório' }));
 
-    expect(await screen.findByText(/Você é o último Administrador ativo/)).toBeTruthy();
+    expect(await screen.findByText('Você é o último administrador. Dê esse papel a outra pessoa antes de sair.')).toBeTruthy();
     expect(api.sair).toHaveBeenCalledWith(ACTIVE_LAB.id);
   });
 
@@ -400,7 +401,7 @@ describe('gestão de laboratórios reais', () => {
     const dialog = screen.getByRole('dialog');
     await user.click(within(dialog).getByRole('button', { name: 'Remover participação' }));
 
-    expect(await screen.findByText(/É necessário manter ao menos um Administrador ativo/)).toBeTruthy();
+    expect(await screen.findByText('É preciso manter pelo menos um administrador. Dê esse papel a outra pessoa antes.')).toBeTruthy();
   });
 
   it('mostra a mensagem de orientandos ativos ao remover e não a repete ao abrir a janela de novo', async () => {
@@ -485,7 +486,7 @@ describe('lista de laboratórios em tabela', () => {
 
     await waitFor(() => expect(rows()).toEqual([
       ['Administrador, Orientador·', '12 lâminas', '', 'genética animal'],
-      ['Orientador·', '1 lâmina', '', 'Laboratório 9Desativado'],
+      ['Orientador·', '1 lâmina', '', 'Laboratório 9DesativadoSomente consulta. Para reativar, fale com a administração da plataforma.'],
       ['Membro·', '0 lâminas', '', 'Laboratório 10'],
     ]));
     expect(contagem.contarLaminasPorLaboratorio).toHaveBeenCalledWith(['lab-c', 'lab-a', 'lab-b'], expect.any(AbortSignal));

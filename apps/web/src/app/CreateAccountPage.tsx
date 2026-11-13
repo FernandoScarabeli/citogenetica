@@ -200,7 +200,7 @@ export function CreateAccountPage() {
     return <AuthLayout
       title="Confira seu e-mail"
       titleId="signup-result-title"
-      description="Se houver uma confirmação de cadastro pendente para esse endereço, enviaremos uma mensagem com as próximas instruções."
+      description="Enviamos um link de confirmação para o seu e-mail. Abra a mensagem para ativar a conta. Se não chegar em alguns minutos, olhe o spam."
       titleRef={titleRef}
       titleFocusable
     >

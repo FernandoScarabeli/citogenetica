@@ -86,6 +86,23 @@ export function ProfileSettings({ user, onBack, onUserUpdate }: ProfileSettingsP
     if (!emailRateLimited) setEmailFeedback(null);
   }
 
+  /** Fechar um bloco leva junto os erros dele, para não sobrar aviso velho na página. */
+  function togglePassword() {
+    if (passwordOpen) {
+      setPasswordErrors({});
+      setPasswordFeedback(current => current?.kind === 'error' ? null : current);
+    }
+    setPasswordOpen(open => !open);
+  }
+
+  function toggleEmail() {
+    if (emailOpen) {
+      setEmailErrors({});
+      if (!emailRateLimited) setEmailFeedback(current => current?.kind === 'error' ? null : current);
+    }
+    setEmailOpen(open => !open);
+  }
+
   async function selectPhoto(file: File | undefined) {
     if (!file || savingPhoto) return;
     if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type) || file.size > 2 * 1024 * 1024) {
@@ -301,7 +318,7 @@ export function ProfileSettings({ user, onBack, onUserUpdate }: ProfileSettingsP
     <section className="profile-card" aria-labelledby="change-email-title">
       <div className="profile-card-row">
         <div><h2 id="change-email-title">E-mail</h2><p className="profile-current">{user.email}</p></div>
-        <button className="button secondary" type="button" aria-expanded={emailOpen} aria-controls="profile-email-panel" onClick={() => setEmailOpen(open => !open)}>{emailOpen ? 'Cancelar' : <>Trocar <span className="sr-only">e-mail</span></>}</button>
+        <button className="button secondary" type="button" aria-expanded={emailOpen} aria-controls="profile-email-panel" onClick={toggleEmail}>{emailOpen ? 'Cancelar' : <>Trocar <span className="sr-only">e-mail</span></>}</button>
       </div>
       {emailOpen && <div className="profile-panel" id="profile-email-panel">
         <p className="profile-panel-hint">Seu endereço atual continua ativo até você confirmar o novo.</p>
@@ -329,7 +346,7 @@ export function ProfileSettings({ user, onBack, onUserUpdate }: ProfileSettingsP
     <section className="profile-card" aria-labelledby="change-password-title">
       <div className="profile-card-row">
         <div><h2 id="change-password-title">Senha</h2><p className="profile-current" aria-hidden="true">••••••••</p></div>
-        <button className="button secondary" type="button" aria-expanded={passwordOpen} aria-controls="profile-password-panel" onClick={() => setPasswordOpen(open => !open)}>{passwordOpen ? 'Cancelar' : <>Alterar <span className="sr-only">senha</span></>}</button>
+        <button className="button secondary" type="button" aria-expanded={passwordOpen} aria-controls="profile-password-panel" onClick={togglePassword}>{passwordOpen ? 'Cancelar' : <>Alterar <span className="sr-only">senha</span></>}</button>
       </div>
       {passwordOpen && <div className="profile-panel" id="profile-password-panel">
         <form className="profile-form" onSubmit={changePassword} noValidate>
