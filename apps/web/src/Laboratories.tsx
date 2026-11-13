@@ -17,6 +17,7 @@ import './laboratory-management.css';
 import { FloatingNotice } from './components/ui/floating-notice';
 import { TabIndicator, TabTransition } from './components/ui/tab-transition';
 import { loadPreferences, savePreferences } from './preferences';
+import { fotoPerfilUrl } from './api/usuario-api';
 import type { UsuarioResponseDTO } from './api/contracts/usuario';
 import { ProfileSettings } from './app/ProfileSettings';
 import { NotificationCenter } from './NotificationCenter';
@@ -502,7 +503,7 @@ export function Laboratories({ user, onLogout, onUserUpdate, renderSlides, api =
   return <div className="labs-app">
     <header className="topbar"><div className="topbar-inner">
       <Link className="brand" to="/laboratorios"><span className="brand-mark"><Microscope size={21} aria-hidden="true" /></span><span>citogenética<small>Laboratório de Citogenética · UFLA</small></span></Link>
-      <div className="lab-account"><NotificationCenter/><AccountMenu name={user.nome} email={user.email} photo={preferences.photo} dark={preferences.dark} platformAdmin={user.role.nome === 'ADMIN'}
+      <div className="lab-account"><NotificationCenter/><AccountMenu name={user.nome} email={user.email} photo={fotoPerfilUrl(user)} dark={preferences.dark} platformAdmin={user.role.nome === 'ADMIN'}
         onProfile={() => { if (location.pathname !== CAMINHO_PERFIL) navigate(CAMINHO_PERFIL); setPageError(''); setNotice(''); }}
         onAppearance={() => updatePreferences({ ...preferences, dark: !preferences.dark })}
         onLogout={onLogout} /></div>
@@ -517,7 +518,7 @@ export function Laboratories({ user, onLogout, onUserUpdate, renderSlides, api =
           : <Fragment key={migrationTick}>{renderSlides(slidesLab, goList, slidesLab?.estado === 'DESATIVADO')}</Fragment>}
     </> : <main className={`page-container labs-main${view === 'manage' ? ' laboratory-management-page' : ''}`}><div className="labs-content">
       {(pageError || (listStatus === 'error' && view === 'list')) && !createOpen && !confirmation && <div className="lab-alert error" role="alert"><span>{pageError || listError}</span><button type="button" aria-label="Dispensar erro" onClick={() => { setPageError(''); setListError(''); }}><X size={16} aria-hidden="true" /></button></div>}
-      {view === 'profile' ? <ProfileSettings user={user} photo={preferences.photo} onBack={goList} onUserUpdate={onUserUpdate} onPhotoChange={photo => updatePreferences({ ...preferences, photo })} />
+      {view === 'profile' ? <ProfileSettings user={user} onBack={goList} onUserUpdate={onUserUpdate} />
         : view === 'list' ? <>
           <div className="page-heading"><div><h1 className={typeClass('display')}>Meus laboratórios</h1><p>{listStatus === 'ready' && labs.length === 0 ? 'Aqui ficam os laboratórios de que você participa.' : 'Escolha onde você vai continuar sua pesquisa.'}</p></div><button className="button primary" type="button" onClick={() => { setCreateName(''); setPageError(''); setCreateOpen(true); }}><Plus size={17} aria-hidden="true" />Criar laboratório</button></div>
           <section className="laboratory-list-section" aria-labelledby="laboratory-list-title">

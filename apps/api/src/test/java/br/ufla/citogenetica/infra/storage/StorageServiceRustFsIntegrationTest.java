@@ -27,6 +27,7 @@ import java.time.Duration;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 @Testcontainers(disabledWithoutDocker = true)
 class StorageServiceRustFsIntegrationTest {
@@ -97,6 +98,18 @@ class StorageServiceRustFsIntegrationTest {
         if (s3Client != null) {
             s3Client.close();
         }
+    }
+
+    @Test
+    void gravaLeEApagaFotoDePerfil() {
+        byte[] foto = {(byte) 0x89, 'P', 'N', 'G', 0x0D, 0x0A, 0x1A, 0x0A, 7, 7};
+
+        String chave = storageService.salvarFotoPerfil(foto, "png", "image/png");
+
+        assertThat(chave).matches("perfis/[0-9a-f-]{36}\\.png");
+        assertThat(storageService.lerFotoPerfil(chave)).isEqualTo(foto);
+        storageService.apagarFotoPerfil(chave);
+        assertThatThrownBy(() -> storageService.lerFotoPerfil(chave)).isInstanceOf(StorageException.class);
     }
 
     @Test

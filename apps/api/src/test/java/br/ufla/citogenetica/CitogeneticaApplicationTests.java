@@ -121,6 +121,7 @@ class CitogeneticaApplicationTests extends AbstractIntegrationTest {
                 "/api/v1/usuarios/{id}",
                 "/api/v1/usuarios/me",
                 "/api/v1/usuarios/me/email",
+                "/api/v1/usuarios/me/foto",
                 "/api/v1/usuarios/me/senha");
     }
 }

@@ -2,7 +2,7 @@ import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { ChevronLeft, Eye, EyeOff, UserRound } from 'lucide-react';
 import './profile.css';
 import { ApiError, NetworkError } from '../api/errors';
-import { usuarioApi } from '../api/usuario-api';
+import { fotoPerfilUrl, usuarioApi } from '../api/usuario-api';
 import type { UsuarioResponseDTO } from '../api/contracts/usuario';
 import { passwordPolicyError, validateResendEmail } from './registration-validation';
 import { retryCountdownMessage, useRetryCountdown } from './useRetryCountdown';
@@ -15,9 +15,7 @@ type EmailErrors = Partial<Record<EmailField, string>>;
 
 interface ProfileSettingsProps {
   user: UsuarioResponseDTO;
-  photo?: string;
   onBack: () => void;
-  onPhotoChange: (photo: string) => boolean;
   onUserUpdate: (user: UsuarioResponseDTO) => void;
 }
 
@@ -44,7 +42,7 @@ function FeedbackMessage({ feedback }: { feedback: Feedback | null }) {
   </p>;
 }
 
-export function ProfileSettings({ user, photo, onBack, onPhotoChange, onUserUpdate }: ProfileSettingsProps) {
+export function ProfileSettings({ user, onBack, onUserUpdate }: ProfileSettingsProps) {
   const [emailOpen, setEmailOpen] = useState(false);
   const [passwordOpen, setPasswordOpen] = useState(false);
   const [name, setName] = useState(user.nome);
@@ -52,6 +50,8 @@ export function ProfileSettings({ user, photo, onBack, onPhotoChange, onUserUpda
   const [nameFeedback, setNameFeedback] = useState<Feedback | null>(null);
   const [savingName, setSavingName] = useState(false);
   const [photoFeedback, setPhotoFeedback] = useState<Feedback | null>(null);
+  const [savingPhoto, setSavingPhoto] = useState(false);
+  const photo = fotoPerfilUrl(user);
   const [password, setPassword] = useState({ current: '', next: '', confirmation: '' });
   const [passwordErrors, setPasswordErrors] = useState<PasswordErrors>({});
   const [passwordFeedback, setPasswordFeedback] = useState<Feedback | null>(null);
@@ -86,21 +86,22 @@ export function ProfileSettings({ user, photo, onBack, onPhotoChange, onUserUpda
     if (!emailRateLimited) setEmailFeedback(null);
   }
 
-  function selectPhoto(file: File | undefined) {
-    if (!file) return;
+  async function selectPhoto(file: File | undefined) {
+    if (!file || savingPhoto) return;
     if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type) || file.size > 2 * 1024 * 1024) {
       setPhotoFeedback({ kind: 'error', message: 'Escolha uma imagem JPG, PNG ou WebP de até 2 MB.' });
       return;
     }
-    const reader = new FileReader();
-    reader.onerror = () => setPhotoFeedback({ kind: 'error', message: 'Não foi possível abrir a imagem. Tente novamente.' });
-    reader.onload = () => {
-      const saved = typeof reader.result === 'string' && onPhotoChange(reader.result);
-      setPhotoFeedback(saved
-        ? { kind: 'success', message: 'Foto atualizada.' }
-        : { kind: 'error', message: 'Não foi possível salvar a foto. Tente novamente.' });
-    };
-    reader.readAsDataURL(file);
+    setSavingPhoto(true);
+    setPhotoFeedback(null);
+    try {
+      onUserUpdate(await usuarioApi.updateMyPhoto(file));
+      setPhotoFeedback({ kind: 'success', message: 'Foto atualizada.' });
+    } catch (error) {
+      setPhotoFeedback({ kind: 'error', message: requestErrorMessage(error, 'Não foi possível salvar a foto. Tente novamente.') });
+    } finally {
+      setSavingPhoto(false);
+    }
   }
 
   async function saveName(event: FormEvent<HTMLFormElement>) {
@@ -270,8 +271,8 @@ export function ProfileSettings({ user, photo, onBack, onPhotoChange, onUserUpda
           <strong>Foto de perfil</strong>
           <p>JPG, PNG ou WebP · até 2 MB</p>
         </div>
-        <button className="button secondary" type="button" onClick={() => fileRef.current?.click()}>Trocar foto</button>
-        <input ref={fileRef} className="sr-only" type="file" accept="image/jpeg,image/png,image/webp" aria-label="Escolher foto de perfil" onChange={(event) => { selectPhoto(event.target.files?.[0]); event.target.value = ''; }}/>
+        <button className="button secondary" type="button" disabled={savingPhoto} onClick={() => fileRef.current?.click()}>{savingPhoto ? 'Enviando…' : 'Trocar foto'}</button>
+        <input ref={fileRef} className="sr-only" type="file" accept="image/jpeg,image/png,image/webp" aria-label="Escolher foto de perfil" onChange={(event) => { void selectPhoto(event.target.files?.[0]); event.target.value = ''; }}/>
       </div>
       {photoFeedback && <FeedbackMessage feedback={photoFeedback}/>}
       <form className="profile-form" onSubmit={saveName} noValidate>

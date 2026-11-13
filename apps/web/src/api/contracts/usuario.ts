@@ -32,4 +32,6 @@ export interface UsuarioResponseDTO {
   email: string;
   status: StatusEnum;
   role: RoleDTO;
+  /** Muda a cada foto nova; nulo (ou ausente) quando a conta não tem foto. */
+  fotoVersao?: string | null;
 }

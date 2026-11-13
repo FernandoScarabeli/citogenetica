@@ -1,12 +1,15 @@
 package br.ufla.citogenetica.infra.storage;
 
+import br.ufla.citogenetica.shared.storage.FotoPerfilStorage;
 import br.ufla.citogenetica.shared.web.error.BusinessException;
 import jakarta.annotation.PostConstruct;
 import org.springframework.http.HttpMethod;
 import org.springframework.stereotype.Service;
 import software.amazon.awssdk.core.exception.SdkClientException;
 import software.amazon.awssdk.services.s3.S3Client;
+import software.amazon.awssdk.core.sync.RequestBody;
 import software.amazon.awssdk.services.s3.model.CreateBucketRequest;
+import software.amazon.awssdk.services.s3.model.DeleteObjectRequest;
 import software.amazon.awssdk.services.s3.model.HeadBucketRequest;
 import software.amazon.awssdk.services.s3.model.S3Exception;
 import software.amazon.awssdk.services.s3.presigner.S3Presigner;
@@ -23,9 +26,11 @@ import java.util.UUID;
 import java.util.regex.Pattern;
 
 @Service
-public class StorageService {
+public class StorageService implements FotoPerfilStorage {
 
     private static final Pattern EXTENSION_PATTERN = Pattern.compile("[a-z0-9]{1,10}");
+    private static final Pattern PROFILE_PHOTO_KEY_PATTERN = Pattern.compile(
+            "perfis/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\\.(jpg|png|webp)");
     private static final Pattern MANAGED_OBJECT_KEY_PATTERN = Pattern.compile(
             "fotos/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\\.[a-z0-9]{1,10}");
 
@@ -98,6 +103,55 @@ public class StorageService {
 
         URI url = URI.create(s3Presigner.presignGetObject(presignRequest).url().toString());
         return new SignedStorageUrl(objectKey, HttpMethod.GET, url, expiryInstant());
+    }
+
+    @Override
+    public String salvarFotoPerfil(byte[] content, String extension, String contentType) {
+        String objectKey = "perfis/" + UUID.randomUUID() + "." + extension;
+        validateProfilePhotoKey(objectKey);
+        try {
+            s3Client.putObject(PutObjectRequest.builder()
+                            .bucket(properties.bucket())
+                            .key(objectKey)
+                            .contentType(contentType)
+                            .build(),
+                    RequestBody.fromBytes(content));
+        } catch (S3Exception | SdkClientException exception) {
+            throw storageUnavailable(exception);
+        }
+        return objectKey;
+    }
+
+    @Override
+    public byte[] lerFotoPerfil(String objectKey) {
+        validateProfilePhotoKey(objectKey);
+        try {
+            return s3Client.getObjectAsBytes(GetObjectRequest.builder()
+                    .bucket(properties.bucket())
+                    .key(objectKey)
+                    .build()).asByteArray();
+        } catch (S3Exception | SdkClientException exception) {
+            throw storageUnavailable(exception);
+        }
+    }
+
+    @Override
+    public void apagarFotoPerfil(String objectKey) {
+        validateProfilePhotoKey(objectKey);
+        try {
+            s3Client.deleteObject(DeleteObjectRequest.builder()
+                    .bucket(properties.bucket())
+                    .key(objectKey)
+                    .build());
+        } catch (S3Exception | SdkClientException exception) {
+            throw storageUnavailable(exception);
+        }
+    }
+
+    private void validateProfilePhotoKey(String objectKey) {
+        if (objectKey == null || !PROFILE_PHOTO_KEY_PATTERN.matcher(objectKey).matches()) {
+            throw new BusinessException("A chave da foto de perfil é inválida.");
+        }
     }
 
     private String normalizeExtension(String fileExtension) {

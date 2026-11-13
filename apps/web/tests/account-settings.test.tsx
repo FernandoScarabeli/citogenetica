@@ -22,6 +22,7 @@ interface AccountOptions {
   updatePassword?: (body: unknown) => Reply;
   requestEmailChange?: (body: unknown) => Reply;
   confirmEmailChange?: (body: unknown) => Reply;
+  updatePhoto?: (form: FormData) => Reply;
 }
 
 function response(status: number, body?: unknown, headers: Record<string, string> = {}) {
@@ -61,6 +62,7 @@ function mockApi(options: AccountOptions = {}) {
     }
     if (path === '/api/v1/usuarios/me' && method === 'GET') return options.me ? options.me() : response(200, userDto);
     if (path === '/api/v1/usuarios/me' && method === 'PUT') return options.updateName ? options.updateName(body) : response(200, userDto);
+    if (path === '/api/v1/usuarios/me/foto' && method === 'PUT') return options.updatePhoto ? options.updatePhoto(init?.body as FormData) : response(200, userDto);
     if (path === '/api/v1/usuarios/me/senha') return options.updatePassword ? options.updatePassword(body) : response(204);
     if (path === '/api/v1/usuarios/me/email') return options.requestEmailChange ? options.requestEmailChange(body) : response(202);
     if (path === '/api/v1/auth/confirmar-troca-email') return options.confirmEmailChange ? options.confirmEmailChange(body) : response(204);
@@ -122,6 +124,48 @@ describe('Minha conta', () => {
     expect(screen.getByRole('button', { name: 'Menu do perfil' }).textContent).toContain('Beatriz Pesquisadora');
     expect(calls.find((call) => call.path === '/api/v1/usuarios/me' && call.method === 'PUT')?.body)
       .toEqual({ nome: 'Beatriz Pesquisadora' });
+  });
+
+  it('envia a foto ao servidor e mostra a nova no perfil e no menu', async () => {
+    let enviada: FormDataEntryValue | null = null;
+    const { user } = await openProfile({
+      updatePhoto: (form) => {
+        enviada = form.get('arquivo');
+        return response(200, { ...userDto, fotoVersao: 'versao-1' });
+      },
+    });
+    const foto = new File([new Uint8Array([0x89, 0x50, 0x4e, 0x47])], 'eu.png', { type: 'image/png' });
+
+    await user.upload(screen.getByLabelText('Escolher foto de perfil'), foto);
+
+    expect((await screen.findByRole('status')).textContent).toContain('Foto atualizada.');
+    expect(enviada).toBeInstanceOf(File);
+    expect((enviada as unknown as File).name).toBe('eu.png');
+    expect(screen.getByRole('img', { name: 'Foto de perfil' }).getAttribute('src')).toBe('/api/v1/usuarios/me/foto?v=versao-1');
+    expect(screen.getByRole('button', { name: 'Menu do perfil' }).querySelector('img')?.getAttribute('src')).toBe('/api/v1/usuarios/me/foto?v=versao-1');
+  });
+
+  it('mostra o aviso do servidor quando a foto é recusada', async () => {
+    const { user } = await openProfile({
+      updatePhoto: () => apiError(422, 'Escolha uma imagem JPG, PNG ou WebP de até 2 MB.'),
+    });
+    const falsa = new File(['não é imagem'], 'eu.png', { type: 'image/png' });
+
+    await user.upload(screen.getByLabelText('Escolher foto de perfil'), falsa);
+
+    expect((await screen.findByRole('alert')).textContent).toContain('Escolha uma imagem JPG, PNG ou WebP de até 2 MB.');
+    expect(screen.queryByRole('img', { name: 'Foto de perfil' })).toBeNull();
+  });
+
+  it('não mostra a foto que outra conta deixou guardada neste navegador', async () => {
+    localStorage.setItem('citogenetica:preferences:v1', JSON.stringify({ dark: false, photo: 'data:image/png;base64,aGVsbG8=' }));
+    try {
+      await openProfile();
+      expect(screen.queryByRole('img', { name: 'Foto de perfil' })).toBeNull();
+      expect(screen.getByRole('button', { name: 'Menu do perfil' }).querySelector('img')).toBeNull();
+    } finally {
+      localStorage.removeItem('citogenetica:preferences:v1');
+    }
   });
 
   it('associa o erro 400 de nome ao campo correspondente', async () => {
