@@ -35,6 +35,10 @@ public class Usuario extends BaseEntity<Long> implements UserDetails {
     @Column(name = "email_confirmado_em")
     private Instant emailConfirmadoEm;
 
+    /** Chave da foto de perfil no armazenamento; nula quando a conta não tem foto. */
+    @Column(name = "foto_chave", length = 80)
+    private String fotoChave;
+
     @Enumerated(EnumType.STRING)
     @Column(name = "status", nullable = false)
     private StatusEnum status;

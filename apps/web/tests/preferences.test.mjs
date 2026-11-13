@@ -11,15 +11,16 @@ test('preferências são recuperadas e dados inválidos são preservados',()=>{
   assert.deepEqual(loadPreferences().value,{dark:false});
   savePreferences({dark:true});
   assert.deepEqual(loadPreferences(),{value:{dark:true},error:''});
+  // Foto antiga guardada aqui (uma só para qualquer conta) é descartada; o resto do registro é preservado.
   const photo='data:image/png;base64,aGVsbG8=';
-  savePreferences({dark:true,photo});
-  assert.deepEqual(loadPreferences().value,{dark:true,photo});
-  records.set('citogenetica:preferences:v1',JSON.stringify({name:'Ana',dark:true,photo}));
-  assert.deepEqual(loadPreferences(),{value:{dark:true,photo},error:''});
-  assert.match(records.get('citogenetica:preferences:v1'),/\"name\":\"Ana\"/);
-  records.set('citogenetica:preferences:v1',JSON.stringify({name:'Ana',dark:true,photo:'https://invalid.example/image.png'}));
+  records.set('citogenetica:preferences:v1',JSON.stringify({dark:true,photo}));
+  assert.deepEqual(loadPreferences(),{value:{dark:true},error:''});
+  assert.equal(records.get('citogenetica:preferences:v1'),JSON.stringify({dark:true}));
+  savePreferences({dark:false,photo});
+  assert.equal(records.get('citogenetica:preferences:v1'),JSON.stringify({dark:false}));
+  records.set('citogenetica:preferences:v1',JSON.stringify({name:'Ana'}));
   assert.notEqual(loadPreferences().error,'');
-  assert.match(records.get('citogenetica:preferences:v1'),/invalid/);
+  assert.match(records.get('citogenetica:preferences:v1'),/\"name\":\"Ana\"/);
   records.set('citogenetica:preferences:v1','{inválido');
   assert.notEqual(loadPreferences().error,'');
   assert.equal(records.get('citogenetica:preferences:v1'),'{inválido');

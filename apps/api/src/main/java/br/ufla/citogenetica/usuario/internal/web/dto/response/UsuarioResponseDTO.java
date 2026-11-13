@@ -14,5 +14,7 @@ public record UsuarioResponseDTO(
         String nome,
         String email,
         StatusEnum status,
-        Role role
+        Role role,
+        /** Muda a cada foto nova (serve para o navegador não mostrar a antiga); nulo quando não há foto. */
+        String fotoVersao
 ) {}

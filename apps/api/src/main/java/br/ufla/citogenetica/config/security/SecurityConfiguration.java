@@ -174,6 +174,8 @@ public class SecurityConfiguration {
                         .requestMatchers(HttpMethod.PUT, "/api/v1/usuarios/me").authenticated()
                         .requestMatchers(HttpMethod.PUT, "/api/v1/usuarios/me/senha").authenticated()
                         .requestMatchers(HttpMethod.POST, "/api/v1/usuarios/me/email").authenticated()
+                        .requestMatchers(HttpMethod.GET, "/api/v1/usuarios/me/foto").authenticated()
+                        .requestMatchers(HttpMethod.PUT, "/api/v1/usuarios/me/foto").authenticated()
                         .requestMatchers("/api/v1/usuarios/**").hasRole("ADMIN")
                         .requestMatchers("/api/v1/exemplos/**").hasRole("ADMIN")
                         .anyRequest().authenticated())

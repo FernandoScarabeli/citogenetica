@@ -14,6 +14,7 @@ import br.ufla.citogenetica.shared.pagination.PaginationConstants;
 import br.ufla.citogenetica.shared.pagination.PageableFactory;
 import br.ufla.citogenetica.usuario.internal.application.UsuarioService;
 import br.ufla.citogenetica.usuario.internal.application.EmailChangeService;
+import br.ufla.citogenetica.usuario.internal.application.FotoPerfilService;
 import br.ufla.citogenetica.usuario.api.UsuarioPrincipal;
 import br.ufla.citogenetica.usuario.internal.web.dto.request.SolicitarTrocaEmailRequestDTO;
 import io.swagger.v3.oas.annotations.Operation;
@@ -30,11 +31,18 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.data.jpa.domain.Specification;
+import org.springframework.http.CacheControl;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.util.MultiValueMap;
 import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
+
+import java.io.IOException;
+import java.io.UncheckedIOException;
+import java.time.Duration;
 
 import java.util.Set;
 
@@ -53,6 +61,7 @@ public class UsuarioController {
     private final UsuarioService usuarioService;
     private final UsuarioMapper usuarioMapper;
     private final EmailChangeService emailChangeService;
+    private final FotoPerfilService fotoPerfilService;
 
     @PostMapping("/me/email")
     @SecurityRequirement(name = "csrf-token")
@@ -168,5 +177,42 @@ public class UsuarioController {
         Usuario usuarioLogado = this.usuarioService.buscarMeuPerfil();
         UsuarioResponseDTO response = usuarioMapper.toResponseDTO(usuarioLogado);
         return ResponseEntity.status(HttpStatus.OK).body(response);
+    }
+
+    @PutMapping(value = "/me/foto", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    @SecurityRequirement(name = "csrf-token")
+    @Operation(summary = "Trocar minha foto de perfil", description = "Recebe uma imagem JPG, PNG ou WebP de até 2 MB no campo \"arquivo\" e substitui a foto anterior.")
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "200", description = "Foto trocada; devolve o perfil com a nova fotoVersao"),
+            @ApiResponse(responseCode = "401", description = "Usuário não autenticado"),
+            @ApiResponse(responseCode = "413", description = "Arquivo maior que o permitido"),
+            @ApiResponse(responseCode = "422", description = "O arquivo não é uma imagem aceita"),
+            @ApiResponse(responseCode = "503", description = "Armazenamento de arquivos indisponível")
+    })
+    public ResponseEntity<UsuarioResponseDTO> trocarMinhaFoto(@RequestParam("arquivo") MultipartFile arquivo) {
+        byte[] conteudo;
+        try {
+            conteudo = arquivo.getBytes();
+        } catch (IOException exception) {
+            throw new UncheckedIOException(exception);
+        }
+        Usuario atualizado = this.fotoPerfilService.trocarMinhaFoto(conteudo);
+        return ResponseEntity.ok(usuarioMapper.toResponseDTO(atualizado));
+    }
+
+    @GetMapping("/me/foto")
+    @Operation(summary = "Ver minha foto de perfil", description = "Devolve a imagem da foto de perfil do usuário autenticado.")
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "200", description = "Imagem da foto"),
+            @ApiResponse(responseCode = "401", description = "Usuário não autenticado"),
+            @ApiResponse(responseCode = "404", description = "A conta não tem foto")
+    })
+    public ResponseEntity<byte[]> buscarMinhaFoto() {
+        FotoPerfilService.Foto foto = this.fotoPerfilService.minhaFoto();
+        // O endereço usado pelo site muda a cada foto (?v=), então guardar em cache não mostra foto velha.
+        return ResponseEntity.ok()
+                .contentType(MediaType.parseMediaType(foto.contentType()))
+                .cacheControl(CacheControl.maxAge(Duration.ofDays(1)).cachePrivate())
+                .body(foto.conteudo());
     }
 }

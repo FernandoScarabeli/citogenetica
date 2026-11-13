@@ -62,6 +62,8 @@ const MUTATING_METHODS = new Set(['POST', 'PUT', 'PATCH', 'DELETE']);
 export interface HttpRequestOptions {
   method?: string;
   json?: unknown;
+  /** Formulário com arquivo; o navegador define o Content-Type com o separador das partes. */
+  form?: FormData;
   headers?: HeadersInit;
   signal?: AbortSignal;
 }
@@ -238,7 +240,7 @@ export function createHttpClient(options: HttpClientOptions = {}): HttpClient {
     headers.set('Accept', 'application/json');
 
     const hasJson = Object.prototype.hasOwnProperty.call(requestOptions, 'json');
-    const body = hasJson ? JSON.stringify(requestOptions.json) : undefined;
+    const body = hasJson ? JSON.stringify(requestOptions.json) : requestOptions.form;
     if (hasJson) headers.set('Content-Type', 'application/json');
 
     if (mutating) {

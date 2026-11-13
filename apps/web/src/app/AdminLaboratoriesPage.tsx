@@ -10,6 +10,7 @@ import { FloatingNotice } from '../components/ui/floating-notice';
 import { SegmentedControl } from '../components/ui/segmented-control';
 import { typeClass } from '../lib/type-scale';
 import { loadPreferences, savePreferences } from '../preferences';
+import { fotoPerfilUrl } from '../api/usuario-api';
 import { NotificationCenter } from '../NotificationCenter';
 import { AccountMenu } from './AccountMenu';
 import { useSession } from './SessionProvider';
@@ -92,7 +93,7 @@ function AdminTopbar({ user, onLogout }: { user: UsuarioResponseDTO; onLogout: (
   }
   return <header className="topbar"><div className="topbar-inner">
     <Link className="brand" to="/laboratorios"><span className="brand-mark"><Microscope size={21} aria-hidden="true" /></span><span>citogenética<small>Laboratório de Citogenética · UFLA</small></span></Link>
-    <div className="lab-account"><NotificationCenter/><AccountMenu name={user.nome} email={user.email} photo={preferences.photo} dark={preferences.dark}
+    <div className="lab-account"><NotificationCenter/><AccountMenu name={user.nome} email={user.email} photo={fotoPerfilUrl(user)} dark={preferences.dark}
       platformAdmin={user.role.nome === 'ADMIN'} onProfile={() => navigate('/perfil')} onAppearance={toggleAppearance} onLogout={onLogout} /></div>
   </div></header>;
 }
