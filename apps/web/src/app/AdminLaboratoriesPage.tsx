@@ -7,6 +7,7 @@ import type { EstadoLaboratorio } from '../api/contracts/laboratorio';
 import type { UsuarioResponseDTO } from '../api/contracts/usuario';
 import { isConflict, isForbidden, isNotFound } from '../api/errors';
 import { FloatingNotice } from '../components/ui/floating-notice';
+import { SegmentedControl } from '../components/ui/segmented-control';
 import { typeClass } from '../lib/type-scale';
 import { loadPreferences } from '../preferences';
 import { useSession } from './SessionProvider';
@@ -224,10 +225,7 @@ function AdminLaboratoriesContent({ api }: { api: AdminApi }) {
               <input type="search" value={draft} onChange={event => setDraft(event.target.value)} placeholder="Buscar por nome" /></label>
             <button className="button secondary" type="submit">Buscar</button>
           </form>
-          <div className="admin-state-filter" role="group" aria-label="Filtrar por estado">
-            {FILTER_OPTIONS.map(option => <button key={option.label} type="button" className={filters.estado === option.value ? 'selected' : ''}
-              aria-pressed={filters.estado === option.value} onClick={() => changeState(option.value)}>{option.label}</button>)}
-          </div>
+          <SegmentedControl className="admin-state-filter" label="Filtrar por estado" options={FILTER_OPTIONS} value={filters.estado} onChange={changeState} />
         </div>
         {status === 'loading' && !result ? <div className="laboratory-loading" aria-live="polite"><p>Carregando laboratórios…</p><span /><span /><span /></div>
           : status === 'error' ? <div className="laboratory-empty"><p>{loadError}</p><button className="button secondary" type="button" onClick={() => setReload(value => value + 1)}>Tentar de novo</button></div>
@@ -235,11 +233,11 @@ function AdminLaboratoriesContent({ api }: { api: AdminApi }) {
               <h3>{filtering ? 'Nenhum resultado para a busca' : 'Nenhum laboratório cadastrado'}</h3>
               <p>{filtering ? 'Tente outro nome ou outro estado.' : 'Os laboratórios criados na plataforma aparecem aqui.'}</p>
               {filtering && <button className="text-button" type="button" onClick={clearFilters}>Limpar busca e filtro</button>}
-            </div> : result && <div aria-busy={status === 'loading'}>
+            </div> : result && <div className={`admin-results${status === 'loading' ? ' is-loading' : ''}`} aria-busy={status === 'loading'}>
               <div className="admin-table-wrap"><table className="admin-table">
                 <caption className="sr-only">Laboratórios da plataforma</caption>
                 <thead><tr><th scope="col">Laboratório</th><th scope="col">Estado</th><th scope="col">Membros ativos</th><th scope="col">Administradores</th><th scope="col"><span className="sr-only">Ações</span></th></tr></thead>
-                <tbody>{result.content.map(lab => <tr key={lab.id}>
+                <tbody key={`${filters.nome}|${filters.estado}|${page}|${result.totalElements}`} className="admin-rows">{result.content.map(lab => <tr key={lab.id}>
                   <td data-label="Laboratório"><strong>{lab.nome}</strong></td>
                   <td data-label="Estado"><span className={`laboratory-state ${lab.estado === 'ATIVO' ? 'is-active' : 'is-disabled'}`}>{lab.estado === 'ATIVO' ? 'Ativo' : 'Desativado'}</span></td>
                   <td data-label="Membros ativos" className="admin-count">{lab.quantidadeMembrosAtivos}</td>

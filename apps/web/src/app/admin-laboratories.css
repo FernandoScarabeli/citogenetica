@@ -11,13 +11,6 @@
 .admin-filters { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px 20px; margin-bottom: 16px; }
 .admin-search { display: flex; flex: 1 1 320px; max-width: 480px; gap: 8px; }
 .admin-search .laboratory-search { flex: 1; width: auto; margin: 0; }
-.admin-state-filter { display: inline-flex; border: 1px solid var(--lab-line); border-radius: 5px; background: var(--lab-surface); }
-.admin-state-filter button:first-child { border-radius: 4px 0 0 4px; }
-.admin-state-filter button:last-child { border-radius: 0 4px 4px 0; }
-.admin-state-filter button { min-height: 40px; padding: 0 14px; border: 0; border-right: 1px solid var(--lab-line); background: transparent; color: var(--lab-ink); font-size: 13px; }
-.admin-state-filter button:last-child { border-right: 0; }
-.admin-state-filter button:hover { background: var(--lab-ground); }
-.admin-state-filter button.selected { background: var(--lab-accent); color: var(--lab-surface); font-weight: 550; }
 .admin-table-wrap { border: 1px solid var(--lab-line); border-radius: 6px; background: var(--lab-surface); }
 .labs-app .admin-table { width: 100%; table-layout: fixed; border-collapse: collapse; }
 .labs-app .admin-table th,.labs-app .admin-table td { padding: 14px 18px; border-bottom: 1px solid var(--lab-line); color: var(--lab-ink); font-size: 13px; line-height: 20px; text-align: left; vertical-align: top; overflow-wrap: anywhere; }
@@ -42,8 +35,8 @@
 }
 @media (max-width: 700px) {
   .labs-app .admin-identity { display: none; }
-  .admin-state-filter { width: 100%; }
-  .admin-state-filter button { flex: 1; min-height: 44px; }
+  .admin-state-filter { display: flex; width: 100%; }
+  .admin-state-filter .segmented-option { flex: 1; min-height: 44px; }
 }
 @media (max-width: 900px) {
   .admin-table-wrap { border: 0; background: transparent; }
@@ -56,3 +49,14 @@
   .admin-pagination { align-items: stretch; flex-direction: column; }
   .admin-pagination div .button { flex: 1; }
 }
+
+/* Espaço no fim da página, abaixo da paginação. */
+.labs-app .admin-labs { padding-bottom: 48px; }
+
+/* Tabela ao trocar filtro, busca ou página (skill animate): são dados que a pessoa lê, então nada se mexe de lugar.
+   Enquanto carrega, a lista atual esmaece um pouco; quando chega a nova, as linhas aparecem com opacidade (180ms). */
+.admin-results { transition: opacity 150ms ease; }
+.admin-results.is-loading { opacity: .55; }
+.admin-rows { animation: admin-rows-in 180ms cubic-bezier(0.23, 1, 0.32, 1); }
+@keyframes admin-rows-in { from { opacity: 0; } }
+@media (prefers-reduced-motion: reduce) { .admin-results { transition: none; } }
