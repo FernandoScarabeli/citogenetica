@@ -9,6 +9,7 @@ import java.util.UUID;
 
 import br.ufla.citogenetica.contagem.internal.application.ComentarioLaminaService;
 import br.ufla.citogenetica.contagem.internal.application.FotoLaminaService;
+import br.ufla.citogenetica.contagem.internal.domain.AnotacaoFoto;
 import br.ufla.citogenetica.usuario.api.UsuarioPrincipal;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
@@ -25,6 +26,7 @@ import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -42,12 +44,15 @@ public class ColaboracaoLaminaController {
     private final ComentarioLaminaService comentarioService;
 
     public record FotoResponseDTO(UUID id, String legenda, int tamanhoBytes, String contentType,
-                                  Long enviadaPorUsuarioId, String enviadaPorNome, Instant enviadaEm) {
+                                  Long enviadaPorUsuarioId, String enviadaPorNome, Instant enviadaEm,
+                                  List<AnotacaoFoto> anotacoes) {
         static FotoResponseDTO de(FotoLaminaService.Foto foto) {
             return new FotoResponseDTO(foto.id(), foto.legenda(), foto.tamanhoBytes(), foto.contentType(),
-                    foto.enviadaPorUsuarioId(), foto.enviadaPorNome(), foto.enviadaEm());
+                    foto.enviadaPorUsuarioId(), foto.enviadaPorNome(), foto.enviadaEm(), foto.anotacoes());
         }
     }
+
+    public record EditarFotoRequestDTO(String legenda, List<AnotacaoFoto> anotacoes) {}
 
     public record ComentarioResponseDTO(UUID id, Long autorUsuarioId, String autorNome, String texto, Instant criadoEm) {
         static ComentarioResponseDTO de(ComentarioLaminaService.Comentario comentario) {
@@ -98,6 +103,22 @@ public class ColaboracaoLaminaController {
                 .contentType(MediaType.parseMediaType(arquivo.contentType()))
                 .cacheControl(CacheControl.maxAge(Duration.ofDays(30)).cachePrivate().immutable())
                 .body(arquivo.conteudo());
+    }
+
+    @PutMapping("/fotos/{fotoId}")
+    @SecurityRequirement(name = "csrf-token")
+    @Operation(summary = "Editar legenda e marcações da foto",
+            description = "Substitui a legenda e a lista de marcações (setas e textos, coordenadas de 0 a 1). A imagem original não muda. Exige escrita na lâmina.")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Foto atualizada"),
+            @ApiResponse(responseCode = "403", description = "Sem permissão de edição"),
+            @ApiResponse(responseCode = "404", description = "Lâmina ou foto sem acesso"),
+            @ApiResponse(responseCode = "422", description = "Legenda longa ou marcação inválida")
+    })
+    public FotoResponseDTO editarFoto(@PathVariable UUID laminaId, @PathVariable UUID fotoId,
+                                      @RequestBody EditarFotoRequestDTO request,
+                                      @AuthenticationPrincipal UsuarioPrincipal principal) {
+        return FotoResponseDTO.de(fotoService.editar(laminaId, fotoId, request.legenda(), request.anotacoes(), principal.id()));
     }
 
     @DeleteMapping("/fotos/{fotoId}")

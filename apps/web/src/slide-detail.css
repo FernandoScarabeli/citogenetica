@@ -158,12 +158,35 @@ html[data-appearance="dark"] .abnormal-dialog .type-button-other { border-color:
 .photo-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 12px; margin: 0; padding: 0; list-style: none; }
 .photo-grid li { display: grid; gap: 6px; min-width: 0; }
 .photo-thumb { display: block; aspect-ratio: 4 / 3; padding: 0; overflow: hidden; border: 1px solid var(--lab-line, #e3e8e3); border-radius: 6px; background: var(--lab-ground, #edf1ed); cursor: zoom-in; }
-.photo-thumb img { display: block; width: 100%; height: 100%; object-fit: cover; transition: transform .2s ease; }
-.photo-thumb:hover img { transform: scale(1.03); }
+.photo-thumb .foto-anotada { transition: transform .2s ease; }
+.photo-thumb:hover .foto-anotada { transform: scale(1.03); }
 .photo-caption { overflow: hidden; color: var(--lab-muted, #6b776e); font-size: var(--fs-micro); line-height: var(--lh-micro); white-space: nowrap; text-overflow: ellipsis; }
 .photo-preview { display: block; width: 100%; max-height: 300px; object-fit: contain; border-radius: 6px; background: var(--lab-ground, #edf1ed); }
-dialog.photo-dialog { width: min(960px, calc(100% - 32px)); }
-.photo-full { display: block; width: 100%; max-height: 70vh; object-fit: contain; border-radius: 6px; background: #111; }
+dialog.photo-dialog { width: fit-content; min-width: min(560px, calc(100% - 32px)); max-width: min(1100px, calc(100% - 32px)); }
+.photo-stage { display: flex; justify-content: center; }
+/* Foto com marcações: o SVG cobre exatamente a imagem. */
+.foto-anotada { position: relative; display: block; }
+.foto-anotada > img { display: block; }
+.foto-anotada > svg { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; }
+.foto-anotada-miniatura { width: 100%; height: 100%; }
+.foto-anotada-miniatura > img { width: 100%; height: 100%; object-fit: cover; }
+.foto-anotada-miniatura > svg { overflow: hidden; }
+.foto-anotada-inteira { display: inline-block; max-width: 100%; }
+.foto-anotada-inteira > img { max-width: 100%; max-height: 64vh; width: auto; height: auto; border-radius: 6px; }
+.foto-anotada.editando > svg { cursor: crosshair; touch-action: none; }
+.annotate-toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 16px; margin-bottom: 8px; }
+.annotate-group { display: flex; align-items: center; gap: 6px; }
+.annotate-group button { display: inline-flex; align-items: center; gap: 6px; height: 36px; padding: 0 12px; border: 1px solid var(--lab-line, #dce3dd); border-radius: 6px; background: var(--lab-surface, #fff); color: var(--lab-ink, #2f3b33); font-size: var(--fs-caption); font-weight: 550; }
+.annotate-group button[aria-pressed="true"] { border-color: var(--lab-primary, #263d32); background: var(--lab-primary, #263d32); color: #fff; }
+.annotate-colors { gap: 8px; }
+.annotate-group .annotate-swatch { width: 28px; height: 28px; padding: 0; border: 2px solid var(--lab-line, #dce3dd); border-radius: 50%; }
+.annotate-group .annotate-swatch[aria-pressed="true"] { border-color: var(--lab-ink, #212924); box-shadow: 0 0 0 2px var(--lab-surface, #fff) inset; background-clip: padding-box; }
+form .annotate-text, .annotate-text { display: flex; align-items: center; gap: 8px; margin: 0; font-size: var(--fs-caption); font-weight: 550; color: var(--lab-muted, #4c5b50); }
+.annotate-text input { width: 90px; height: 36px; margin: 0; padding: 0 10px; border: 1px solid var(--lab-line, #dce4dd); border-radius: 6px; background: var(--lab-surface, #fff); color: var(--lab-ink, #34433a); font: inherit; }
+.annotate-hint { margin: 0 0 10px; color: var(--lab-muted, #6b776e); font-size: var(--fs-caption); line-height: var(--lh-caption); }
+.annotate-caption { display: block; margin: 14px 0 0; font-size: var(--fs-caption); font-weight: 550; color: var(--lab-muted, #4c5b50); }
+.annotate-caption span { font-weight: 400; }
+.annotate-caption input { display: block; width: 100%; height: 41px; margin-top: 7px; padding: 0 11px; border: 1px solid var(--lab-line, #dce4dd); border-radius: 6px; background: var(--lab-surface, #fff); color: var(--lab-ink, #34433a); font: inherit; box-sizing: border-box; }
 .photo-meta { margin: 10px 0 0; color: var(--lab-muted, #6b776e); font-size: var(--fs-caption); line-height: var(--lh-caption); }
 .comment-list { display: grid; gap: 0; margin: 0 0 14px; padding: 0 20px; border: 1px solid var(--lab-line, #e3e8e3); border-radius: 6px; background: var(--lab-surface, #fff); list-style: none; }
 .comment { padding: 14px 0; border-top: 1px solid var(--lab-line, #edf0ed); }

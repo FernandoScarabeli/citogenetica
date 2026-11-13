@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react';
-import { ImagePlus, Trash2 } from 'lucide-react';
+import { ArrowUpRight, Eraser, ImagePlus, PenLine, Trash2, Type, Undo2 } from 'lucide-react';
 import { typeClass } from '@/lib/type-scale';
-import { colaboracaoApi, fotoUrl, type ColaboracaoApi, type ComentarioLaminaDTO, type FotoLaminaDTO } from './api/colaboracao-api';
+import { colaboracaoApi, fotoUrl, type AnotacaoFotoDTO, type ColaboracaoApi, type ComentarioLaminaDTO, type CorAnotacao, type FotoLaminaDTO } from './api/colaboracao-api';
+import { CORES_ANOTACAO, FotoAnotada } from './FotoAnotada';
 import { ApiError, NetworkError, isUnauthorized } from './api/errors';
 import { formatarData, formatarHora } from './contagem-utils';
 import { Modal } from './SlideWidgets';
@@ -27,7 +28,54 @@ export function SlidePhotos({ laminaId, canEdit, api = colaboracaoApi }: { lamin
   const [enviando, setEnviando] = useState(false);
   const [aberta, setAberta] = useState<FotoLaminaDTO | null>(null);
   const [apagando, setApagando] = useState(false);
+  const [edicao, setEdicao] = useState<{ legenda: string; anotacoes: AnotacaoFotoDTO[] } | null>(null);
+  const [ferramenta, setFerramenta] = useState<'SETA' | 'TEXTO'>('SETA');
+  const [cor, setCor] = useState<CorAnotacao>('azul');
+  const [textoMarcacao, setTextoMarcacao] = useState('A');
+  const [salvando, setSalvando] = useState(false);
   const arquivoRef = useRef<HTMLInputElement>(null);
+
+  /** Próxima letra livre (A, B, C…) para o texto da marcação, como nas figuras de artigo. */
+  const proximaLetra = (anotacoes: AnotacaoFotoDTO[]) => String.fromCharCode(65 + Math.min(25, anotacoes.filter(item => item.tipo === 'TEXTO').length));
+
+  function abrir(foto: FotoLaminaDTO) {
+    setErro('');
+    setEdicao(null);
+    setAberta(foto);
+  }
+
+  function comecarEdicao(foto: FotoLaminaDTO) {
+    const anotacoes = foto.anotacoes ?? [];
+    setErro('');
+    setFerramenta('SETA');
+    setTextoMarcacao(proximaLetra(anotacoes));
+    setEdicao({ legenda: foto.legenda ?? '', anotacoes });
+  }
+
+  function adicionar(anotacao: AnotacaoFotoDTO) {
+    setEdicao(atual => {
+      if (!atual) return atual;
+      const anotacoes = [...atual.anotacoes, anotacao];
+      if (anotacao.tipo === 'TEXTO' && /^[A-Z]$/.test(anotacao.texto)) setTextoMarcacao(proximaLetra(anotacoes));
+      return { ...atual, anotacoes };
+    });
+  }
+
+  async function salvarEdicao() {
+    if (!aberta || !edicao || salvando) return;
+    setSalvando(true);
+    setErro('');
+    try {
+      const atualizada = await api.editarFoto(laminaId, aberta.id, edicao);
+      setFotos(atual => atual.map(item => item.id === atualizada.id ? atualizada : item));
+      setAberta(atualizada);
+      setEdicao(null);
+    } catch (error) {
+      if (!isUnauthorized(error)) setErro(mensagem(error, 'Não foi possível salvar as marcações. Tente de novo.'));
+    } finally {
+      setSalvando(false);
+    }
+  }
 
   useEffect(() => {
     const controller = new AbortController();
@@ -94,8 +142,8 @@ export function SlidePhotos({ laminaId, canEdit, api = colaboracaoApi }: { lamin
       : status === 'error' ? <p className="collab-empty" role="alert">Não foi possível carregar as fotos.</p>
       : fotos.length === 0 ? <p className="collab-empty">{canEdit ? 'Nenhuma foto ainda. Adicione fotos do microscópio para guardar junto com a contagem.' : 'Nenhuma foto nesta lâmina.'}</p>
       : <ul className="photo-grid" aria-label="Fotos da lâmina">{fotos.map(foto => <li key={foto.id}>
-          <button type="button" className="photo-thumb" onClick={() => setAberta(foto)} aria-label={`Abrir foto${foto.legenda ? `: ${foto.legenda}` : ''}`}>
-            <img src={fotoUrl(laminaId, foto.id)} alt="" loading="lazy" />
+          <button type="button" className="photo-thumb" onClick={() => abrir(foto)} aria-label={`Abrir foto${foto.legenda ? `: ${foto.legenda}` : ''}`}>
+            <FotoAnotada src={fotoUrl(laminaId, foto.id)} alt="" anotacoes={foto.anotacoes ?? []} modo="miniatura" />
           </button>
           {foto.legenda && <span className="photo-caption">{foto.legenda}</span>}
         </li>)}</ul>}
@@ -109,10 +157,37 @@ export function SlidePhotos({ laminaId, canEdit, api = colaboracaoApi }: { lamin
       </form>
     </Modal>}
 
-    {aberta && <Modal title={aberta.legenda || 'Foto da lâmina'} className="photo-dialog" onClose={() => setAberta(null)}>
-      <img className="photo-full" src={fotoUrl(laminaId, aberta.id)} alt={aberta.legenda || 'Foto da lâmina'} />
-      <p className="photo-meta">Enviada por {aberta.enviadaPorNome} em {quando(aberta.enviadaEm)}</p>
-      {canEdit && <div className="modal-actions"><button className="button danger" type="button" disabled={apagando} onClick={() => void apagar(aberta)}><Trash2 size={15} aria-hidden="true" /> {apagando ? 'Apagando…' : 'Apagar foto'}</button></div>}
+    {aberta && <Modal title={edicao ? 'Anotar foto' : aberta.legenda || 'Foto da lâmina'} className="photo-dialog" locked={salvando} onClose={() => { if (!salvando) { setAberta(null); setEdicao(null); } }}>
+      {edicao && <div className="annotate-toolbar" role="toolbar" aria-label="Ferramentas de marcação">
+        <div className="annotate-group" role="group" aria-label="Ferramenta">
+          <button type="button" aria-pressed={ferramenta === 'SETA'} onClick={() => setFerramenta('SETA')}><ArrowUpRight size={16} aria-hidden="true" /> Seta</button>
+          <button type="button" aria-pressed={ferramenta === 'TEXTO'} onClick={() => setFerramenta('TEXTO')}><Type size={16} aria-hidden="true" /> Texto</button>
+        </div>
+        {ferramenta === 'TEXTO' && <label className="annotate-text">Texto <input value={textoMarcacao} maxLength={80} onChange={event => setTextoMarcacao(event.target.value)} /></label>}
+        <div className="annotate-group annotate-colors" role="group" aria-label="Cor">
+          {CORES_ANOTACAO.map(item => <button key={item.id} type="button" className="annotate-swatch" aria-pressed={cor === item.id} aria-label={item.nome} title={item.nome} style={{ background: item.hex }} onClick={() => setCor(item.id)} />)}
+        </div>
+        <div className="annotate-group">
+          <button type="button" disabled={edicao.anotacoes.length === 0} onClick={() => setEdicao(atual => atual && { ...atual, anotacoes: atual.anotacoes.slice(0, -1) })}><Undo2 size={16} aria-hidden="true" /> Desfazer</button>
+          <button type="button" disabled={edicao.anotacoes.length === 0} onClick={() => { setEdicao(atual => atual && { ...atual, anotacoes: [] }); setTextoMarcacao('A'); }}><Eraser size={16} aria-hidden="true" /> Limpar</button>
+        </div>
+      </div>}
+      {edicao && <p className="annotate-hint">{ferramenta === 'SETA' ? 'Arraste na foto: a ponta da seta fica onde você soltar.' : 'Clique na foto onde o texto deve ficar.'}</p>}
+      <div className="photo-stage">
+        <FotoAnotada src={fotoUrl(laminaId, aberta.id)} alt={aberta.legenda || 'Foto da lâmina'} anotacoes={edicao ? edicao.anotacoes : aberta.anotacoes ?? []} modo="inteira"
+          editor={edicao ? { ferramenta, cor, texto: textoMarcacao, aoAdicionar: adicionar } : undefined} />
+      </div>
+      {edicao
+        ? <>
+            <label className="annotate-caption">Legenda <span>Opcional</span><input maxLength={200} value={edicao.legenda} onChange={event => setEdicao(atual => atual && { ...atual, legenda: event.target.value })} placeholder="Ex.: A e B mostram a parede celular" /></label>
+            {erro && <p className="select-error" role="alert">{erro}</p>}
+            <div className="modal-actions"><button className="button secondary" type="button" disabled={salvando} onClick={() => { setEdicao(null); setErro(''); }}>Cancelar</button><button className="button primary" type="button" disabled={salvando} onClick={() => void salvarEdicao()}>{salvando ? 'Salvando…' : 'Salvar marcações'}</button></div>
+          </>
+        : <>
+            <p className="photo-meta">Enviada por {aberta.enviadaPorNome} em {quando(aberta.enviadaEm)}</p>
+            {erro && <p className="select-error" role="alert">{erro}</p>}
+            {canEdit && <div className="modal-actions"><button className="button danger" type="button" disabled={apagando} onClick={() => void apagar(aberta)}><Trash2 size={15} aria-hidden="true" /> {apagando ? 'Apagando…' : 'Apagar foto'}</button><button className="button primary" type="button" onClick={() => comecarEdicao(aberta)}><PenLine size={15} aria-hidden="true" /> Anotar</button></div>}
+          </>}
     </Modal>}
   </section>;
 }

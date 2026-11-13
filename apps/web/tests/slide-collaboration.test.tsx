@@ -1,4 +1,4 @@
-import { render, screen, waitFor, within } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { SlideComments, SlidePhotos } from '../src/SlideCollaboration';
@@ -18,6 +18,7 @@ function apiFalsa() {
     listarFotos: vi.fn(async () => [FOTO]),
     enviarFoto: vi.fn(async (_lamina: string, _arquivo: File, legenda: string) => ({ ...FOTO, id: 'foto-2', legenda: legenda || null })),
     apagarFoto: vi.fn(async () => undefined),
+    editarFoto: vi.fn(async (_lamina: string, id: string, dados: { legenda: string; anotacoes: unknown[] }) => ({ ...FOTO, id, legenda: dados.legenda || null, anotacoes: dados.anotacoes })),
     listarComentarios: vi.fn(async () => [COMENTARIO]),
     comentar: vi.fn(async (_lamina: string, texto: string) => ({ ...COMENTARIO, id: 'c-2', autorUsuarioId: 12, autorNome: 'Ana Pesquisadora', texto })),
     apagarComentario: vi.fn(async () => undefined),
@@ -52,6 +53,44 @@ describe('fotos da lâmina', () => {
     await user.click(screen.getByRole('button', { name: /Apagar foto/ }));
     await waitFor(() => expect(within(galeria).getAllByRole('listitem')).toHaveLength(1));
     expect(api.apagarFoto).toHaveBeenCalledWith('lamina-1', 'foto-1');
+  });
+
+  it('anota a foto com seta e texto (A) e salva junto com a legenda', async () => {
+    const user = userEvent.setup();
+    render(<SlidePhotos laminaId="lamina-1" canEdit api={api as unknown as ColaboracaoApi} />);
+    await user.click(await screen.findByRole('button', { name: 'Abrir foto: Metáfase com ponte' }));
+    await user.click(screen.getByRole('button', { name: /Anotar/ }));
+
+    const imagem = screen.getByRole('img', { name: 'Metáfase com ponte' }) as HTMLImageElement;
+    Object.defineProperty(imagem, 'naturalWidth', { value: 800 });
+    Object.defineProperty(imagem, 'naturalHeight', { value: 600 });
+    fireEvent.load(imagem);
+    const area = await screen.findByRole('application');
+    area.getBoundingClientRect = () => ({ left: 0, top: 0, width: 400, height: 300, right: 400, bottom: 300, x: 0, y: 0, toJSON: () => ({}) });
+
+    fireEvent.pointerDown(area, { clientX: 40, clientY: 60, pointerId: 1 });
+    fireEvent.pointerMove(area, { clientX: 100, clientY: 30, pointerId: 1 });
+    fireEvent.pointerUp(area, { clientX: 120, clientY: 30, pointerId: 1 });
+
+    await user.click(screen.getByRole('button', { name: 'Texto' }));
+    expect((screen.getByRole('textbox', { name: 'Texto' }) as HTMLInputElement).value).toBe('A');
+    fireEvent.pointerDown(area, { clientX: 20, clientY: 75, pointerId: 2 });
+    expect((screen.getByRole('textbox', { name: 'Texto' }) as HTMLInputElement).value).toBe('B');
+
+    await user.clear(screen.getByRole('textbox', { name: /Legenda/ }));
+    await user.type(screen.getByRole('textbox', { name: /Legenda/ }), 'A mostra a parede');
+    await user.click(screen.getByRole('button', { name: 'Salvar marcações' }));
+
+    await waitFor(() => expect(api.editarFoto).toHaveBeenCalledTimes(1));
+    expect(api.editarFoto).toHaveBeenCalledWith('lamina-1', 'foto-1', {
+      legenda: 'A mostra a parede',
+      anotacoes: [
+        { tipo: 'SETA', x1: 0.1, y1: 0.2, x2: 0.3, y2: 0.1, cor: 'azul' },
+        { tipo: 'TEXTO', x1: 0.05, y1: 0.25, texto: 'A', cor: 'azul' },
+      ],
+    });
+    expect(await screen.findByRole('heading', { name: 'A mostra a parede' })).toBeTruthy();
+    expect(screen.queryByRole('application')).toBeNull();
   });
 
   it('quem só vê não tem botão de enviar nem de apagar, e arquivo errado é recusado antes de enviar', async () => {

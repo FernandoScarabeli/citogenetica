@@ -1,5 +1,6 @@
 package br.ufla.citogenetica.contagem;
 
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
@@ -32,6 +33,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -115,6 +117,42 @@ class ContagemFotosComentariosIntegrationTest extends AbstractContagemIntegratio
                 .andExpect(status().isNotFound());
     }
 
+    @Test
+    void donoAnotaAFotoDepoisDePublicarEOrientadorSoVe() throws Exception {
+        Cenario c = montarCenario();
+        UUID lamina = criarLamina(c.pesquisador(), c.laboratorio());
+        String foto = json(enviarFoto(sessao(c.pesquisador()), lamina, JPEG, null).andReturn()).path("id").asText();
+        Map<String, Object> seta = Map.of("tipo", "SETA", "x1", 0.2, "y1", 0.3, "x2", 0.35, "y2", 0.2, "cor", "azul");
+        Map<String, Object> texto = Map.of("tipo", "TEXTO", "x1", 0.15, "y1", 0.32, "texto", " A ", "cor", "azul");
+
+        editarFoto(sessao(c.pesquisador()), lamina, foto, Map.of("legenda", "Parede celular", "anotacoes", List.of(seta, texto)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.legenda").value("Parede celular"))
+                .andExpect(jsonPath("$.anotacoes.length()").value(2))
+                .andExpect(jsonPath("$.anotacoes[1].texto").value("A"));
+        requisicaoAutenticada(sessao(c.orientador()), get(LAMINAS + "/{id}/fotos", lamina))
+                .andExpect(jsonPath("$[0].anotacoes[0].tipo").value("SETA"))
+                .andExpect(jsonPath("$[0].anotacoes[0].x2").value(0.35));
+
+        editarFoto(sessao(c.orientador()), lamina, foto, Map.of("anotacoes", List.of()))
+                .andExpect(status().isForbidden());
+        editarFoto(sessao(c.pesquisador()), lamina, foto, Map.of("anotacoes",
+                List.of(Map.of("tipo", "SETA", "x1", 1.5, "y1", 0.3, "x2", 0.35, "y2", 0.2, "cor", "azul"))))
+                .andExpect(status().isUnprocessableEntity())
+                .andExpect(jsonPath("$.message").value("Marcação fora da foto."));
+        editarFoto(sessao(c.pesquisador()), lamina, foto, Map.of("anotacoes",
+                List.of(Map.of("tipo", "TEXTO", "x1", 0.5, "y1", 0.5, "texto", "  ", "cor", "azul"))))
+                .andExpect(status().isUnprocessableEntity());
+        editarFoto(sessao(c.pesquisador()), lamina, foto, Map.of("anotacoes",
+                List.of(Map.of("tipo", "SETA", "x1", 0.1, "y1", 0.1, "x2", 0.2, "y2", 0.2, "cor", "#ff00ff"))))
+                .andExpect(status().isUnprocessableEntity());
+
+        editarFoto(sessao(c.pesquisador()), lamina, foto, Map.of("anotacoes", List.of()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.legenda").doesNotExist())
+                .andExpect(jsonPath("$.anotacoes.length()").value(0));
+    }
+
     // ---------------------------------------------------------------- comentários
 
     @Test
@@ -178,6 +216,12 @@ class ContagemFotosComentariosIntegrationTest extends AbstractContagemIntegratio
             requisicao.param("legenda", legenda);
         }
         return requisicaoAutenticada(sessao, requisicao);
+    }
+
+    private ResultActions editarFoto(Cookie sessao, UUID lamina, String foto, Map<String, Object> corpo) throws Exception {
+        return requisicaoAutenticada(sessao, put(LAMINAS + "/{id}/fotos/{foto}", lamina, foto)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(corpo)));
     }
 
     private ResultActions comentar(Cookie sessao, UUID lamina, String texto) throws Exception {

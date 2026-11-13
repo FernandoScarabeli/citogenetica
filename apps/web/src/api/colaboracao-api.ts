@@ -1,5 +1,12 @@
 import { httpClient, type HttpClient } from './http-client.js';
 
+export type CorAnotacao = 'azul' | 'amarelo' | 'vermelho' | 'branco' | 'preto';
+
+/** Marcação sobre a foto; coordenadas de 0 a 1 relativas à imagem. Seta vai de (x1, y1) até a ponta (x2, y2). */
+export type AnotacaoFotoDTO =
+  | { tipo: 'SETA'; x1: number; y1: number; x2: number; y2: number; cor: CorAnotacao; texto?: null }
+  | { tipo: 'TEXTO'; x1: number; y1: number; texto: string; cor: CorAnotacao; x2?: null; y2?: null };
+
 export interface FotoLaminaDTO {
   id: string;
   legenda: string | null;
@@ -8,6 +15,7 @@ export interface FotoLaminaDTO {
   enviadaPorUsuarioId: number;
   enviadaPorNome: string;
   enviadaEm: string;
+  anotacoes?: AnotacaoFotoDTO[];
 }
 
 export interface ComentarioLaminaDTO {
@@ -34,6 +42,12 @@ export function createColaboracaoApi(client: Pick<HttpClient, 'request'> = httpC
       form.append('arquivo', arquivo);
       if (legenda.trim()) form.append('legenda', legenda.trim());
       return client.request<FotoLaminaDTO>(`${base(laminaId)}/fotos`, { method: 'POST', form });
+    },
+
+    editarFoto(laminaId: string, fotoId: string, dados: { legenda: string; anotacoes: AnotacaoFotoDTO[] }): Promise<FotoLaminaDTO> {
+      return client.request<FotoLaminaDTO>(`${base(laminaId)}/fotos/${encodeURIComponent(fotoId)}`, {
+        method: 'PUT', json: { legenda: dados.legenda.trim() || null, anotacoes: dados.anotacoes },
+      });
     },
 
     apagarFoto(laminaId: string, fotoId: string): Promise<void> {
