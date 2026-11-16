@@ -1,5 +1,5 @@
 # A tag acompanha o Node 26 definido em .nvmrc, com versão e Alpine fixos.
-FROM node:26.13.0-alpine3.24 AS build
+FROM node:26.13.1-alpine3.24 AS build
 WORKDIR /app
 
 COPY package.json package-lock.json ./
