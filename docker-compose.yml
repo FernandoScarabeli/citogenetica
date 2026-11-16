@@ -78,7 +78,7 @@ services:
       retries: 5
 
   rustfs:
-    image: rustfs/rustfs:1.0.4
+    image: rustfs/rustfs:1.0.5
     environment:
       RUSTFS_ACCESS_KEY: ${STORAGE_ACCESS_KEY:?Defina STORAGE_ACCESS_KEY no arquivo .env}
       RUSTFS_SECRET_KEY: ${STORAGE_SECRET_KEY:?Defina STORAGE_SECRET_KEY no arquivo .env}
@@ -98,7 +98,7 @@ services:
       retries: 5
 
   mailpit:
-    image: axllent/mailpit:v1.33.0
+    image: axllent/mailpit:v1.33.1
     ports:
       - "127.0.0.1:${MAILPIT_WEB_PORT:?Defina MAILPIT_WEB_PORT no arquivo .env}:8025"
     healthcheck:
