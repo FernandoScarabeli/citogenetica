@@ -1,5 +1,5 @@
 # A tag acompanha o Node 26 definido em .nvmrc, com versão e Alpine fixos.
-FROM node:26.13.0-alpine3.24 AS build
+FROM node:26.13.1-alpine3.24 AS build
 WORKDIR /app
 
 COPY package.json package-lock.json ./
@@ -9,7 +9,7 @@ COPY . .
 RUN npm run build
 
 # Imagem final contém apenas Nginx e os arquivos estáticos da aplicação.
-FROM nginx:1.31.8-alpine3.24 AS runtime
+FROM nginx:1.31.9-alpine3.24 AS runtime
 
 RUN rm -f /etc/nginx/conf.d/default.conf && \
     mkdir -p \
